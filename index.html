@@ -102,6 +102,18 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .provisional-note { font-size: 11px; color: var(--cream-dim); text-align: center; margin-top: 10px; }
 .dare-score-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 4px; }
 .auth-switch { display: flex; justify-content: space-between; margin-top: 12px; }
+.tabs-sub { display: flex; gap: 6px; margin-bottom: 4px; }
+.tabs-sub .tab { flex: 1; text-align: center; padding: 5px 8px; border-radius: 8px; font-size: 11px; cursor: pointer; border: 1px solid transparent; color: var(--cream-dim); opacity: 0.75; }
+.tabs-sub .tab.active { border-color: var(--line); color: var(--cream-dim); background: var(--ink-raised); opacity: 1; }
+.account-header { margin-bottom: 4px; }
+.account-username { font-size: 20px; color: var(--gold); }
+.section-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cream-dim); margin: 14px 0 8px; }
+.room-item-summary { text-align: right; font-size: 12px; color: var(--teal); font-weight: 600; white-space: nowrap; }
+.room-item-summary .sub { display: block; font-size: 10px; color: var(--cream-dim); font-weight: 400; margin-top: 2px; }
+.example-card { margin-top: 16px; padding: 14px; background: var(--ink-raised); border: 1px solid var(--gold-soft); border-radius: 12px; }
+.example-card .example-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.example-card .example-sentence { font-size: 16px; line-height: 1.5; color: var(--cream); }
+.custom-question-input.hidden { display: none; }
 </style>
 </head>
 <body>
@@ -143,7 +155,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <option>What was your first pet's name?</option>
       <option>What's your favorite subject?</option>
       <option>What city were you born in?</option>
+      <option value="__custom__">Write your own…</option>
     </select>
+    <input id="signup-question-custom" class="custom-question-input hidden" placeholder="Type your own security question" />
     <label for="signup-answer">Answer</label>
     <input id="signup-answer" />
     <div class="error-text hidden" id="signup-error"></div>
@@ -170,14 +184,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 
   <!-- HOME -->
   <section id="view-home" class="card hidden">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <h2 class="display">Your Rooms</h2>
+    <div class="account-header" style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 class="display account-username" id="account-username-display">Account</h2>
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
     <div id="streak-chip-holder"></div>
+    <div class="section-label">Game Rooms</div>
     <div id="rooms-list"></div>
     <div class="btn-row" style="margin-top:10px;">
-      <button class="btn-primary" id="btn-create-room">Create room</button>
+      <button class="btn-primary" id="btn-create-room">Create Game Room</button>
       <button class="btn-secondary" id="btn-join-room">Join with code</button>
     </div>
     <button class="btn-ghost" id="btn-enable-push" style="margin-top:10px;">Turn on notifications</button>
@@ -185,22 +200,22 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 
   <!-- CREATE ROOM -->
   <section id="view-create-room" class="card hidden">
-    <h2 class="display" style="margin-bottom:14px;">Name your room</h2>
-    <label for="create-room-name">Room name</label>
+    <h2 class="display" style="margin-bottom:14px;">Name your Game Room</h2>
+    <label for="create-room-name">Game room name</label>
     <input id="create-room-name" placeholder="e.g. Maximus's JC Friends" />
     <label>Who can invite people?</label>
     <div class="tabs" style="margin-bottom:14px;">
       <div class="tab active" data-open="true">Open (anyone)</div>
       <div class="tab" data-open="false">Closed (admins only)</div>
     </div>
-    <button class="btn-primary" id="btn-confirm-create-room">Create room</button>
+    <button class="btn-primary" id="btn-confirm-create-room">Create Game Room</button>
     <button class="link-btn" id="btn-back-from-create" style="margin-top:10px;">Back</button>
   </section>
 
   <!-- JOIN ROOM -->
   <section id="view-join-room" class="card hidden">
-    <h2 class="display" style="margin-bottom:14px;">Join a room</h2>
-    <label for="join-room-code">Room code</label>
+    <h2 class="display" style="margin-bottom:14px;">Join a Game Room</h2>
+    <label for="join-room-code">Game room code</label>
     <input id="join-room-code" placeholder="e.g. MW-7XQ2" />
     <div class="error-text hidden" id="join-error"></div>
     <button class="btn-primary" id="btn-confirm-join">Join</button>
@@ -216,28 +231,29 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <button class="btn-ghost" id="btn-invite-room" style="margin:12px 0;">Invite via WhatsApp</button>
 
     <div class="tabs">
-      <div class="tab active" data-panel="dares">Open Dares</div>
+      <div class="tab active" data-panel="dares" id="tab-challenges">Challenges</div>
       <div class="tab" data-panel="leaderboard">Leaderboard</div>
     </div>
 
     <div id="panel-dares">
       <div id="dares-list"></div>
       <div class="dare-sub" id="dare-cap-note" style="margin-top:6px;"></div>
-      <button class="btn-primary" id="btn-start-round" style="margin-top:10px;">Start a new round</button>
+      <button class="btn-primary" id="btn-start-round" style="margin-top:10px;">Start a game</button>
     </div>
 
     <div id="panel-leaderboard" class="hidden">
       <div id="rank-banner" class="rank-banner hidden"></div>
-      <div class="tabs">
+      <div class="tabs-sub">
         <div class="tab active" data-lb="room">This room</div>
         <div class="tab" data-lb="global">Global</div>
       </div>
-      <div class="tabs">
+      <div class="tabs-sub">
         <div class="tab active" data-period="monthly">This month</div>
         <div class="tab" data-period="alltime">All-time</div>
       </div>
       <div id="leaderboard-list"></div>
       <div class="provisional-note">Scores marked (provisional) need 3+ scored rounds to settle.</div>
+      <button class="btn-primary" id="btn-start-round-lb" style="margin-top:14px;">Start a game</button>
     </div>
   </section>
 
@@ -256,7 +272,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="advanced-word" id="game-word"></div>
     </div>
     <div class="options" id="game-options"></div>
-    <div class="reveal-sentence hidden" id="game-sentence"></div>
+    <div class="example-card hidden" id="game-sentence-card">
+      <div class="example-label">Example</div>
+      <div class="example-sentence" id="game-sentence"></div>
+    </div>
     <button class="btn-primary hidden" id="btn-next-word" style="margin-top:16px;">Next word</button>
   </section>
 
@@ -273,7 +292,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <button class="btn-primary" id="btn-share-whatsapp">Share to WhatsApp</button>
     </div>
     <div class="btn-row" style="margin-top:10px;">
-      <button class="btn-secondary" id="btn-dare-back">Dare back</button>
+      <button class="btn-secondary" id="btn-dare-back">Challenge back</button>
     </div>
     <div id="other-dares-holder" style="margin-top:14px;"></div>
     <button class="btn-ghost" id="btn-back-to-room" style="margin-top:10px;">Back to room</button>
@@ -345,14 +364,18 @@ $('link-goto-login').onclick = () => show('view-login');
 $('btn-back-from-forgot').onclick = () => show('view-login');
 $('btn-forgot-pin').onclick = () => show('view-forgot');
 
+$('signup-question').onchange = () => {
+  $('signup-question-custom').classList.toggle('hidden', $('signup-question').value !== '__custom__');
+};
+
 $('btn-signup').onclick = async () => {
   const username = $('signup-username').value.trim().toLowerCase();
   const pin = $('signup-pin').value.trim();
-  const question = $('signup-question').value;
+  const question = $('signup-question').value === '__custom__' ? $('signup-question-custom').value.trim() : $('signup-question').value;
   const answer = $('signup-answer').value.trim().toLowerCase();
   const err = $('signup-error');
   err.classList.add('hidden');
-  if (!username || !/^\d{4}$/.test(pin) || !answer) { err.textContent = 'Fill in a username, 4-digit PIN, and answer.'; err.classList.remove('hidden'); return; }
+  if (!username || !/^\d{4}$/.test(pin) || !question || !answer) { err.textContent = 'Fill in a username, 4-digit PIN, security question, and answer.'; err.classList.remove('hidden'); return; }
   const pin_hash = await sha256(pin + username);
   const security_answer_hash = await sha256(answer);
   const { error } = await sb.from('profiles').insert({ username, pin_hash, security_question: question, security_answer_hash });
@@ -404,6 +427,7 @@ $('btn-logout').onclick = () => { me = null; currentRoom = null; show('view-logi
 // HOME / ROOMS
 // ---------------------------------------------------------------
 async function afterLogin() {
+  $('account-username-display').textContent = me;
   await updateStreakOnOpen();
   await maybeAwardShowedUp();
   await loadRoomsList();
@@ -438,15 +462,27 @@ async function loadRoomsList() {
   const roomIds = (memberships || []).map(m => m.room_id);
   const list = $('rooms-list');
   list.innerHTML = '';
-  if (roomIds.length === 0) { list.innerHTML = '<div class="empty-state">No rooms yet — create one or join with a code.</div>'; return; }
+  if (roomIds.length === 0) { list.innerHTML = '<div class="empty-state">No Game Rooms yet — create one or join with a code.</div>'; return; }
   const { data: rooms } = await sb.from('rooms').select('*').in('id', roomIds);
   for (const room of rooms) {
     const div = document.createElement('div');
     div.className = 'room-item';
-    div.innerHTML = `<div><div class="room-name">${room.name}</div><div class="room-meta">${room.code} · ${room.is_open ? 'Open' : 'Closed'}</div></div>`;
+    div.innerHTML = `<div><div class="room-name">${room.name}</div><div class="room-meta">${room.code} · ${room.is_open ? 'Open' : 'Closed'}</div></div><div class="room-item-summary" id="room-summary-${room.id}">…</div>`;
     div.onclick = () => openRoom(room);
     list.appendChild(div);
+    loadRoomSummary(room.id);
   }
+}
+
+async function loadRoomSummary(roomId) {
+  const el = $(`room-summary-${roomId}`);
+  if (!el) return;
+  const { data: rows } = await sb.from('room_leaderboard_alltime').select('*').eq('room_id', roomId);
+  const mine = (rows || []).find(r => r.username === me);
+  if (!mine) { el.innerHTML = `<span class="sub">not ranked yet</span>`; return; }
+  const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
+  const rank = sorted.findIndex(r => r.username === me) + 1;
+  el.innerHTML = `${Math.round(mine.avg_score)} avg<span class="sub">rank #${rank}</span>`;
 }
 
 $('btn-create-room').onclick = () => show('view-create-room');
@@ -474,7 +510,7 @@ $('btn-confirm-join').onclick = async () => {
   const err = $('join-error');
   err.classList.add('hidden');
   const { data: room } = await sb.from('rooms').select('*').eq('code', code).maybeSingle();
-  if (!room) { err.textContent = 'No room found with that code.'; err.classList.remove('hidden'); return; }
+  if (!room) { err.textContent = 'No Game Room found with that code.'; err.classList.remove('hidden'); return; }
   await joinRoomRow(room);
   await loadRoomsList();
   openRoom(room);
@@ -528,6 +564,7 @@ function switchRoomPanel(panel) {
   if (panel === 'dares') loadDares();
   if (panel === 'leaderboard') loadLeaderboard();
 }
+$('btn-start-round-lb').onclick = () => startNewRound();
 
 document.querySelectorAll('[data-lb]').forEach(tab => {
   tab.onclick = () => { document.querySelectorAll('[data-lb]').forEach(t => t.classList.remove('active')); tab.classList.add('active'); lbScope = tab.dataset.lb; loadLeaderboard(); };
@@ -545,12 +582,14 @@ async function loadDares() {
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const open = (rounds || []).filter(r => !playedIds.has(r.id));
 
+  $('tab-challenges').textContent = open.length > 0 ? `Challenges (${open.length})` : 'Challenges';
+
   list.innerHTML = '';
-  if (open.length === 0) { list.innerHTML = '<div class="empty-state">No open dares right now. Start one!</div>'; }
+  if (open.length === 0) { list.innerHTML = '<div class="empty-state">No open challenges right now. Start one!</div>'; }
   for (const r of open) {
     const div = document.createElement('div');
     div.className = 'dare-card';
-    const label = r.target_username === me ? `${r.creator_username} dared YOU back` : `${r.creator_username}'s dare`;
+    const label = r.target_username === me ? `${r.creator_username} challenged YOU back` : `${r.creator_username}'s challenge`;
 
     const { data: creatorScore } = await sb.from('round_scores').select('correct_count, score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
     const scoreLine = creatorScore ? `<div class="dare-score-line">${creatorScore.score_points} pts (${creatorScore.correct_count}/${QUESTIONS_PER_ROUND}) — beat it?</div>` : '';
@@ -562,7 +601,7 @@ async function loadDares() {
     div.innerHTML = `<div class="dare-title">${label}</div>${scoreLine}<div class="dare-sub">${timeLeft(r.expires_at)} · ${r.status === 'locked' ? 'counts toward leaderboard' : 'first to accept locks it in'}</div>`;
     const btn = document.createElement('button');
     btn.className = 'btn-secondary';
-    btn.textContent = 'Play this dare';
+    btn.textContent = 'Play this challenge';
     btn.onclick = () => startRound(r);
     div.appendChild(btn);
 
@@ -588,14 +627,15 @@ async function loadDares() {
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const { count } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('room_id', currentRoom.id).eq('creator_username', me).gte('created_at', startOfDay.toISOString());
   const used = count || 0;
-  $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} dares in this room today.`;
+  $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} challenges in this Game Room today.`;
   $('btn-start-round').disabled = used >= MAX_OPEN_DARES_PER_DAY;
+  $('btn-start-round-lb').disabled = used >= MAX_OPEN_DARES_PER_DAY;
   $('btn-start-round').onclick = () => startNewRound();
 }
 
 $('btn-invite-room').onclick = () => {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-  const text = encodeURIComponent(`Join my MaxWord room "${currentRoom.name}" — ${url}`);
+  const text = encodeURIComponent(`Join my MaxWord Game Room "${currentRoom.name}" — ${url}`);
   window.open(`https://wa.me/?text=${text}`, '_blank');
 };
 
@@ -722,7 +762,7 @@ function renderQuestion() {
   $('progress-fill').style.width = `${(qIndex / roundWords.length) * 100}%`;
   $('game-category-label').textContent = catLabel(w.category);
   $('game-word').textContent = w.word;
-  $('game-sentence').classList.add('hidden');
+  $('game-sentence-card').classList.add('hidden');
   $('btn-next-word').classList.add('hidden');
 
   // Question = advanced word. Correct answer = its basic OR intermediate match (chosen at random).
@@ -757,7 +797,7 @@ function selectAnswer(chosen, w, btnEl, optDiv) {
     else if (b === btnEl) b.classList.add('wrong');
   });
   $('game-sentence').textContent = w.sentence;
-  $('game-sentence').classList.remove('hidden');
+  $('game-sentence-card').classList.remove('hidden');
   $('btn-next-word').classList.remove('hidden');
   $('btn-next-word').textContent = qIndex === roundWords.length - 1 ? 'See result' : 'Next word';
 }
@@ -817,12 +857,12 @@ function renderScorecard(correct, points, newBadges) {
 
   $('btn-share-whatsapp').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.id}`;
-    const text = encodeURIComponent(`I scored ${points} pts (${correct}/${roundWords.length}) on MaxWord in "${currentRoom.name}" — beat me: ${url}`);
+    const text = encodeURIComponent(`I scored ${points} pts (${correct}/${roundWords.length}) on MaxWord in "${currentRoom.name}" — challenge me back: ${url}`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
   $('btn-dare-back').onclick = async () => {
-    if (currentRound.creator_username === me) { alert('You started this one — invite someone else to accept it instead.'); return; }
+    if (currentRound.creator_username === me) { alert("This is your own challenge — tap 'Share to WhatsApp' above to invite someone to accept it."); return; }
     const wordIds = shuffle(WORDS).slice(0, QUESTIONS_PER_ROUND).map(w => w.id);
     const now = new Date();
     const { data: round, error } = await sb.from('rounds').insert({
@@ -830,7 +870,7 @@ function renderScorecard(correct, points, newBadges) {
       status: 'open', created_at: now.toISOString(), expires_at: new Date(now.getTime() + DARE_EXPIRY_MS).toISOString()
     }).select().single();
     if (error) { alert(error.message); return; }
-    alert(`Dare sent back to ${currentRound.creator_username}!`);
+    alert(`Challenge sent back to ${currentRound.creator_username}!`);
     startRound(round);
   };
 
@@ -848,12 +888,12 @@ async function renderOtherDares() {
   if (open.length === 0) return;
   const title = document.createElement('div');
   title.className = 'dare-sub';
-  title.textContent = `${open.length} more open dare${open.length > 1 ? 's' : ''} in this room:`;
+  title.textContent = `${open.length} more open challenge${open.length > 1 ? 's' : ''} in this Game Room:`;
   holder.appendChild(title);
   open.slice(0, 3).forEach(r => {
     const div = document.createElement('div');
     div.className = 'dare-card';
-    div.innerHTML = `<div class="dare-title">${r.creator_username}'s dare</div><div class="dare-sub">${timeLeft(r.expires_at)}</div>`;
+    div.innerHTML = `<div class="dare-title">${r.creator_username}'s challenge</div><div class="dare-sub">${timeLeft(r.expires_at)}</div>`;
     const btn = document.createElement('button');
     btn.className = 'btn-secondary';
     btn.textContent = 'Play it';
@@ -883,7 +923,7 @@ async function handleDeepLink() {
     if (room.is_open) {
       await joinRoomRow(room);
     } else {
-      alert(`"${room.name}" is a closed room — ask an admin to add you (@${room.creator_username}).`);
+      alert(`"${room.name}" is a closed Game Room — ask an admin to add you (@${room.creator_username}).`);
       return;
     }
   }

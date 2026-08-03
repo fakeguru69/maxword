@@ -534,7 +534,7 @@ $('btn-forgot-reset').onclick = async () => {
   show('view-login');
 };
 
-$('btn-logout').onclick = () => { me = null; currentRoom = null; localStorage.removeItem('mw_session_username'); show('view-login'); };
+$('btn-logout').onclick = () => { unsubscribeRoomRealtime(); me = null; currentRoom = null; localStorage.removeItem('mw_session_username'); show('view-login'); };
 
 // ---------------------------------------------------------------
 // HOME / ROOMS
@@ -553,9 +553,12 @@ async function afterLogin() {
   await checkRankReminder();
 }
 
-// One-time-each nudge, shown on login: fires once after the 1st game ("2 more to get
-// ranked") and once after the 2nd ("1 more") — never again after that, and never once
-// they've actually crossed MIN_GAMES_TO_RANK.
+// One-time-each nudge, shown the moment Home or a room is opened (login, resuming a
+// session, or returning from a finished round) — fires once after the 1st game
+// ("2 more to get ranked") and once after the 2nd ("1 more"), never again after that,
+// and never once they've actually crossed MIN_GAMES_TO_RANK. Only ONE primary action
+// button (smart-routed), plus a plain dismiss — not a menu of choices.
+let reminderAction = null;
 async function checkRankReminder() {
   const { data: mine } = await sb.from('global_leaderboard_alltime').select('rounds_played').eq('username', me).maybeSingle();
   const played = mine ? mine.rounds_played : 0;
@@ -565,11 +568,32 @@ async function checkRankReminder() {
   if (existing) return;
   await sb.from('reminders_shown').insert({ username: me, reminder_key: reminderKey });
   const remaining = MIN_GAMES_TO_RANK - played;
-  $('reminder-modal-text').textContent = `${remaining} more round${remaining > 1 ? 's' : ''} to get ranked!`;
+
+  // Find the single most useful thing for them to do next: a challenge already
+  // aimed at them (any room), if one exists — otherwise just start one here.
+  const now = new Date().toISOString();
+  const { data: targeted } = await sb.from('rounds').select('*, rooms!inner(*)').eq('target_username', me).gt('expires_at', now).order('created_at', { ascending: false });
+  let targetRound = null;
+  if (targeted && targeted.length > 0) {
+    const roundIds = targeted.map(r => r.id);
+    const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', roundIds);
+    const playedIds = new Set((myScores || []).map(s => s.round_id));
+    targetRound = targeted.find(r => !playedIds.has(r.id)) || null;
+  }
+
+  if (targetRound) {
+    $('reminder-modal-text').textContent = `${remaining} more round${remaining > 1 ? 's' : ''} to get ranked — ${displayName(targetRound.creator_username)} is waiting for you!`;
+    $('btn-reminder-play').textContent = 'Play it now';
+    reminderAction = async () => { await openRoom(targetRound.rooms); startRound(targetRound); };
+  } else {
+    $('reminder-modal-text').textContent = `${remaining} more round${remaining > 1 ? 's' : ''} to get ranked!`;
+    $('btn-reminder-play').textContent = 'Start a game';
+    reminderAction = () => show('view-home');
+  }
   $('reminder-modal').classList.remove('hidden');
 }
 $('btn-reminder-later').onclick = () => $('reminder-modal').classList.add('hidden');
-$('btn-reminder-play').onclick = () => { $('reminder-modal').classList.add('hidden'); show('view-home'); };
+$('btn-reminder-play').onclick = () => { $('reminder-modal').classList.add('hidden'); if (reminderAction) reminderAction(); };
 
 const BADGE_META = {
   showed_up: { emoji: '👋', label: 'Showed Up', req: 'Play your first round, ever.' },
@@ -810,6 +834,28 @@ async function openRoom(room) {
   switchRoomPanel('dares');
   await loadDares();
   await renderMemberLine();
+  await checkRankReminder();
+  subscribeRoomRealtime(room.id);
+}
+
+// Keeps the Challenges/Leaderboard tabs current while you're actually looking at them —
+// without this, a screen only reflects reality at the moment it was opened, and stays
+// stale until you navigate away and back, which is exactly what felt unreliable.
+let roomChannel = null;
+function subscribeRoomRealtime(roomId) {
+  unsubscribeRoomRealtime();
+  roomChannel = sb.channel(`room-${roomId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `room_id=eq.${roomId}` }, () => refreshActiveRoomPanel())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'round_scores' }, () => refreshActiveRoomPanel())
+    .subscribe();
+}
+function unsubscribeRoomRealtime() {
+  if (roomChannel) { sb.removeChannel(roomChannel); roomChannel = null; }
+}
+function refreshActiveRoomPanel() {
+  if (!currentRoom) return;
+  if (!$('panel-dares').classList.contains('hidden')) loadDares();
+  else if (!$('panel-leaderboard').classList.contains('hidden')) loadLeaderboard();
 }
 
 async function renderMemberLine() {
@@ -819,7 +865,7 @@ async function renderMemberLine() {
   $('link-manage-members').onclick = () => { show('view-members'); loadMembers(); };
 }
 
-$('btn-room-back').onclick = () => { currentRoom = null; show('view-home'); loadRoomsList(); };
+$('btn-room-back').onclick = () => { unsubscribeRoomRealtime(); currentRoom = null; show('view-home'); loadRoomsList(); };
 $('btn-members-back').onclick = () => show('view-room');
 
 document.querySelectorAll('#view-room > .tabs')[0].querySelectorAll('.tab').forEach(tab => {
@@ -1140,6 +1186,7 @@ function renderRankBanner(rows, bannerId, keyBase, period) {
 // ---------------------------------------------------------------
 async function openTargetPicker() {
   show('view-choose-target');
+  $('btn-target-anyone').disabled = false;
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id).neq('username', me);
   const list = $('target-member-list');
   list.innerHTML = '';
@@ -1147,16 +1194,20 @@ async function openTargetPicker() {
     list.innerHTML = '<div class="empty-state">No one else has joined this Game Room yet.</div>';
     return;
   }
+  const disableAllPickerButtons = () => {
+    $('btn-target-anyone').disabled = true;
+    list.querySelectorAll('button').forEach(b => b.disabled = true);
+  };
   members.forEach(m => {
     const btn = document.createElement('button');
     btn.className = 'btn-secondary';
     btn.style.marginBottom = '8px';
     btn.textContent = displayName(m.username);
-    btn.onclick = () => startNewRound(m.username);
+    btn.onclick = () => { disableAllPickerButtons(); startNewRound(m.username); };
     list.appendChild(btn);
   });
+  $('btn-target-anyone').onclick = () => { disableAllPickerButtons(); startNewRound(); };
 }
-$('btn-target-anyone').onclick = () => startNewRound();
 $('btn-choose-target-back').onclick = () => show('view-room');
 
 async function startNewRound(targetUsername) {

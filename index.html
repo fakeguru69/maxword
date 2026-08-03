@@ -387,6 +387,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
   </div>
 
+  <!-- ONBOARDING TIP MODAL — reused for every "first time ever" explainer -->
+  <div class="modal-overlay hidden" id="onboarding-modal">
+    <div class="card modal-card">
+      <h2 class="display" id="onboarding-modal-title" style="margin-bottom:10px;"></h2>
+      <p id="onboarding-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
+      <button class="btn-primary" id="btn-onboarding-ok">Got it</button>
+    </div>
+  </div>
+
   <!-- GAME VIEW -->
   <section id="view-game" class="card hidden">
     <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
@@ -440,8 +449,7 @@ const HARD_WORD_MIN_SAMPLE = 5;   // min times a word must've been answered befo
 const HARD_WORD_MAX_RATE = 0.5;   // correct_rate at/below this counts as "hard"
 const HARD_WORDS_PER_ROUND = 3;   // how many hard words to force into a round, when enough data exists
 const MAX_OPEN_DARES_PER_DAY = 10;
-const DARE_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000; // 14 days — endures long enough that a busy week doesn't cost someone their shot
-const TRIAL_URGENCY_WINDOW_MS = 24 * 60 * 60 * 1000; // only show the "expires soon" banner in the final 24h — scarcity without sacrificing endurance
+const DARE_EXPIRY_MS = 100 * 365 * 24 * 60 * 60 * 1000; // effectively permanent — a Trial's card, leaderboard, and championship status now persist indefinitely, so there's no expiry deadline to create urgency around anymore
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -622,6 +630,23 @@ async function afterLogin() {
 // and never once they've actually crossed MIN_GAMES_TO_RANK. Only ONE primary action
 // button (smart-routed), plus a plain dismiss — not a menu of choices.
 let reminderAction = null;
+
+// Reusable "explain this the very first time it happens, then get out of the way
+// forever" popup — server-tracked via reminders_shown, same pattern as the rank
+// reminders above. Pass a callback to run once the person dismisses it (or
+// immediately, if they've already seen this one before) so a flow that needs to
+// wait for acknowledgment (e.g. don't start the quiz until they've read the tip)
+// can do so safely either way.
+async function showOnboardingTipOnce(key, title, text, onDismiss) {
+  const { data: existing } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', key).maybeSingle();
+  if (existing) { if (onDismiss) onDismiss(); return; }
+  await sb.from('reminders_shown').insert({ username: me, reminder_key: key });
+  $('onboarding-modal-title').textContent = title;
+  $('onboarding-modal-text').textContent = text;
+  $('btn-onboarding-ok').onclick = () => { $('onboarding-modal').classList.add('hidden'); if (onDismiss) onDismiss(); };
+  $('onboarding-modal').classList.remove('hidden');
+}
+
 // The sharpest trigger in the whole app: since Trials are one-shot, losing the top
 // spot is permanent — you can never retake it. Checked on every Home/Room load,
 // each event marked notified so it's shown exactly once, ever.
@@ -636,6 +661,13 @@ async function checkDethronements() {
     text = `${displayName(e.dethroned_by_username)} just took Trial #${e.rounds.trial_number} from you.`;
   } else {
     text = `You've been dethroned on ${events.length} Trials — open your Game Rooms to see who got you.`;
+  }
+  // First dethronement ever gets a longer, one-time explainer tacked on — every
+  // one after this stays short, since by then the person already knows the rule.
+  const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
+  if (!seenBefore) {
+    await sb.from('reminders_shown').insert({ username: me, reminder_key: 'first_dethroned' });
+    text += ` Trials are one-shot, so you can't replay this one — but you can challenge them back with a fresh Trial.`;
   }
   $('dethroned-modal-text').textContent = text;
   $('dethroned-modal').classList.remove('hidden');
@@ -780,9 +812,13 @@ async function renderBadgeShowcase() {
 // Lifetime, ever-increasing count of Trials this person has won — only counts
 // SETTLED Trials (past expiry), so it never flickers as new players join in
 // and never shrinks even after being dethroned somewhere else.
+// Live, not permanent: how many Trials you currently hold the #1 spot on, right
+// now — same as everything else in the app (rank, throne), this can go up OR
+// down as other people play. A "settled/permanent" version doesn't make sense
+// anymore now that Trials don't expire — there'd never be a moment to settle at.
 async function renderChampionships() {
   const holder = $('championships-holder');
-  const { count } = await sb.from('settled_trial_champions').select('*', { count: 'exact', head: true }).eq('username', me);
+  const { count } = await sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', me).eq('rank', 1);
   holder.innerHTML = count ? `<div class="championships-line">🏆 ${count} Championship${count === 1 ? '' : 's'}</div>` : '';
 }
 
@@ -1010,53 +1046,39 @@ async function loadDares() {
   const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me);
   if (myToken !== daresLoadToken) return; // a newer loadDares() call has since started — abandon this one
   const playedIds = new Set((myScores || []).map(s => s.round_id));
-  // Never show your own created rounds here as playable — finished ones would already be
-  // excluded via playedIds, but an abandoned/unfinished one has no score yet and would
-  // otherwise slip through and let you "replay" your own challenge. The lightweight
-  // "N open challenges waiting" line above already covers your own open challenges.
-  const open = (rounds || []).filter(r => !playedIds.has(r.id) && r.creator_username !== me);
+  const all = rounds || [];
+  const unplayedCount = all.filter(r => !playedIds.has(r.id) && r.creator_username !== me).length;
 
-  $('tab-challenges').textContent = open.length > 0 ? `Trials (${open.length})` : 'Trials';
-
-  // Your own still-open challenges (already played by you as creator, so they never
-  // appear in the list above) — a lightweight status line rather than full cards.
-  const myOpen = (rounds || []).filter(r => r.creator_username === me && r.status === 'open');
-  const myOpenHolder = $('my-open-challenges');
-  myOpenHolder.innerHTML = '';
-  if (myOpen.length > 0) {
-    const row = document.createElement('div');
-    row.className = 'my-open-row';
-    const text = document.createElement('span');
-    text.textContent = `You have ${myOpen.length} open Trial${myOpen.length > 1 ? 's' : ''} waiting`;
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'share-icon-btn';
-    shareBtn.textContent = '🔗 Send';
-    shareBtn.title = 'Send challenge';
-    shareBtn.onclick = () => shareRound(myOpen[0]);
-    row.appendChild(text);
-    row.appendChild(shareBtn);
-    myOpenHolder.appendChild(row);
-  }
+  $('tab-challenges').textContent = unplayedCount > 0 ? `Trials (${unplayedCount})` : 'Trials';
+  $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
 
   if (myToken !== daresLoadToken) return;
   list.innerHTML = '';
-  if (open.length === 0) { list.innerHTML = '<div class="empty-state">No open Trials right now. Start one!</div>'; }
-  for (const r of open) {
+  if (all.length === 0) { list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; }
+  for (const r of all) {
     if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
+
+    const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', r.id).order('rank');
+    if (myToken !== daresLoadToken) return;
+    const rows = lb || [];
+    const myRow = rows.find(row => row.username === me);
+    const champ = rows[0] || null;
+
     const div = document.createElement('div');
     div.className = 'trial-card';
     div.onclick = () => openTrialScreen(r);
 
-    const tags = [];
-    tags.push(`<span class="trial-tag">started by ${displayName(r.creator_username)}</span>`);
-    if (r.target_username === me) tags.push(`<span class="trial-tag mine">${r.via_challenge_back ? 'reclaim this — you were beaten' : 'aimed at you'}</span>`);
+    const tags = [`<span class="trial-tag">started by ${displayName(r.creator_username)}</span>`];
+    let statusLine;
+    if (myRow) {
+      if (myRow.rank === 1) { tags.push(`<span class="trial-tag mine">👑 you hold the throne</span>`); statusLine = `${myRow.score_points} pts`; }
+      else { tags.push(`<span class="trial-tag mine">😤 #${myRow.rank} of ${rows.length}</span>`); statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts`; }
+    } else {
+      if (r.target_username === me) tags.push(`<span class="trial-tag mine">${r.via_challenge_back ? 'challenged you back' : 'aimed at you'}</span>`);
+      statusLine = champ ? `${champ.score_points} pts to beat` : 'nobody has played yet';
+    }
 
-    const { count: playCount } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('round_id', r.id);
-    if (myToken !== daresLoadToken) return;
-
-    div.innerHTML = `<div class="trial-card-number">📜 Trial #${r.trial_number}</div><div class="trial-tags">${tags.join('')}</div><div class="dare-sub">${timeLeft(r.expires_at)} · played by ${playCount || 0}</div>`;
-
-    if (myToken !== daresLoadToken) return;
+    div.innerHTML = `<div class="trial-card-number">📜 Trial #${r.trial_number}</div><div class="trial-tags">${tags.join('')}</div><div class="dare-sub">${statusLine} · played by ${rows.length}</div>`;
     list.appendChild(div);
   }
 
@@ -1080,29 +1102,30 @@ async function openTrialScreen(round) {
   currentTrialRound = round;
   show('view-trial');
   $('trial-number-display').textContent = round.trial_number;
-
-  const tags = [];
-  tags.push(`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`);
-  if (round.target_username === me) tags.push(`<span class="trial-tag mine">${round.via_challenge_back ? 'reclaim this — you were beaten' : 'aimed at you'}</span>`);
-  $('trial-tags').innerHTML = tags.join('');
-
-  // urgency — only in the final 24h, so the long expiry window still feels generous
-  const msLeft = new Date(round.expires_at) - new Date();
-  const urgencyHolder = $('trial-urgency-holder');
-  urgencyHolder.innerHTML = (msLeft > 0 && msLeft < TRIAL_URGENCY_WINDOW_MS)
-    ? `<div class="urgency-banner">⏳ Trial #${round.trial_number} expires in ${Math.max(1, Math.round(msLeft / (60 * 60 * 1000)))}h — take your shot!</div>` : '';
+  $('trial-urgency-holder').innerHTML = ''; // Trials are permanent now — nothing to count down
 
   const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', round.id).order('rank');
   const rows = lb || [];
+  const myRow = rows.find(row => row.username === me);
+  const iPlayed = !!myRow;
+
+  // Tags: duel-framing before you've played it (why should I tap in?), rank-framing
+  // after (am I still winning?) — same card, different question depending on state.
+  const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
+  if (!iPlayed && round.target_username === me) {
+    tags.push(`<span class="trial-tag mine">${round.via_challenge_back ? 'challenged you back' : 'aimed at you'}</span>`);
+  } else if (iPlayed) {
+    if (myRow.rank === 1) tags.push(`<span class="trial-tag mine">👑 you hold the throne</span>`);
+    else tags.push(`<span class="trial-tag mine">😤 #${myRow.rank} of ${rows.length}</span>`);
+  }
+  $('trial-tags').innerHTML = tags.join('');
 
   // champion banner
   const championHolder = $('trial-champion-holder');
-  if (rows.length > 0) {
-    const champ = rows[0];
-    championHolder.innerHTML = `<div class="champion-banner"><div class="crown">👑</div><div class="champ-name">${displayName(champ.username)}</div><div class="dare-sub">${champ.score_points} pts</div></div>`;
-  } else {
-    championHolder.innerHTML = '';
-  }
+  const champ = rows[0] || null;
+  championHolder.innerHTML = champ
+    ? `<div class="champion-banner"><div class="crown">👑</div><div class="champ-name">${displayName(champ.username)}</div><div class="dare-sub">${champ.score_points} pts</div></div>`
+    : '';
 
   // completionist line
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
@@ -1131,15 +1154,20 @@ async function openTrialScreen(round) {
     lbList.appendChild(div);
   });
 
-  // play / already-played state
-  const iPlayed = rows.some(row => row.username === me);
+  // play / status state — once you've played, there's nothing left to "play" here;
+  // if you're not on top, the same slot becomes a Challenge-them-back action instead
+  // of just silently disappearing, so the throne always has an obvious next move.
   const playBtn = $('btn-trial-play');
-  if (iPlayed) {
-    playBtn.classList.add('hidden');
-  } else {
+  if (!iPlayed) {
     playBtn.classList.remove('hidden');
-    playBtn.textContent = round.target_username === me && round.via_challenge_back ? `Reclaim Trial #${round.trial_number}` : 'Play this Trial';
+    playBtn.textContent = 'Play this Trial';
     playBtn.onclick = () => startRound(round);
+  } else if (myRow.rank !== 1) {
+    playBtn.classList.remove('hidden');
+    playBtn.textContent = `Challenge ${displayName(champ.username)} back`;
+    playBtn.onclick = () => startNewRound(champ.username, true);
+  } else {
+    playBtn.classList.add('hidden'); // you're already champion — nothing to challenge
   }
   $('btn-trial-send').onclick = () => shareRound(round);
 }
@@ -1421,6 +1449,18 @@ async function startRound(round) {
   roundWords = round.word_ids.map(id => wordById[id]).filter(Boolean);
   roundAnswers = [];
   qIndex = 0;
+
+  // Fires before the very first Trial this person has EVER played, however they
+  // got here — self-created, tapped from the list, a WhatsApp link, or a reminder.
+  // One check at the one chokepoint every path already funnels through, so a
+  // WhatsApp arrival gets the same explainer as anyone who tapped "Start a game."
+  const { count: everPlayed } = await sb.from('round_scores').select('id', { count: 'exact', head: true }).eq('username', me);
+  if (!everPlayed) {
+    await showOnboardingTipOnce('first_trial_ever', '📜 How Trials work',
+      `Each Trial is permanent and one-shot — you only get one attempt at it, ever, so make it count. Beat the current top score to become champion — but stay alert, since someone else can beat YOUR score later and take the throne back.`,
+      () => { show('view-game'); renderQuestion(); });
+    return;
+  }
   show('view-game');
   renderQuestion();
 }
@@ -1501,6 +1541,10 @@ async function finishRound() {
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
   await checkDethronements(); // catches anything that happened while you were mid-quiz and got skipped live
+  if (newBadges.length > 0) {
+    await showOnboardingTipOnce('first_badge_earned', '🏅 Your First Badge!',
+      `Badges are a running collection — check your Game Rooms page anytime to see all the ones you've earned.`);
+  }
 }
 
 // Fires exactly once, the moment someone crosses from "Unranked" into their first
@@ -1554,7 +1598,7 @@ async function renderScorecard(correct, points, newBadges) {
     if (creatorScore) {
       const theirs = creatorScore.score_points;
       if (points > theirs) { verdictEl.textContent = `🎉 You beat ${displayName(currentRound.creator_username)}'s ${theirs} by ${points - theirs}!`; iWon = true; }
-      else if (points < theirs) { verdictEl.textContent = `${displayName(currentRound.creator_username)}'s ${theirs} still stands — try again?`; iWon = false; }
+      else if (points < theirs) { verdictEl.textContent = `${displayName(currentRound.creator_username)}'s ${theirs} pts still stands.`; iWon = false; }
       else { verdictEl.textContent = `🤝 Tied with ${displayName(currentRound.creator_username)} at ${theirs}!`; iWon = false; }
       verdictEl.classList.remove('hidden');
     } else {
@@ -1569,25 +1613,19 @@ async function renderScorecard(correct, points, newBadges) {
     shareText(`I scored ${points} pts on MaxWord's "${currentRoom.name}" — think you can beat me? ${url}`);
   };
 
-  // No one to challenge back if this is your own round — hide the button entirely
-  // instead of showing it and blocking the tap with an alert.
+  // Challenge-back only exists when there's someone to challenge: hidden entirely on
+  // your own round (nothing to beat yet) AND on a win (nothing to avenge) — only
+  // shown, bold, when you've lost or tied. One consistent phrase everywhere this
+  // action appears: "Challenge [name] back."
   const dareBackBtn = $('btn-dare-back');
-  if (isOwnRound) {
+  if (isOwnRound || iWon === true) {
     dareBackBtn.classList.add('hidden');
     $('btn-challenge-others').className = 'btn-primary';
   } else {
     dareBackBtn.classList.remove('hidden');
-    // Weight whichever button matches the moment: just lost -> Challenge back is
-    // the obvious next move and gets the bold treatment; won or fresh -> sharing does.
-    if (iWon === false) {
-      dareBackBtn.className = 'btn-primary';
-      dareBackBtn.textContent = `Get ${displayName(currentRound.creator_username)} back`;
-      $('btn-challenge-others').className = 'btn-secondary';
-    } else {
-      dareBackBtn.className = 'btn-secondary';
-      dareBackBtn.textContent = 'Challenge back';
-      $('btn-challenge-others').className = 'btn-primary';
-    }
+    dareBackBtn.className = 'btn-primary';
+    dareBackBtn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
+    $('btn-challenge-others').className = 'btn-secondary';
   }
 
   dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(currentRound.creator_username, true); };

@@ -98,7 +98,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .member-line .manage-link { color: var(--teal); text-decoration: underline; cursor: pointer; }
 .rank-banner { font-size: 13px; padding: 10px 12px; border-radius: 10px; margin-bottom: 10px; background: rgba(79,182,168,0.1); border: 1px solid var(--teal-dim); color: var(--teal); }
 .rank-banner.down { background: rgba(192,85,74,0.1); border-color: #7A4A3A; color: #E08A6B; }
-.provisional-note { font-size: 11px; color: var(--cream-dim); text-align: center; margin-top: 10px; }
 .dare-score-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 4px; }
 .auth-switch { display: flex; justify-content: space-between; margin-top: 12px; }
 .account-header { margin-bottom: 4px; }
@@ -119,6 +118,11 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tabs-sub { display: flex; gap: 0; margin-bottom: 4px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; padding: 2px; background: var(--ink-raised); }
 .tabs-sub .tab { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; font-size: 12px; cursor: pointer; border: none; color: var(--cream-dim); opacity: 0.75; }
 .tabs-sub .tab.active { color: var(--teal); background: var(--ink-card); opacity: 1; }
+.rank-pill-strong { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); background: rgba(212,175,55,0.08); margin-top: 4px; }
+.global-rank-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); background: rgba(212,175,55,0.08); margin-bottom: 10px; }
+.badge-showcase { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.notif-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; margin-bottom: 12px; background: rgba(79,182,168,0.08); border: 1px solid var(--teal-dim); font-size: 13px; }
+.notif-banner button { width: auto; padding: 8px 14px; font-size: 13px; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -193,14 +197,17 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="account-line" id="account-username-display">Signed in</div>
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
+    <div id="global-rank-badge-holder"></div>
     <div id="streak-chip-holder"></div>
+    <div id="badge-showcase-holder"></div>
+    <div id="notif-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
     <div id="rooms-list"></div>
     <div class="btn-row" style="margin-top:10px;">
       <button class="btn-ghost" id="btn-create-room">Create Game Room</button>
       <button class="btn-ghost" id="btn-join-room">Join with code</button>
     </div>
-    <button class="btn-ghost" id="btn-enable-push" style="margin-top:10px;">Turn on notifications</button>
+    <button class="btn-ghost" id="btn-global-leaderboard" style="margin-top:10px;">🌍 Global Leaderboard</button>
   </section>
 
   <!-- CREATE ROOM -->
@@ -250,17 +257,26 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="panel-leaderboard" class="hidden">
       <div id="rank-banner" class="rank-banner hidden"></div>
       <div class="tabs-sub">
-        <div class="tab active" data-lb="room">This room</div>
-        <div class="tab" data-lb="global">Global</div>
-      </div>
-      <div class="tabs-sub">
-        <div class="tab active" data-period="monthly">This month</div>
-        <div class="tab" data-period="alltime">All-time</div>
+        <div class="tab" data-room-period="weekly">Week</div>
+        <div class="tab active" data-room-period="monthly">Month</div>
+        <div class="tab" data-room-period="alltime">All-time</div>
       </div>
       <div id="leaderboard-list"></div>
-      <div class="provisional-note">Scores marked (provisional) need 3+ scored rounds to settle.</div>
       <button class="btn-primary" id="btn-start-round-lb" style="margin-top:14px;">Start a game</button>
     </div>
+  </section>
+
+  <!-- GLOBAL LEADERBOARD (its own screen, not nested in a room) -->
+  <section id="view-global-leaderboard" class="card hidden">
+    <button class="link-btn breadcrumb" id="btn-global-lb-back">&larr; Game Rooms</button>
+    <h2 class="display" style="margin-bottom:14px;">Global Leaderboard</h2>
+    <div id="rank-banner-global" class="rank-banner hidden"></div>
+    <div class="tabs-sub">
+      <div class="tab" data-global-period="weekly">Week</div>
+      <div class="tab active" data-global-period="monthly">Month</div>
+      <div class="tab" data-global-period="alltime">All-time</div>
+    </div>
+    <div id="leaderboard-list-global"></div>
   </section>
 
   <!-- MEMBERS (separate screen, not a tab — kept out of the main loop) -->
@@ -390,8 +406,8 @@ let currentRound = null;    // { id, room_id, creator_username, target_username,
 let roundWords = [];        // resolved word objects
 let roundAnswers = [];      // booleans per question
 let qIndex = 0;
-let lbScope = 'room';       // 'room' | 'global'
-let lbPeriod = 'monthly';   // 'monthly' | 'alltime'
+let lbPeriod = 'monthly';         // in-room leaderboard: 'weekly' | 'monthly' | 'alltime'
+let globalLbPeriod = 'monthly';   // standalone Global Leaderboard screen: same options
 let deepLinkParams = null;
 
 // ---------------------------------------------------------------
@@ -472,8 +488,52 @@ async function afterLogin() {
   await maybeAwardShowedUp();
   await loadRoomsList();
   await renderStreakChip();
+  await renderGlobalRankBadge();
+  await renderBadgeShowcase();
+  renderNotifBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
+}
+
+const BADGE_META = {
+  showed_up: { emoji: '👋', label: 'Showed Up' },
+  streak_3: { emoji: '🔥', label: '3-Day Streak' },
+  streak_7: { emoji: '🔥', label: '7-Day Streak' },
+  streak_30: { emoji: '🔥', label: '30-Day Streak' },
+  flawless_scroll: { emoji: '🏆', label: 'Flawless Scroll' },
+};
+
+async function renderGlobalRankBadge() {
+  const holder = $('global-rank-badge-holder');
+  holder.innerHTML = '';
+  const { data: rows } = await sb.from('global_leaderboard_alltime').select('*');
+  const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
+  const myIndex = sorted.findIndex(r => r.username === me);
+  if (myIndex === -1) return;
+  const rank = myIndex + 1;
+  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+  const pill = document.createElement('div');
+  pill.className = 'global-rank-pill';
+  pill.textContent = medal ? `${medal} Global #${rank}` : `🌍 Global #${rank}`;
+  holder.appendChild(pill);
+}
+
+async function renderBadgeShowcase() {
+  const holder = $('badge-showcase-holder');
+  holder.innerHTML = '';
+  const { data: rows } = await sb.from('badges').select('badge_key').eq('username', me);
+  const uniqueKeys = [...new Set((rows || []).map(r => r.badge_key))];
+  if (uniqueKeys.length === 0) return;
+  const row = document.createElement('div');
+  row.className = 'badge-showcase';
+  uniqueKeys.forEach(key => {
+    const meta = BADGE_META[key] || { emoji: '🏅', label: key };
+    const chip = document.createElement('span');
+    chip.className = 'badge-chip';
+    chip.textContent = `${meta.emoji} ${meta.label}`;
+    row.appendChild(chip);
+  });
+  holder.appendChild(row);
 }
 
 async function renderStreakChip() {
@@ -522,7 +582,8 @@ async function loadRoomSummary(roomId) {
   if (!mine) { el.innerHTML = `<span class="sub">not ranked yet</span>`; return; }
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const rank = sorted.findIndex(r => r.username === me) + 1;
-  el.innerHTML = `${Math.round(mine.avg_score)} avg<span class="sub">rank #${rank}</span>`;
+  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+  el.innerHTML = `${Math.round(mine.avg_score)} avg<span class="rank-pill-strong">${medal || '#' + rank}</span>`;
 }
 
 $('btn-create-room').onclick = () => show('view-create-room');
@@ -561,16 +622,33 @@ async function joinRoomRow(room) {
   if (!existing) await sb.from('room_members').insert({ room_id: room.id, username: me, role: 'member' });
 }
 
-$('btn-enable-push').onclick = async () => {
+async function enablePush() {
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { alert('Notifications permission denied.'); return; }
+    if (perm !== 'granted') { renderNotifBanner(); return; }
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: VAPID_PUBLIC_KEY });
     await sb.from('push_subscriptions').upsert({ username: me, endpoint: sub.endpoint, subscription: sub.toJSON() });
-    alert('Notifications are on. (Sending is wired up server-side separately — see README.)');
   } catch (e) { alert('Could not enable notifications: ' + e.message); }
-};
+  renderNotifBanner();
+}
+
+// Shown until the person has answered the permission prompt (granted or denied) —
+// disappears either way so it doesn't nag once they've made a choice.
+function renderNotifBanner() {
+  const holder = $('notif-banner-holder');
+  holder.innerHTML = '';
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  const banner = document.createElement('div');
+  banner.className = 'notif-banner';
+  banner.innerHTML = `<span>🔔 Turn on notifications so you never miss a challenge (max a few pings a day, never a flood).</span>`;
+  const btn = document.createElement('button');
+  btn.className = 'btn-primary';
+  btn.textContent = 'Enable';
+  btn.onclick = enablePush;
+  banner.appendChild(btn);
+  holder.appendChild(banner);
+}
 
 // ---------------------------------------------------------------
 // ROOM VIEW
@@ -606,19 +684,24 @@ function switchRoomPanel(panel) {
 }
 $('btn-start-round-lb').onclick = () => startNewRound();
 
-document.querySelectorAll('[data-lb]').forEach(tab => {
-  tab.onclick = () => { document.querySelectorAll('[data-lb]').forEach(t => t.classList.remove('active')); tab.classList.add('active'); lbScope = tab.dataset.lb; loadLeaderboard(); };
+document.querySelectorAll('[data-room-period]').forEach(tab => {
+  tab.onclick = () => { document.querySelectorAll('[data-room-period]').forEach(t => t.classList.remove('active')); tab.classList.add('active'); lbPeriod = tab.dataset.roomPeriod; loadLeaderboard(); };
 });
-document.querySelectorAll('[data-period]').forEach(tab => {
-  tab.onclick = () => { document.querySelectorAll('[data-period]').forEach(t => t.classList.remove('active')); tab.classList.add('active'); lbPeriod = tab.dataset.period; loadLeaderboard(); };
+document.querySelectorAll('[data-global-period]').forEach(tab => {
+  tab.onclick = () => { document.querySelectorAll('[data-global-period]').forEach(t => t.classList.remove('active')); tab.classList.add('active'); globalLbPeriod = tab.dataset.globalPeriod; loadGlobalLeaderboard(); };
 });
+$('btn-global-leaderboard').onclick = () => { show('view-global-leaderboard'); loadGlobalLeaderboard(); };
+$('btn-global-lb-back').onclick = () => show('view-home');
 
+let daresLoadToken = 0;
 async function loadDares() {
+  const myToken = ++daresLoadToken;
   const list = $('dares-list');
   list.innerHTML = '<div class="empty-state">Loading…</div>';
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*').eq('room_id', currentRoom.id).gt('expires_at', now).order('created_at', { ascending: false });
   const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me);
+  if (myToken !== daresLoadToken) return; // a newer loadDares() call has since started — abandon this one
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const open = (rounds || []).filter(r => !playedIds.has(r.id));
 
@@ -644,9 +727,11 @@ async function loadDares() {
     myOpenHolder.appendChild(row);
   }
 
+  if (myToken !== daresLoadToken) return;
   list.innerHTML = '';
   if (open.length === 0) { list.innerHTML = '<div class="empty-state">No open challenges right now. Start one!</div>'; }
   for (const r of open) {
+    if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
     const div = document.createElement('div');
     div.className = 'dare-card';
     const label = r.target_username === me ? `${r.creator_username} challenged YOU back` : `${r.creator_username}'s challenge`;
@@ -659,6 +744,7 @@ async function loadDares() {
     const { data: reax } = await sb.from('reactions').select('from_username').eq('round_id', r.id).eq('target_username', r.creator_username);
     const reaxCount = (reax || []).length;
     const iReacted = (reax || []).some(x => x.from_username === me);
+    if (myToken !== daresLoadToken) return;
 
     div.innerHTML = `<div class="dare-title">${label}</div>${scoreLine}<div class="dare-sub">${timeLeft(r.expires_at)} · played by ${playCount || 0}</div>`;
 
@@ -692,6 +778,7 @@ async function loadDares() {
       div.appendChild(reactRow);
     }
 
+    if (myToken !== daresLoadToken) return;
     list.appendChild(div);
   }
 
@@ -737,27 +824,41 @@ async function loadMembers() {
 }
 
 async function loadLeaderboard() {
-  const list = $('leaderboard-list');
+  await renderLeaderboard({ scope: 'room', roomId: currentRoom.id, period: lbPeriod, listId: 'leaderboard-list', bannerId: 'rank-banner', keyBase: `mw_rank_room_${currentRoom.id}` });
+}
+
+async function loadGlobalLeaderboard() {
+  await renderLeaderboard({ scope: 'global', roomId: null, period: globalLbPeriod, listId: 'leaderboard-list-global', bannerId: 'rank-banner-global', keyBase: 'mw_rank_global' });
+}
+
+async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyBase }) {
+  const list = $(listId);
   list.innerHTML = '<div class="empty-state">Loading…</div>';
 
-  const view = lbScope === 'room'
-    ? (lbPeriod === 'monthly' ? 'room_leaderboard_monthly' : 'room_leaderboard_alltime')
-    : (lbPeriod === 'monthly' ? 'global_leaderboard_monthly' : 'global_leaderboard_alltime');
+  const view = scope === 'room'
+    ? (period === 'weekly' ? 'room_leaderboard_weekly' : period === 'monthly' ? 'room_leaderboard_monthly' : 'room_leaderboard_alltime')
+    : (period === 'weekly' ? 'global_leaderboard_weekly' : period === 'monthly' ? 'global_leaderboard_monthly' : 'global_leaderboard_alltime');
 
-  // Monthly views bucket by date_trunc('month', played_at) — fetch all rows for scope and filter client-side to current month for robustness across timezones.
-  let { data: rows, error } = await sb.from(view).select('*').match(lbScope === 'room' ? { room_id: currentRoom.id } : {});
+  let { data: rows, error } = await sb.from(view).select('*').match(scope === 'room' ? { room_id: roomId } : {});
   if (error) { list.innerHTML = `<div class="empty-state">${error.message}</div>`; return; }
-  if (lbPeriod === 'monthly') {
+
+  if (period === 'monthly') {
     const now = new Date();
     rows = (rows || []).filter(r => { const m = new Date(r.month); return m.getUTCFullYear() === now.getUTCFullYear() && m.getUTCMonth() === now.getUTCMonth(); });
+  } else if (period === 'weekly') {
+    // date_trunc('week', ...) buckets by ISO week (Monday start) — match against this week's Monday.
+    const now = new Date();
+    const dayIdx = (now.getUTCDay() + 6) % 7; // 0 = Monday
+    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - dayIdx));
+    rows = (rows || []).filter(r => Math.abs(new Date(r.week) - monday) < 86400000);
   }
   rows = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
 
-  // decaying "defending champion" marker: last month's #1 in this scope, opacity fades across the current month
+  // decaying "defending champion" marker — only meaningful for the monthly view
   let defendingChamp = null;
-  if (lbPeriod === 'monthly') {
+  if (period === 'monthly') {
     const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1);
-    let { data: lastRows } = await sb.from(view).select('*').match(lbScope === 'room' ? { room_id: currentRoom.id } : {});
+    let { data: lastRows } = await sb.from(view).select('*').match(scope === 'room' ? { room_id: roomId } : {});
     lastRows = (lastRows || []).filter(r => { const m = new Date(r.month); return m.getUTCFullYear() === lastMonth.getUTCFullYear() && m.getUTCMonth() === lastMonth.getUTCMonth(); }).sort((a, b) => b.avg_score - a.avg_score);
     if (lastRows.length) defendingChamp = lastRows[0].username;
   }
@@ -765,27 +866,27 @@ async function loadLeaderboard() {
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const decay = Math.max(0.15, 1 - (dayOfMonth / daysInMonth));
 
-  renderRankBanner(rows);
+  renderRankBanner(rows, bannerId, keyBase, period);
 
   list.innerHTML = '';
-  if (rows.length === 0) { list.innerHTML = '<div class="empty-state">No scored rounds yet — a round only counts once a second person plays it.</div>'; return; }
+  if (rows.length === 0) { list.innerHTML = '<div class="empty-state">No scored rounds yet.</div>'; return; }
   rows.forEach((r, i) => {
     const div = document.createElement('div');
     div.className = 'lb-row' + (r.username === me ? ' me' : '');
     const champTag = i === 0 ? `<span class="champion-tag">👑 champion</span>` : (r.username === defendingChamp ? `<span class="champion-tag defending" style="--decay:${decay}">🛡️ defending champ</span>` : '');
-    const provisional = r.rounds_played < 3 ? '<span class="lb-sub">(provisional)</span>' : '';
-    div.innerHTML = `<div class="lb-rank">${i + 1}</div><div class="lb-name">${r.username} ${champTag} ${provisional}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
+    const rankDisplay = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+    div.innerHTML = `<div class="lb-rank">${rankDisplay}</div><div class="lb-name">${r.username} ${champTag}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
     list.appendChild(div);
   });
 }
 
 // Rank-movement banner: shows what changed since the last time THIS user
 // viewed THIS scope/period, instead of just a static "you are #3" number.
-function renderRankBanner(rows) {
-  const banner = $('rank-banner');
+function renderRankBanner(rows, bannerId, keyBase, period) {
+  const banner = $(bannerId);
   const myIndex = rows.findIndex(r => r.username === me);
   const myRank = myIndex === -1 ? null : myIndex + 1;
-  const key = `mw_rank_${currentRoom.id}_${lbScope}_${lbPeriod}`;
+  const key = `${keyBase}_${period}`;
   const prevRank = localStorage.getItem(key) ? parseInt(localStorage.getItem(key), 10) : null;
 
   banner.classList.add('hidden');

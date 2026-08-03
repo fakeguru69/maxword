@@ -84,6 +84,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .scorecard { text-align: center; padding: 28px 16px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--gold); }
 .scorecard .grid-emoji { font-size: 20px; letter-spacing: 4px; margin: 14px 0; }
+.scorecard .score-comment { font-size: 14px; color: var(--cream-dim); font-style: italic; margin-bottom: 16px; }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 12px; color: var(--cream-dim); text-align: center; }
@@ -108,10 +109,12 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .example-card .example-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
 .example-card .example-sentence { font-size: 16px; line-height: 1.5; color: var(--cream); }
 .custom-question-input.hidden { display: none; }
-.share-icon-btn { width: auto; flex: 0 0 auto; padding: 10px 14px; font-size: 16px; background: var(--ink-raised); border: 1px solid var(--line); color: var(--cream); }
+.share-icon-btn { background: transparent; color: var(--cream-dim); border: 1px solid var(--line); font-size: 14px; }
+.my-open-row .share-icon-btn { width: auto; flex: 0 0 auto; padding: 8px 12px; }
 .my-open-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 10px; border: 1px dashed var(--gold-soft); border-radius: 10px; font-size: 13px; color: var(--gold); background: rgba(212,175,55,0.05); }
 .section-label.strong { font-size: 16px; letter-spacing: 0.02em; text-transform: none; color: var(--cream); font-family: 'Cinzel', serif; margin: 16px 0 10px; }
-.account-line { font-size: 13px; color: var(--cream-dim); }
+.account-name-line { font-size: 22px; font-weight: 700; font-family: 'Cinzel', serif; color: var(--gold); }
+.tier-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--teal-dim); color: var(--teal); background: rgba(79,182,168,0.08); margin: 6px 8px 10px 0; }
 .room-item { padding: 18px 16px; }
 .room-item .room-name { font-size: 18px; font-family: 'Cinzel', serif; color: var(--gold); }
 .room-item .room-meta { margin-top: 3px; }
@@ -194,10 +197,13 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <!-- HOME -->
   <section id="view-home" class="card hidden">
     <div class="account-header" style="display:flex; justify-content:space-between; align-items:center;">
-      <div class="account-line" id="account-username-display">Signed in</div>
-      <button class="link-btn" id="btn-logout">Log out</button>
+      <div class="account-name-line" id="account-username-display">Signed in</div>
+      <div style="display:flex; gap:14px; align-items:center;">
+        <button class="link-btn" id="btn-global-leaderboard">🌍 Global Leaderboard</button>
+        <button class="link-btn" id="btn-logout">Log out</button>
+      </div>
     </div>
-    <div id="global-rank-badge-holder"></div>
+    <div id="tier-rank-holder"></div>
     <div id="streak-chip-holder"></div>
     <div id="badge-showcase-holder"></div>
     <div id="notif-banner-holder"></div>
@@ -207,8 +213,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <button class="btn-ghost" id="btn-create-room">Create Game Room</button>
       <button class="btn-ghost" id="btn-join-room">Join with code</button>
     </div>
-    <button class="btn-ghost" id="btn-global-leaderboard" style="margin-top:10px;">🌍 Global Leaderboard</button>
   </section>
+
 
   <!-- CREATE ROOM -->
   <section id="view-create-room" class="card hidden">
@@ -307,6 +313,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="cat-eyebrow">MaxWord result</div>
       <div class="big-score" id="score-big"></div>
       <div class="grid-emoji" id="score-grid"></div>
+      <div class="score-comment" id="score-comment"></div>
       <div id="score-badges"></div>
     </div>
     <div class="btn-row" style="margin-top:10px;">
@@ -483,12 +490,12 @@ $('btn-logout').onclick = () => { me = null; currentRoom = null; localStorage.re
 // HOME / ROOMS
 // ---------------------------------------------------------------
 async function afterLogin() {
-  $('account-username-display').textContent = `Signed in as ${me}`;
+  $('account-username-display').textContent = me;
   await updateStreakOnOpen();
   await maybeAwardShowedUp();
   await loadRoomsList();
   await renderStreakChip();
-  await renderGlobalRankBadge();
+  await renderTierAndRank();
   await renderBadgeShowcase();
   renderNotifBanner();
   show('view-home');
@@ -503,19 +510,49 @@ const BADGE_META = {
   flawless_scroll: { emoji: '🏆', label: 'Flawless Scroll' },
 };
 
-async function renderGlobalRankBadge() {
-  const holder = $('global-rank-badge-holder');
+// Tier reflects skill (global all-time average), separate from streak (consistency).
+// Gated behind a minimum sample size so one lucky round can't buy "Grandmaster."
+const TIER_MIN_GAMES = 5;
+const TIER_BANDS = [
+  { min: 900, name: 'Grandmaster' },
+  { min: 700, name: 'Sage' },
+  { min: 500, name: 'Scholar' },
+  { min: 300, name: 'Wordsmith' },
+  { min: 0, name: 'Novice' },
+];
+function tierForScore(avgScore) { return TIER_BANDS.find(t => avgScore >= t.min).name; }
+
+const SCORE_COMMENTS = [
+  { min: 900, lines: ['Flawless run — Grandmaster form!', 'Certified word wizard.', 'The GP examiners are shaking.'] },
+  { min: 700, lines: ['Sharp. Keep it up!', "That's a distinction-grade round.", "Vocabulary's clearly your comfort zone."] },
+  { min: 500, lines: ['Solid — a few more reps and you\'ll cruise.', 'Respectable. Room to grow.', 'Halfway to fluent-flex status.'] },
+  { min: 300, lines: ['Getting there — review the ones you missed.', "A few gaps, nothing a rerun won't fix.", 'The dictionary called, it misses you.'] },
+  { min: 0, lines: ['Rough round — happens to everyone!', 'Even Sages have off days.', 'Time for a rematch — you know the words are winnable.'] },
+];
+function commentForScore(points) {
+  const band = SCORE_COMMENTS.find(b => points >= b.min);
+  return band.lines[Math.floor(Math.random() * band.lines.length)];
+}
+
+async function renderTierAndRank() {
+  const holder = $('tier-rank-holder');
   holder.innerHTML = '';
   const { data: rows } = await sb.from('global_leaderboard_alltime').select('*');
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
+  const mine = sorted.find(r => r.username === me);
   const myIndex = sorted.findIndex(r => r.username === me);
-  if (myIndex === -1) return;
-  const rank = myIndex + 1;
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
-  const pill = document.createElement('div');
-  pill.className = 'global-rank-pill';
-  pill.textContent = medal ? `${medal} Global #${rank}` : `🌍 Global #${rank}`;
-  holder.appendChild(pill);
+
+  const tierPill = document.createElement('span');
+  tierPill.className = 'tier-pill';
+  tierPill.textContent = (mine && mine.rounds_played >= TIER_MIN_GAMES) ? `🏅 ${tierForScore(mine.avg_score)}` : '🏅 Unranked';
+  holder.appendChild(tierPill);
+
+  if (myIndex !== -1) {
+    const rankPill = document.createElement('span');
+    rankPill.className = 'global-rank-pill';
+    rankPill.textContent = `🌍 Global #${myIndex + 1}`;
+    holder.appendChild(rankPill);
+  }
 }
 
 async function renderBadgeShowcase() {
@@ -582,8 +619,7 @@ async function loadRoomSummary(roomId) {
   if (!mine) { el.innerHTML = `<span class="sub">not ranked yet</span>`; return; }
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const rank = sorted.findIndex(r => r.username === me) + 1;
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
-  el.innerHTML = `${Math.round(mine.avg_score)} avg<span class="rank-pill-strong">${medal || '#' + rank}</span>`;
+  el.innerHTML = `${Math.round(mine.avg_score)} avg<span class="rank-pill-strong">#${rank}</span>`;
 }
 
 $('btn-create-room').onclick = () => show('view-create-room');
@@ -641,7 +677,7 @@ function renderNotifBanner() {
   if (!('Notification' in window) || Notification.permission !== 'default') return;
   const banner = document.createElement('div');
   banner.className = 'notif-banner';
-  banner.innerHTML = `<span>🔔 Turn on notifications so you never miss a challenge (max a few pings a day, never a flood).</span>`;
+  banner.innerHTML = `<span>🔔 Don't miss a challenge — turn on notifications</span>`;
   const btn = document.createElement('button');
   btn.className = 'btn-primary';
   btn.textContent = 'Enable';
@@ -719,8 +755,8 @@ async function loadDares() {
     text.textContent = `You have ${myOpen.length} open challenge${myOpen.length > 1 ? 's' : ''} waiting`;
     const shareBtn = document.createElement('button');
     shareBtn.className = 'share-icon-btn';
-    shareBtn.textContent = '🔗';
-    shareBtn.title = 'Share your challenge';
+    shareBtn.textContent = '🔗 Send';
+    shareBtn.title = 'Send challenge';
     shareBtn.onclick = () => shareRound(myOpen[0]);
     row.appendChild(text);
     row.appendChild(shareBtn);
@@ -756,8 +792,8 @@ async function loadDares() {
     btn.onclick = () => startRound(r);
     const shareBtn = document.createElement('button');
     shareBtn.className = 'share-icon-btn';
-    shareBtn.textContent = '🔗';
-    shareBtn.title = 'Share this challenge';
+    shareBtn.textContent = '🔗 Send challenge';
+    shareBtn.title = 'Send challenge';
     shareBtn.onclick = () => shareRound(r);
     btnRow.appendChild(btn);
     btnRow.appendChild(shareBtn);
@@ -874,7 +910,7 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
     const div = document.createElement('div');
     div.className = 'lb-row' + (r.username === me ? ' me' : '');
     const champTag = i === 0 ? `<span class="champion-tag">👑 champion</span>` : (r.username === defendingChamp ? `<span class="champion-tag defending" style="--decay:${decay}">🛡️ defending champ</span>` : '');
-    const rankDisplay = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+    const rankDisplay = i + 1;
     div.innerHTML = `<div class="lb-rank">${rankDisplay}</div><div class="lb-name">${r.username} ${champTag}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
     list.appendChild(div);
   });
@@ -1027,6 +1063,7 @@ async function maybeAwardBadges(correct) {
 function renderScorecard(correct, points, newBadges) {
   $('score-big').textContent = `${points} pts`;
   $('score-grid').textContent = roundAnswers.map(a => a ? '🟩' : '⬛').join('');
+  $('score-comment').textContent = commentForScore(points);
   const badgeDiv = $('score-badges');
   badgeDiv.innerHTML = '';
   newBadges.forEach(b => { const chip = document.createElement('span'); chip.className = 'badge-chip'; chip.textContent = b; badgeDiv.appendChild(chip); });

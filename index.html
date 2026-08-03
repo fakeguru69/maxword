@@ -87,11 +87,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .scorecard .score-comment { font-size: 14px; color: var(--cream-dim); font-style: italic; margin-bottom: 16px; }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
-.footnote { font-size: 12px; color: var(--cream-dim); text-align: center; }
+.footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
 .error-text { color: var(--danger); font-size: 13px; margin-top: -8px; margin-bottom: 10px; }
-.reaction-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.reaction-btn { width: auto; padding: 4px 10px; font-size: 14px; background: var(--ink-raised); border: 1px solid var(--line); color: var(--cream); }
-.reaction-btn.mine { border-color: var(--teal); }
 .empty-state { text-align: center; color: var(--cream-dim); font-size: 13px; padding: 20px 10px; }
 .breadcrumb { font-size: 12px; color: var(--cream-dim); padding: 0; margin-bottom: 6px; text-decoration: none; }
 .breadcrumb:active { color: var(--teal); }
@@ -115,13 +112,18 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .section-label.strong { font-size: 16px; letter-spacing: 0.02em; text-transform: none; color: var(--cream); font-family: 'Cinzel', serif; margin: 16px 0 10px; }
 .account-name-line { font-size: 22px; font-weight: 700; font-family: 'Cinzel', serif; color: var(--gold); }
 .tier-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--teal-dim); color: var(--teal); background: rgba(79,182,168,0.08); margin: 6px 8px 10px 0; }
+.info-toggle-btn { width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; background: var(--ink-raised); border: 1px solid var(--line); color: var(--cream-dim); font-size: 12px; padding: 0; margin-bottom: 10px; }
+.tier-info-box { font-size: 12px; color: var(--cream-dim); background: var(--ink-raised); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.tier-info-box .tier-info-title { font-weight: 700; color: var(--cream); margin: 8px 0 4px; }
+.tier-info-box .tier-info-title:first-child { margin-top: 0; }
+.tier-info-box ul { margin: 0 0 4px; padding-left: 18px; }
+.tier-info-box li { margin-bottom: 2px; }
 .room-item { padding: 18px 16px; }
 .room-item .room-name { font-size: 18px; font-family: 'Cinzel', serif; color: var(--gold); }
 .room-item .room-meta { margin-top: 3px; }
 .tabs-sub { display: flex; gap: 0; margin-bottom: 4px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; padding: 2px; background: var(--ink-raised); }
 .tabs-sub .tab { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; font-size: 12px; cursor: pointer; border: none; color: var(--cream-dim); opacity: 0.75; }
 .tabs-sub .tab.active { color: var(--teal); background: var(--ink-card); opacity: 1; }
-.rank-pill-strong { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); background: rgba(212,175,55,0.08); margin-top: 4px; }
 .global-rank-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); background: rgba(212,175,55,0.08); margin-bottom: 10px; }
 .badge-showcase { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .notif-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; margin-bottom: 12px; background: rgba(79,182,168,0.08); border: 1px solid var(--teal-dim); font-size: 13px; }
@@ -198,10 +200,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <section id="view-home" class="card hidden">
     <div class="account-header" style="display:flex; justify-content:space-between; align-items:center;">
       <div class="account-name-line" id="account-username-display">Signed in</div>
-      <div style="display:flex; gap:14px; align-items:center;">
-        <button class="link-btn" id="btn-global-leaderboard">🌍 Global Leaderboard</button>
-        <button class="link-btn" id="btn-logout">Log out</button>
-      </div>
+      <button class="link-btn" id="btn-logout">Log out</button>
     </div>
     <div id="tier-rank-holder"></div>
     <div id="streak-chip-holder"></div>
@@ -213,7 +212,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <button class="btn-ghost" id="btn-create-room">Create Game Room</button>
       <button class="btn-ghost" id="btn-join-room">Join with code</button>
     </div>
+    <button class="btn-ghost" id="btn-global-leaderboard" style="margin-top:10px;">🌍 Global Leaderboard</button>
   </section>
+
 
 
   <!-- CREATE ROOM -->
@@ -272,6 +273,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
   </section>
 
+  <!-- CHOOSE TARGET (shown when starting a game — pick anyone, or call someone out specifically) -->
+  <section id="view-choose-target" class="card hidden">
+    <button class="link-btn breadcrumb" id="btn-choose-target-back">&larr; Back</button>
+    <h2 class="display" style="margin-bottom:14px;">Who's this challenge for?</h2>
+    <button class="btn-secondary" id="btn-target-anyone" style="margin-bottom:10px;">Challenge anyone</button>
+    <div class="section-label">Or call out someone specific</div>
+    <div id="target-member-list"></div>
+  </section>
+
   <!-- GLOBAL LEADERBOARD (its own screen, not nested in a room) -->
   <section id="view-global-leaderboard" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-global-lb-back">&larr; Game Rooms</button>
@@ -284,6 +294,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
     <div id="leaderboard-list-global"></div>
   </section>
+
 
   <!-- MEMBERS (separate screen, not a tab — kept out of the main loop) -->
   <section id="view-members" class="card hidden">
@@ -326,7 +337,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <button class="btn-ghost" id="btn-back-to-room" style="margin-top:10px;">Back to room</button>
   </section>
 
-  <div class="footnote">Fake Guru™ — upgrade your Words, upgrade your Style.</div>
+  <div class="footnote">Fake Guru™ — Upgrade your Words, Upgrade your Style.</div>
 </div>
 
 <script type="module">
@@ -503,11 +514,11 @@ async function afterLogin() {
 }
 
 const BADGE_META = {
-  showed_up: { emoji: '👋', label: 'Showed Up' },
-  streak_3: { emoji: '🔥', label: '3-Day Streak' },
-  streak_7: { emoji: '🔥', label: '7-Day Streak' },
-  streak_30: { emoji: '🔥', label: '30-Day Streak' },
-  flawless_scroll: { emoji: '🏆', label: 'Flawless Scroll' },
+  showed_up: { emoji: '👋', label: 'Showed Up', req: 'Play your first round, ever.' },
+  streak_3: { emoji: '🔥', label: '3-Day Streak', req: 'Play 3 days in a row.' },
+  streak_7: { emoji: '🔥', label: '7-Day Streak', req: 'Play 7 days in a row.' },
+  streak_30: { emoji: '🔥', label: '30-Day Streak', req: 'Play 30 days in a row.' },
+  flawless_scroll: { emoji: '🏆', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.' },
 };
 
 // Tier reflects skill (global all-time average), separate from streak (consistency).
@@ -542,17 +553,44 @@ async function renderTierAndRank() {
   const mine = sorted.find(r => r.username === me);
   const myIndex = sorted.findIndex(r => r.username === me);
 
+  const pillRow = document.createElement('div');
+  pillRow.style.display = 'flex';
+  pillRow.style.alignItems = 'center';
+  pillRow.style.flexWrap = 'wrap';
+
   const tierPill = document.createElement('span');
   tierPill.className = 'tier-pill';
   tierPill.textContent = (mine && mine.rounds_played >= TIER_MIN_GAMES) ? `🏅 ${tierForScore(mine.avg_score)}` : '🏅 Unranked';
-  holder.appendChild(tierPill);
+  pillRow.appendChild(tierPill);
 
   if (myIndex !== -1) {
     const rankPill = document.createElement('span');
     rankPill.className = 'global-rank-pill';
     rankPill.textContent = `🌍 Global #${myIndex + 1}`;
-    holder.appendChild(rankPill);
+    pillRow.appendChild(rankPill);
   }
+
+  const infoBtn = document.createElement('button');
+  infoBtn.className = 'info-toggle-btn';
+  infoBtn.textContent = 'ⓘ';
+  infoBtn.title = 'What do these mean?';
+  infoBtn.onclick = () => $('tier-info-box').classList.toggle('hidden');
+  pillRow.appendChild(infoBtn);
+
+  holder.appendChild(pillRow);
+
+  const infoBox = document.createElement('div');
+  infoBox.id = 'tier-info-box';
+  infoBox.className = 'tier-info-box hidden';
+  const tierList = TIER_BANDS.slice().reverse().map(t => `<li>${t.name} — ${t.min}+ avg</li>`).join('');
+  const badgeList = Object.values(BADGE_META).map(b => `<li>${b.emoji} ${b.label} — ${b.req}</li>`).join('');
+  infoBox.innerHTML = `
+    <div class="tier-info-title">Tiers (global all-time average, ${TIER_MIN_GAMES}+ games needed)</div>
+    <ul>${tierList}</ul>
+    <div class="tier-info-title">Badges</div>
+    <ul>${badgeList}</ul>
+  `;
+  holder.appendChild(infoBox);
 }
 
 async function renderBadgeShowcase() {
@@ -619,7 +657,7 @@ async function loadRoomSummary(roomId) {
   if (!mine) { el.innerHTML = `<span class="sub">not ranked yet</span>`; return; }
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const rank = sorted.findIndex(r => r.username === me) + 1;
-  el.innerHTML = `${Math.round(mine.avg_score)} avg<span class="rank-pill-strong">#${rank}</span>`;
+  el.innerHTML = `${Math.round(mine.avg_score)} avg<span class="sub">Rank #${rank}</span>`;
 }
 
 $('btn-create-room').onclick = () => show('view-create-room');
@@ -718,7 +756,7 @@ function switchRoomPanel(panel) {
   if (panel === 'dares') loadDares();
   if (panel === 'leaderboard') loadLeaderboard();
 }
-$('btn-start-round-lb').onclick = () => startNewRound();
+$('btn-start-round-lb').onclick = () => openTargetPicker();
 
 document.querySelectorAll('[data-room-period]').forEach(tab => {
   tab.onclick = () => { document.querySelectorAll('[data-room-period]').forEach(t => t.classList.remove('active')); tab.classList.add('active'); lbPeriod = tab.dataset.roomPeriod; loadLeaderboard(); };
@@ -770,16 +808,13 @@ async function loadDares() {
     if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
     const div = document.createElement('div');
     div.className = 'dare-card';
-    const label = r.target_username === me ? `${r.creator_username} challenged YOU back` : `${r.creator_username}'s challenge`;
+    let label = `${r.creator_username}'s challenge`;
+    if (r.target_username === me) label = r.via_challenge_back ? `${r.creator_username} challenged YOU back` : `${r.creator_username} challenged YOU`;
 
     const { data: creatorScore } = await sb.from('round_scores').select('correct_count, score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
     const scoreLine = creatorScore ? `<div class="dare-score-line">${creatorScore.score_points} pts — beat it?</div>` : '';
 
     const { count: playCount } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('round_id', r.id);
-
-    const { data: reax } = await sb.from('reactions').select('from_username').eq('round_id', r.id).eq('target_username', r.creator_username);
-    const reaxCount = (reax || []).length;
-    const iReacted = (reax || []).some(x => x.from_username === me);
     if (myToken !== daresLoadToken) return;
 
     div.innerHTML = `<div class="dare-title">${label}</div>${scoreLine}<div class="dare-sub">${timeLeft(r.expires_at)} · played by ${playCount || 0}</div>`;
@@ -799,21 +834,6 @@ async function loadDares() {
     btnRow.appendChild(shareBtn);
     div.appendChild(btnRow);
 
-    if (r.creator_username !== me && creatorScore) {
-      const reactRow = document.createElement('div');
-      reactRow.className = 'reaction-row';
-      const reactBtn = document.createElement('button');
-      reactBtn.className = 'reaction-btn' + (iReacted ? ' mine' : '');
-      reactBtn.textContent = `👏 ${reaxCount > 0 ? reaxCount : ''}`.trim();
-      reactBtn.disabled = iReacted;
-      reactBtn.onclick = async () => {
-        await sb.from('reactions').upsert({ round_id: r.id, target_username: r.creator_username, from_username: me, emoji: '👏' });
-        loadDares();
-      };
-      reactRow.appendChild(reactBtn);
-      div.appendChild(reactRow);
-    }
-
     if (myToken !== daresLoadToken) return;
     list.appendChild(div);
   }
@@ -825,7 +845,7 @@ async function loadDares() {
   $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} challenges in this Game Room today.`;
   $('btn-start-round').disabled = used >= MAX_OPEN_DARES_PER_DAY;
   $('btn-start-round-lb').disabled = used >= MAX_OPEN_DARES_PER_DAY;
-  $('btn-start-round').onclick = () => startNewRound();
+  $('btn-start-round').onclick = () => openTargetPicker();
 }
 
 $('btn-invite-room').onclick = () => {
@@ -944,14 +964,35 @@ function renderRankBanner(rows, bannerId, keyBase, period) {
 // ---------------------------------------------------------------
 // GAME
 // ---------------------------------------------------------------
-async function startNewRound() {
+async function openTargetPicker() {
+  show('view-choose-target');
+  const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id).neq('username', me);
+  const list = $('target-member-list');
+  list.innerHTML = '';
+  if (!members || members.length === 0) {
+    list.innerHTML = '<div class="empty-state">No one else has joined this Game Room yet.</div>';
+    return;
+  }
+  members.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-secondary';
+    btn.style.marginBottom = '8px';
+    btn.textContent = m.username;
+    btn.onclick = () => startNewRound(m.username);
+    list.appendChild(btn);
+  });
+}
+$('btn-target-anyone').onclick = () => startNewRound();
+$('btn-choose-target-back').onclick = () => show('view-room');
+
+async function startNewRound(targetUsername) {
   $('btn-start-round').disabled = true;
   $('btn-start-round-lb').disabled = true;
   const wordIds = await pickRoundWords();
   const now = new Date();
   const expires = new Date(now.getTime() + DARE_EXPIRY_MS);
   const { data: round, error } = await sb.from('rounds').insert({
-    room_id: currentRoom.id, creator_username: me, word_ids: wordIds, short_code: shortRoundCode(), status: 'open',
+    room_id: currentRoom.id, creator_username: me, target_username: targetUsername || null, word_ids: wordIds, short_code: shortRoundCode(), status: 'open',
     created_at: now.toISOString(), expires_at: expires.toISOString()
   }).select().single();
   if (error) { $('btn-start-round').disabled = false; $('btn-start-round-lb').disabled = false; alert(error.message); return; }
@@ -1079,7 +1120,7 @@ function renderScorecard(correct, points, newBadges) {
     const wordIds = await pickRoundWords();
     const now = new Date();
     const { data: round, error } = await sb.from('rounds').insert({
-      room_id: currentRoom.id, creator_username: me, target_username: currentRound.creator_username, word_ids: wordIds,
+      room_id: currentRoom.id, creator_username: me, target_username: currentRound.creator_username, via_challenge_back: true, word_ids: wordIds,
       short_code: shortRoundCode(), status: 'open', created_at: now.toISOString(), expires_at: new Date(now.getTime() + DARE_EXPIRY_MS).toISOString()
     }).select().single();
     if (error) { $('btn-dare-back').disabled = false; alert(error.message); return; }

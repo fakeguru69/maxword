@@ -446,7 +446,15 @@ const TRIAL_URGENCY_WINDOW_MS = 24 * 60 * 60 * 1000; // only show the "expires s
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // WORD BANK — moved to words.js (pure data, no logic)
-import { CATEGORIES, WORDS } from './words.js';
+// IMPORTANT: bump the ?v= number below any time words.js's content changes
+// (new words, edited words, anything) — static import specifiers must be a
+// plain string literal (a variable/template literal here is a real syntax
+// error, not just untidy), so this has to be hand-edited each time. Without
+// it, a browser can keep serving an old cached words.js even after
+// index.html reloads fresh — which is exactly what caused a round to
+// silently shrink from 10 questions to 4 for someone whose cached word bank
+// didn't have the newer word IDs yet.
+import { CATEGORIES, WORDS } from './words.js?v=2';
 const wordById = Object.fromEntries(WORDS.map(w => [w.id, w]));
 const catLabel = key => CATEGORIES.find(c => c.key === key)?.label || key;
 

@@ -950,8 +950,15 @@ function subscribeRoomRealtime(roomId) {
   unsubscribeRoomRealtime();
   roomChannel = sb.channel(`room-${roomId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `room_id=eq.${roomId}` }, () => refreshActiveRoomPanel())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'round_scores' }, () => refreshActiveRoomPanel())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'round_scores' }, () => { refreshActiveRoomPanel(); checkDethronementsLive(); })
     .subscribe();
+}
+// Only pops the dethroned modal live if you're NOT mid-quiz — never interrupt an
+// active question. If you are mid-quiz, this is a no-op and the event stays
+// unnotified, so it's picked up right after you finish (see finishRound) or the
+// next time you open a room, instead of being lost.
+function checkDethronementsLive() {
+  if ($('view-game').classList.contains('hidden')) checkDethronements();
 }
 function unsubscribeRoomRealtime() {
   if (roomChannel) { sb.removeChannel(roomChannel); roomChannel = null; }
@@ -1493,6 +1500,7 @@ async function finishRound() {
 
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
+  await checkDethronements(); // catches anything that happened while you were mid-quiz and got skipped live
 }
 
 // Fires exactly once, the moment someone crosses from "Unranked" into their first

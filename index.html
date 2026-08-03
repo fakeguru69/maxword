@@ -1477,7 +1477,11 @@ async function finishRound() {
   await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points });
 
   const wordAnswerRows = roundWords.map((w, i) => ({ round_id: currentRound.id, username: me, word_id: w.id, is_correct: !!roundAnswers[i] }));
-  await sb.from('word_answers').insert(wordAnswerRows);
+  // upsert + ignoreDuplicates instead of a plain insert: if this ever fires twice for the
+  // same play (a retried network call, a double-tap slipping past some other guard), the
+  // unique constraint on (round_id, username, word_id) makes the second attempt a safe
+  // no-op instead of either erroring or silently duplicating rows in word_stats.
+  await sb.from('word_answers').upsert(wordAnswerRows, { onConflict: 'round_id,username,word_id', ignoreDuplicates: true });
 
   const { count } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('round_id', currentRound.id);
   if ((count || 0) >= 2) await sb.from('rounds').update({ status: 'locked' }).eq('id', currentRound.id);

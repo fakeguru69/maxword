@@ -6,6 +6,9 @@
 <title>MaxWord — A Fake Guru App</title>
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0B0E14" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
@@ -84,7 +87,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .scorecard { text-align: center; padding: 28px 16px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--gold); }
 .scorecard .grid-emoji { font-size: 20px; letter-spacing: 4px; margin: 14px 0; }
-.scorecard .score-comment { font-size: 14px; color: var(--cream-dim); font-style: italic; margin-bottom: 16px; }
+.scorecard .score-comment { font-size: 17px; font-weight: 600; color: var(--cream); margin-bottom: 10px; }
+.scorecard .score-verdict { font-size: 15px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold-soft); color: var(--gold); }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
@@ -120,6 +124,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tier-info-box li { margin-bottom: 2px; }
 .room-item { padding: 18px 16px; }
 .room-item .room-name { font-size: 18px; font-family: 'Cinzel', serif; color: var(--gold); }
+.target-badge { display: inline-block; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--danger); color: var(--cream); vertical-align: middle; }
 .room-item .room-meta { margin-top: 3px; }
 .tabs-sub { display: flex; gap: 0; margin-bottom: 4px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; padding: 2px; background: var(--ink-raised); }
 .tabs-sub .tab { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; font-size: 12px; cursor: pointer; border: none; color: var(--cream-dim); opacity: 0.75; }
@@ -325,6 +330,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="big-score" id="score-big"></div>
       <div class="grid-emoji" id="score-grid"></div>
       <div class="score-comment" id="score-comment"></div>
+      <div class="score-verdict hidden" id="score-verdict"></div>
       <div id="score-badges"></div>
     </div>
     <div class="btn-row" style="margin-top:10px;">
@@ -377,6 +383,11 @@ function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i-
 
 // Shares plain text via the device's native share sheet (WhatsApp, SMS, email, etc.)
 // Falls back to a WhatsApp web link on browsers without navigator.share (mostly desktop).
+// Usernames are stored lowercase (case-insensitive login) but shown in caps
+// everywhere in the UI to match the Cinzel/seal aesthetic — visual only,
+// never affects storage, matching, or login.
+function displayName(u) { return (u || '').toUpperCase(); }
+
 async function shareText(text) {
   if (navigator.share) {
     try { await navigator.share({ text }); return; } catch (e) { /* user cancelled — no-op */ return; }
@@ -388,7 +399,7 @@ async function shareRound(r) {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${r.short_code}`;
   const { data: creatorScore } = await sb.from('round_scores').select('score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
   const scorePart = creatorScore ? `scored ${creatorScore.score_points} pts` : `posted a challenge`;
-  shareText(`${r.creator_username} ${scorePart} on MaxWord's "${currentRoom.name}" — beat it? ${url}`);
+  shareText(`${displayName(r.creator_username)} ${scorePart} on MaxWord's "${currentRoom.name}" — beat it? ${url}`);
 }
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
@@ -501,7 +512,7 @@ $('btn-logout').onclick = () => { me = null; currentRoom = null; localStorage.re
 // HOME / ROOMS
 // ---------------------------------------------------------------
 async function afterLogin() {
-  $('account-username-display').textContent = me;
+  $('account-username-display').textContent = displayName(me);
   await updateStreakOnOpen();
   await maybeAwardShowedUp();
   await loadRoomsList();
@@ -642,11 +653,28 @@ async function loadRoomsList() {
   for (const room of rooms) {
     const div = document.createElement('div');
     div.className = 'room-item';
-    div.innerHTML = `<div><div class="room-name">${room.name}</div><div class="room-meta">${room.code} · ${room.is_open ? 'Open' : 'Closed'}</div></div><div class="room-item-summary" id="room-summary-${room.id}">…</div>`;
+    div.innerHTML = `<div><div class="room-name">${room.name} <span id="room-target-badge-${room.id}"></span></div><div class="room-meta">${room.code} · ${room.is_open ? 'Open' : 'Closed'}</div></div><div class="room-item-summary" id="room-summary-${room.id}">…</div>`;
     div.onclick = () => openRoom(room);
     list.appendChild(div);
     loadRoomSummary(room.id);
+    loadRoomTargetBadge(room.id);
   }
+}
+
+// Shows a small "🎯 N" badge on a room card when N challenges are aimed
+// specifically at you in that room and you haven't played them yet — the
+// in-app substitute for a push notification until real push exists.
+async function loadRoomTargetBadge(roomId) {
+  const el = $(`room-target-badge-${roomId}`);
+  if (!el) return;
+  const now = new Date().toISOString();
+  const { data: rounds } = await sb.from('rounds').select('id').eq('room_id', roomId).eq('target_username', me).gt('expires_at', now);
+  const ids = (rounds || []).map(r => r.id);
+  if (ids.length === 0) { el.innerHTML = ''; return; }
+  const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', ids);
+  const playedIds = new Set((myScores || []).map(s => s.round_id));
+  const count = ids.filter(id => !playedIds.has(id)).length;
+  el.innerHTML = count > 0 ? `<span class="target-badge">🎯 ${count}</span>` : '';
 }
 
 async function loadRoomSummary(roomId) {
@@ -808,8 +836,8 @@ async function loadDares() {
     if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
     const div = document.createElement('div');
     div.className = 'dare-card';
-    let label = `${r.creator_username}'s challenge`;
-    if (r.target_username === me) label = r.via_challenge_back ? `${r.creator_username} challenged YOU back` : `${r.creator_username} challenged YOU`;
+    let label = `${displayName(r.creator_username)}'s challenge`;
+    if (r.target_username === me) label = r.via_challenge_back ? `${displayName(r.creator_username)} challenged YOU back` : `${displayName(r.creator_username)} challenged YOU`;
 
     const { data: creatorScore } = await sb.from('round_scores').select('correct_count, score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
     const scoreLine = creatorScore ? `<div class="dare-score-line">${creatorScore.score_points} pts — beat it?</div>` : '';
@@ -861,7 +889,7 @@ async function loadMembers() {
   for (const m of members) {
     const div = document.createElement('div');
     div.className = 'lb-row';
-    div.innerHTML = `<div class="lb-name">${m.username}${m.role === 'admin' ? ' <span class="badge-chip">admin</span>' : ''}</div>`;
+    div.innerHTML = `<div class="lb-name">${displayName(m.username)}${m.role === 'admin' ? ' <span class="badge-chip">admin</span>' : ''}</div>`;
     if (myRole === 'admin' && m.role !== 'admin') {
       const btn = document.createElement('button');
       btn.className = 'btn-ghost';
@@ -931,7 +959,7 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
     div.className = 'lb-row' + (r.username === me ? ' me' : '');
     const champTag = i === 0 ? `<span class="champion-tag">👑 champion</span>` : (r.username === defendingChamp ? `<span class="champion-tag defending" style="--decay:${decay}">🛡️ defending champ</span>` : '');
     const rankDisplay = i + 1;
-    div.innerHTML = `<div class="lb-rank">${rankDisplay}</div><div class="lb-name">${r.username} ${champTag}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
+    div.innerHTML = `<div class="lb-rank">${rankDisplay}</div><div class="lb-name">${displayName(r.username)} ${champTag}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
     list.appendChild(div);
   });
 }
@@ -977,7 +1005,7 @@ async function openTargetPicker() {
     const btn = document.createElement('button');
     btn.className = 'btn-secondary';
     btn.style.marginBottom = '8px';
-    btn.textContent = m.username;
+    btn.textContent = displayName(m.username);
     btn.onclick = () => startNewRound(m.username);
     list.appendChild(btn);
   });
@@ -1075,7 +1103,7 @@ async function finishRound() {
   const newBadges = await maybeAwardBadges(correct);
   await recordRoundPlayed();
 
-  renderScorecard(correct, points, newBadges);
+  await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
 }
 
@@ -1101,7 +1129,7 @@ async function maybeAwardBadges(correct) {
   return earned;
 }
 
-function renderScorecard(correct, points, newBadges) {
+async function renderScorecard(correct, points, newBadges) {
   $('score-big').textContent = `${points} pts`;
   $('score-grid').textContent = roundAnswers.map(a => a ? '🟩' : '⬛').join('');
   $('score-comment').textContent = commentForScore(points);
@@ -1109,21 +1137,61 @@ function renderScorecard(correct, points, newBadges) {
   badgeDiv.innerHTML = '';
   newBadges.forEach(b => { const chip = document.createElement('span'); chip.className = 'badge-chip'; chip.textContent = b; badgeDiv.appendChild(chip); });
 
+  // Win/lose verdict — only meaningful when you just accepted SOMEONE ELSE's challenge
+  // (there's a score to compare against). Your own fresh round has nothing to beat yet.
+  const verdictEl = $('score-verdict');
+  const isOwnRound = currentRound.creator_username === me;
+  let iWon = null; // true = I won, false = I lost/tied, null = no comparison (own round)
+  if (!isOwnRound) {
+    const { data: creatorScore } = await sb.from('round_scores').select('score_points').eq('round_id', currentRound.id).eq('username', currentRound.creator_username).maybeSingle();
+    if (creatorScore) {
+      const theirs = creatorScore.score_points;
+      if (points > theirs) { verdictEl.textContent = `🎉 You beat ${displayName(currentRound.creator_username)}'s ${theirs} by ${points - theirs}!`; iWon = true; }
+      else if (points < theirs) { verdictEl.textContent = `${displayName(currentRound.creator_username)}'s ${theirs} still stands — try again?`; iWon = false; }
+      else { verdictEl.textContent = `🤝 Tied with ${displayName(currentRound.creator_username)} at ${theirs}!`; iWon = false; }
+      verdictEl.classList.remove('hidden');
+    } else {
+      verdictEl.classList.add('hidden');
+    }
+  } else {
+    verdictEl.classList.add('hidden');
+  }
+
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
     shareText(`I scored ${points} pts on MaxWord's "${currentRoom.name}" — think you can beat me? ${url}`);
   };
 
-  $('btn-dare-back').onclick = async () => {
-    if (currentRound.creator_username === me) { alert("This is your own challenge — tap 'Challenge others' above to invite someone to accept it."); return; }
-    $('btn-dare-back').disabled = true;
+  // No one to challenge back if this is your own round — hide the button entirely
+  // instead of showing it and blocking the tap with an alert.
+  const dareBackBtn = $('btn-dare-back');
+  if (isOwnRound) {
+    dareBackBtn.classList.add('hidden');
+    $('btn-challenge-others').className = 'btn-primary';
+  } else {
+    dareBackBtn.classList.remove('hidden');
+    // Weight whichever button matches the moment: just lost -> Challenge back is
+    // the obvious next move and gets the bold treatment; won or fresh -> sharing does.
+    if (iWon === false) {
+      dareBackBtn.className = 'btn-primary';
+      dareBackBtn.textContent = `Get ${displayName(currentRound.creator_username)} back`;
+      $('btn-challenge-others').className = 'btn-secondary';
+    } else {
+      dareBackBtn.className = 'btn-secondary';
+      dareBackBtn.textContent = 'Challenge back';
+      $('btn-challenge-others').className = 'btn-primary';
+    }
+  }
+
+  dareBackBtn.onclick = async () => {
+    dareBackBtn.disabled = true;
     const wordIds = await pickRoundWords();
     const now = new Date();
     const { data: round, error } = await sb.from('rounds').insert({
       room_id: currentRoom.id, creator_username: me, target_username: currentRound.creator_username, via_challenge_back: true, word_ids: wordIds,
       short_code: shortRoundCode(), status: 'open', created_at: now.toISOString(), expires_at: new Date(now.getTime() + DARE_EXPIRY_MS).toISOString()
     }).select().single();
-    if (error) { $('btn-dare-back').disabled = false; alert(error.message); return; }
+    if (error) { dareBackBtn.disabled = false; alert(error.message); return; }
     startRound(round);
   };
 
@@ -1146,7 +1214,7 @@ async function renderOtherDares() {
   open.slice(0, 3).forEach(r => {
     const div = document.createElement('div');
     div.className = 'dare-card';
-    div.innerHTML = `<div class="dare-title">${r.creator_username}'s challenge</div><div class="dare-sub">${timeLeft(r.expires_at)}</div>`;
+    div.innerHTML = `<div class="dare-title">${displayName(r.creator_username)}'s challenge</div><div class="dare-sub">${timeLeft(r.expires_at)}</div>`;
     const btn = document.createElement('button');
     btn.className = 'btn-secondary';
     btn.textContent = 'Play it';
@@ -1176,7 +1244,7 @@ async function handleDeepLink() {
     if (room.is_open) {
       await joinRoomRow(room);
     } else {
-      alert(`"${room.name}" is a closed Game Room — ask an admin to add you (@${room.creator_username}).`);
+      alert(`"${room.name}" is a closed Game Room — ask an admin to add you (@${displayName(room.creator_username)}).`);
       return;
     }
   }

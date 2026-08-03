@@ -126,6 +126,28 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tier-info-box .tier-info-title:first-child { margin-top: 0; }
 .tier-info-box ul { margin: 0 0 4px; padding-left: 18px; }
 .tier-info-box li { margin-bottom: 2px; }
+
+/* Trial screens get a warmer, louder treatment than Room/Global's calm ledger
+   feel — this is the "excitement" layer, so it should visually say so. */
+.trial-card { border: 1px solid var(--gold-soft); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: rgba(212,175,55,0.05); cursor: pointer; }
+.trial-card:active { border-color: var(--gold); }
+.trial-card-number { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.trial-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.trial-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--cream-dim); }
+.trial-tag.mine { border-color: var(--gold); color: var(--gold); }
+.trial-header { text-align: center; margin-bottom: 14px; }
+.trial-header .trial-number { font-family: 'Cinzel', serif; font-size: 26px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
+.champion-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold); }
+.champion-banner .crown { font-size: 26px; }
+.champion-banner .champ-name { font-family: 'Cinzel', serif; color: var(--gold); font-size: 18px; margin-top: 2px; }
+.dethroned-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(192,85,74,0.15); border: 1px solid var(--danger); color: #F0A898; font-weight: 600; }
+.completionist-line { font-size: 12px; color: var(--cream-dim); text-align: center; margin-bottom: 10px; }
+.urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
+.duel-record { text-align: center; font-size: 14px; color: var(--cream); margin-bottom: 14px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
+.trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.trial-lb-row.champion { color: var(--gold); font-weight: 700; }
+.championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
+.mastery-line { font-size: 13px; color: var(--teal); margin-bottom: 8px; }
 .room-item { padding: 18px 16px; }
 .room-item .room-name { font-size: 18px; font-family: 'Cinzel', serif; color: var(--gold); }
 .target-badge { display: inline-block; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--danger); color: var(--cream); vertical-align: middle; }
@@ -212,7 +234,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
     <div id="tier-rank-holder"></div>
+    <div id="championships-holder"></div>
     <div id="streak-chip-holder"></div>
+    <div id="mastery-holder"></div>
     <div id="badge-showcase-holder"></div>
     <div id="notif-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
@@ -259,7 +283,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <button class="btn-ghost" id="btn-invite-room" style="margin:12px 0;">Invite to Game Room</button>
 
     <div class="tabs">
-      <div class="tab active" data-panel="dares" id="tab-challenges">Challenges</div>
+      <div class="tab active" data-panel="dares" id="tab-challenges">Trials</div>
       <div class="tab" data-panel="leaderboard">Leaderboard</div>
     </div>
 
@@ -282,13 +306,31 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
   </section>
 
-  <!-- CHOOSE TARGET (shown when starting a game — pick anyone, or call someone out specifically) -->
+  <!-- CHOOSE TARGET (direct callout is the default/prominent path — "anyone" is the fallback) -->
   <section id="view-choose-target" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-choose-target-back">&larr; Back</button>
-    <h2 class="display" style="margin-bottom:14px;">Who's this challenge for?</h2>
-    <button class="btn-secondary" id="btn-target-anyone" style="margin-bottom:10px;">Challenge anyone</button>
-    <div class="section-label">Or call out someone specific</div>
+    <h2 class="display" style="margin-bottom:6px;">Call someone out</h2>
+    <div class="section-label" style="margin-top:0;">Aim this Trial at someone specific</div>
     <div id="target-member-list"></div>
+    <button class="link-btn" id="btn-target-anyone" style="margin-top:6px;">Or just open it to anyone</button>
+  </section>
+
+  <!-- TRIAL (per-Trial mini-screen — the star of the app: champion, leaderboard, duel record) -->
+  <section id="view-trial" class="card hidden">
+    <button class="link-btn breadcrumb" id="btn-trial-back">&larr; Back to room</button>
+    <div class="trial-header">
+      <div class="trial-number">📜 Trial #<span id="trial-number-display"></span></div>
+      <div class="trial-tags" id="trial-tags"></div>
+    </div>
+    <div id="trial-urgency-holder"></div>
+    <div id="trial-champion-holder"></div>
+    <div id="trial-completionist-holder"></div>
+    <div id="trial-duel-holder"></div>
+    <div id="trial-leaderboard-list"></div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn-primary" id="btn-trial-play">Play this Trial</button>
+      <button class="share-icon-btn" id="btn-trial-send">🔗 Send</button>
+    </div>
   </section>
 
   <!-- GLOBAL LEADERBOARD (its own screen, not nested in a room) -->
@@ -333,6 +375,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <p id="reminder-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
       <button class="btn-primary" id="btn-reminder-play">Play now</button>
       <button class="link-btn" id="btn-reminder-later" style="margin-top:10px;">Later</button>
+    </div>
+  </div>
+
+  <!-- DETHRONED MODAL -->
+  <div class="modal-overlay hidden" id="dethroned-modal">
+    <div class="card modal-card">
+      <div class="dethroned-banner" style="margin-bottom:14px;">🔻 Dethroned</div>
+      <p id="dethroned-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
+      <button class="btn-primary" id="btn-dethroned-ok">Got it</button>
     </div>
   </div>
 
@@ -389,7 +440,8 @@ const HARD_WORD_MIN_SAMPLE = 5;   // min times a word must've been answered befo
 const HARD_WORD_MAX_RATE = 0.5;   // correct_rate at/below this counts as "hard"
 const HARD_WORDS_PER_ROUND = 3;   // how many hard words to force into a round, when enough data exists
 const MAX_OPEN_DARES_PER_DAY = 10;
-const DARE_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
+const DARE_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000; // 14 days — endures long enough that a busy week doesn't cost someone their shot
+const TRIAL_URGENCY_WINDOW_MS = 24 * 60 * 60 * 1000; // only show the "expires soon" banner in the final 24h — scarcity without sacrificing endurance
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -426,8 +478,8 @@ async function shareText(text) {
 async function shareRound(r) {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${r.short_code}`;
   const { data: creatorScore } = await sb.from('round_scores').select('score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
-  const scorePart = creatorScore ? `scored ${creatorScore.score_points} pts` : `posted a challenge`;
-  shareText(`${displayName(r.creator_username)} ${scorePart} on MaxWord's "${currentRoom.name}" — beat it? ${url}`);
+  const scorePart = creatorScore ? `scored ${creatorScore.score_points} pts` : `posted it`;
+  shareText(`${displayName(r.creator_username)} ${scorePart} on Trial #${r.trial_number} in MaxWord's "${currentRoom.name}" — beat it? ${url}`);
 }
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
@@ -547,9 +599,12 @@ async function afterLogin() {
   await renderStreakChip();
   await renderTierAndRank();
   await renderBadgeShowcase();
+  await renderChampionships();
+  await renderMastery();
   renderNotifBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
+  await checkDethronements();
   await checkRankReminder();
 }
 
@@ -559,6 +614,26 @@ async function afterLogin() {
 // and never once they've actually crossed MIN_GAMES_TO_RANK. Only ONE primary action
 // button (smart-routed), plus a plain dismiss — not a menu of choices.
 let reminderAction = null;
+// The sharpest trigger in the whole app: since Trials are one-shot, losing the top
+// spot is permanent — you can never retake it. Checked on every Home/Room load,
+// each event marked notified so it's shown exactly once, ever.
+async function checkDethronements() {
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(trial_number)').eq('dethroned_username', me).eq('notified', false).order('created_at', { ascending: true });
+  if (!events || events.length === 0) return;
+  const ids = events.map(e => e.id);
+  await sb.from('dethronement_events').update({ notified: true }).in('id', ids);
+  let text;
+  if (events.length === 1) {
+    const e = events[0];
+    text = `${displayName(e.dethroned_by_username)} just took Trial #${e.rounds.trial_number} from you.`;
+  } else {
+    text = `You've been dethroned on ${events.length} Trials — open your Game Rooms to see who got you.`;
+  }
+  $('dethroned-modal-text').textContent = text;
+  $('dethroned-modal').classList.remove('hidden');
+}
+$('btn-dethroned-ok').onclick = () => $('dethroned-modal').classList.add('hidden');
+
 async function checkRankReminder() {
   const { data: mine } = await sb.from('global_leaderboard_alltime').select('rounds_played').eq('username', me).maybeSingle();
   const played = mine ? mine.rounds_played : 0;
@@ -600,7 +675,8 @@ const BADGE_META = {
   streak_3: { emoji: '🔥', label: '3-Day Streak', req: 'Play 3 days in a row.' },
   streak_7: { emoji: '🔥', label: '7-Day Streak', req: 'Play 7 days in a row.' },
   streak_30: { emoji: '🔥', label: '30-Day Streak', req: 'Play 30 days in a row.' },
-  flawless_scroll: { emoji: '🏆', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.' },
+  flawless_scroll: { emoji: '✨', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.' },
+  ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 3 games played (matches MIN_GAMES_TO_RANK).' },
 };
 
 // Tier reflects skill (global all-time average), separate from streak (consistency).
@@ -691,6 +767,25 @@ async function renderBadgeShowcase() {
     row.appendChild(chip);
   });
   holder.appendChild(row);
+}
+
+// Lifetime, ever-increasing count of Trials this person has won — only counts
+// SETTLED Trials (past expiry), so it never flickers as new players join in
+// and never shrinks even after being dethroned somewhere else.
+async function renderChampionships() {
+  const holder = $('championships-holder');
+  const { count } = await sb.from('settled_trial_champions').select('*', { count: 'exact', head: true }).eq('username', me);
+  holder.innerHTML = count ? `<div class="championships-line">🏆 ${count} Championship${count === 1 ? '' : 's'}</div>` : '';
+}
+
+// Mastery track: private, competition-free — words answered correctly at least
+// once and never missed. No leaderboard on purpose; it's the one signal that
+// keeps working even when nobody else is playing.
+async function renderMastery() {
+  const holder = $('mastery-holder');
+  const { data: rows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
+  const mastered = (rows || []).filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
+  holder.innerHTML = mastered ? `<div class="mastery-line">📖 ${mastered} word${mastered === 1 ? '' : 's'} mastered</div>` : '';
 }
 
 async function renderStreakChip() {
@@ -834,6 +929,7 @@ async function openRoom(room) {
   switchRoomPanel('dares');
   await loadDares();
   await renderMemberLine();
+  await checkDethronements();
   await checkRankReminder();
   subscribeRoomRealtime(room.id);
 }
@@ -854,6 +950,7 @@ function unsubscribeRoomRealtime() {
 }
 function refreshActiveRoomPanel() {
   if (!currentRoom) return;
+  if (currentTrialRound && !$('view-trial').classList.contains('hidden')) { openTrialScreen(currentTrialRound); return; }
   if (!$('panel-dares').classList.contains('hidden')) loadDares();
   else if (!$('panel-leaderboard').classList.contains('hidden')) loadLeaderboard();
 }
@@ -904,7 +1001,7 @@ async function loadDares() {
   // "N open challenges waiting" line above already covers your own open challenges.
   const open = (rounds || []).filter(r => !playedIds.has(r.id) && r.creator_username !== me);
 
-  $('tab-challenges').textContent = open.length > 0 ? `Challenges (${open.length})` : 'Challenges';
+  $('tab-challenges').textContent = open.length > 0 ? `Trials (${open.length})` : 'Trials';
 
   // Your own still-open challenges (already played by you as creator, so they never
   // appear in the list above) — a lightweight status line rather than full cards.
@@ -915,7 +1012,7 @@ async function loadDares() {
     const row = document.createElement('div');
     row.className = 'my-open-row';
     const text = document.createElement('span');
-    text.textContent = `You have ${myOpen.length} open challenge${myOpen.length > 1 ? 's' : ''} waiting`;
+    text.textContent = `You have ${myOpen.length} open Trial${myOpen.length > 1 ? 's' : ''} waiting`;
     const shareBtn = document.createElement('button');
     shareBtn.className = 'share-icon-btn';
     shareBtn.textContent = '🔗 Send';
@@ -928,36 +1025,21 @@ async function loadDares() {
 
   if (myToken !== daresLoadToken) return;
   list.innerHTML = '';
-  if (open.length === 0) { list.innerHTML = '<div class="empty-state">No open challenges right now. Start one!</div>'; }
+  if (open.length === 0) { list.innerHTML = '<div class="empty-state">No open Trials right now. Start one!</div>'; }
   for (const r of open) {
     if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
     const div = document.createElement('div');
-    div.className = 'dare-card';
-    let label = `${displayName(r.creator_username)}'s challenge`;
-    if (r.target_username === me) label = r.via_challenge_back ? `${displayName(r.creator_username)} challenged YOU back` : `${displayName(r.creator_username)} challenged YOU`;
+    div.className = 'trial-card';
+    div.onclick = () => openTrialScreen(r);
 
-    const { data: creatorScore } = await sb.from('round_scores').select('correct_count, score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
-    const scoreLine = creatorScore ? `<div class="dare-score-line">${creatorScore.score_points} pts — beat it?</div>` : '';
+    const tags = [];
+    tags.push(`<span class="trial-tag">started by ${displayName(r.creator_username)}</span>`);
+    if (r.target_username === me) tags.push(`<span class="trial-tag mine">${r.via_challenge_back ? 'reclaim this — you were beaten' : 'aimed at you'}</span>`);
 
     const { count: playCount } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('round_id', r.id);
     if (myToken !== daresLoadToken) return;
 
-    div.innerHTML = `<div class="dare-title">${label}</div>${scoreLine}<div class="dare-sub">${timeLeft(r.expires_at)} · played by ${playCount || 0}</div>`;
-
-    const btnRow = document.createElement('div');
-    btnRow.className = 'btn-row';
-    const btn = document.createElement('button');
-    btn.className = 'btn-secondary';
-    btn.textContent = 'Play this challenge';
-    btn.onclick = () => startRound(r);
-    const shareBtn = document.createElement('button');
-    shareBtn.className = 'share-icon-btn';
-    shareBtn.textContent = '🔗 Send challenge';
-    shareBtn.title = 'Send challenge';
-    shareBtn.onclick = () => shareRound(r);
-    btnRow.appendChild(btn);
-    btnRow.appendChild(shareBtn);
-    div.appendChild(btnRow);
+    div.innerHTML = `<div class="trial-card-number">📜 Trial #${r.trial_number}</div><div class="trial-tags">${tags.join('')}</div><div class="dare-sub">${timeLeft(r.expires_at)} · played by ${playCount || 0}</div>`;
 
     if (myToken !== daresLoadToken) return;
     list.appendChild(div);
@@ -967,7 +1049,7 @@ async function loadDares() {
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const { count } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('room_id', currentRoom.id).eq('creator_username', me).gte('created_at', startOfDay.toISOString());
   const used = count || 0;
-  $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} challenges in this Game Room today.`;
+  $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} Trials in this Game Room today.`;
   $('btn-start-round').disabled = used >= MAX_OPEN_DARES_PER_DAY;
   $('btn-start-round-lb').disabled = used >= MAX_OPEN_DARES_PER_DAY;
   $('btn-start-round').onclick = () => openTargetPicker();
@@ -977,6 +1059,101 @@ $('btn-invite-room').onclick = () => {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
   shareText(`Join my Game Room "${currentRoom.name}" on MaxWord — ${url}`);
 };
+
+let currentTrialRound = null;
+async function openTrialScreen(round) {
+  currentTrialRound = round;
+  show('view-trial');
+  $('trial-number-display').textContent = round.trial_number;
+
+  const tags = [];
+  tags.push(`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`);
+  if (round.target_username === me) tags.push(`<span class="trial-tag mine">${round.via_challenge_back ? 'reclaim this — you were beaten' : 'aimed at you'}</span>`);
+  $('trial-tags').innerHTML = tags.join('');
+
+  // urgency — only in the final 24h, so the long expiry window still feels generous
+  const msLeft = new Date(round.expires_at) - new Date();
+  const urgencyHolder = $('trial-urgency-holder');
+  urgencyHolder.innerHTML = (msLeft > 0 && msLeft < TRIAL_URGENCY_WINDOW_MS)
+    ? `<div class="urgency-banner">⏳ Trial #${round.trial_number} expires in ${Math.max(1, Math.round(msLeft / (60 * 60 * 1000)))}h — take your shot!</div>` : '';
+
+  const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', round.id).order('rank');
+  const rows = lb || [];
+
+  // champion banner
+  const championHolder = $('trial-champion-holder');
+  if (rows.length > 0) {
+    const champ = rows[0];
+    championHolder.innerHTML = `<div class="champion-banner"><div class="crown">👑</div><div class="champ-name">${displayName(champ.username)}</div><div class="dare-sub">${champ.score_points} pts</div></div>`;
+  } else {
+    championHolder.innerHTML = '';
+  }
+
+  // completionist line
+  const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
+  const totalMembers = (members || []).length;
+  $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${totalMembers} in the room have played this Trial</div>`;
+
+  // duel record — only when this Trial is a direct callout between two specific people, and I'm one of them
+  const duelHolder = $('trial-duel-holder');
+  duelHolder.innerHTML = '';
+  if (round.target_username && (me === round.creator_username || me === round.target_username)) {
+    const opponent = me === round.creator_username ? round.target_username : round.creator_username;
+    const record = await computeDuelRecord(me, opponent);
+    if (record.total > 0) {
+      duelHolder.innerHTML = `<div class="duel-record">⚔️ Duel Record vs. ${displayName(opponent)}: ${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>`;
+    }
+  }
+
+  // leaderboard — plain rank, no medals, matches Room/Global
+  const lbList = $('trial-leaderboard-list');
+  lbList.innerHTML = '';
+  if (rows.length === 0) { lbList.innerHTML = '<div class="empty-state">Nobody has played this Trial yet.</div>'; }
+  rows.forEach(row => {
+    const div = document.createElement('div');
+    div.className = 'trial-lb-row' + (row.rank === 1 ? ' champion' : '');
+    div.innerHTML = `<div class="lb-rank">#${row.rank}</div><div class="lb-name">${displayName(row.username)}</div><div class="lb-score">${row.score_points} pts</div>`;
+    lbList.appendChild(div);
+  });
+
+  // play / already-played state
+  const iPlayed = rows.some(row => row.username === me);
+  const playBtn = $('btn-trial-play');
+  if (iPlayed) {
+    playBtn.classList.add('hidden');
+  } else {
+    playBtn.classList.remove('hidden');
+    playBtn.textContent = round.target_username === me && round.via_challenge_back ? `Reclaim Trial #${round.trial_number}` : 'Play this Trial';
+    playBtn.onclick = () => startRound(round);
+  }
+  $('btn-trial-send').onclick = () => shareRound(round);
+}
+
+// Head-to-head tally between two people, scoped to this room, across every direct
+// Trial between them that both have actually played.
+async function computeDuelRecord(userA, userB) {
+  const { data: rounds } = await sb.from('rounds').select('id')
+    .eq('room_id', currentRoom.id)
+    .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`);
+  const roundIds = (rounds || []).map(r => r.id);
+  let wins = 0, losses = 0, ties = 0;
+  if (roundIds.length > 0) {
+    const { data: scores } = await sb.from('round_scores').select('round_id, username, score_points').in('round_id', roundIds);
+    const byRound = {};
+    (scores || []).forEach(s => { (byRound[s.round_id] = byRound[s.round_id] || []).push(s); });
+    Object.values(byRound).forEach(pair => {
+      const a = pair.find(s => s.username === userA);
+      const b = pair.find(s => s.username === userB);
+      if (!a || !b) return; // only counts once both have actually played it
+      if (a.score_points > b.score_points) wins++;
+      else if (a.score_points < b.score_points) losses++;
+      else ties++;
+    });
+  }
+  return { wins, losses, ties, total: wins + losses + ties };
+}
+
+$('btn-trial-back').onclick = () => { currentTrialRound = null; switchRoomPanel('dares'); show('view-room'); };
 
 async function loadMembers() {
   const { data: members } = await sb.from('room_members').select('*').eq('room_id', currentRoom.id).order('joined_at');
@@ -1200,7 +1377,7 @@ async function openTargetPicker() {
   };
   members.forEach(m => {
     const btn = document.createElement('button');
-    btn.className = 'btn-secondary';
+    btn.className = 'btn-primary';
     btn.style.marginBottom = '8px';
     btn.textContent = displayName(m.username);
     btn.onclick = () => { disableAllPickerButtons(); startNewRound(m.username); };
@@ -1210,14 +1387,14 @@ async function openTargetPicker() {
 }
 $('btn-choose-target-back').onclick = () => show('view-room');
 
-async function startNewRound(targetUsername) {
+async function startNewRound(targetUsername, viaChallengeBack) {
   $('btn-start-round').disabled = true;
   $('btn-start-round-lb').disabled = true;
   const wordIds = await pickRoundWords();
   const now = new Date();
   const expires = new Date(now.getTime() + DARE_EXPIRY_MS);
   const { data: round, error } = await sb.from('rounds').insert({
-    room_id: currentRoom.id, creator_username: me, target_username: targetUsername || null, word_ids: wordIds, short_code: shortRoundCode(), status: 'open',
+    room_id: currentRoom.id, creator_username: me, target_username: targetUsername || null, via_challenge_back: !!viaChallengeBack, word_ids: wordIds, short_code: shortRoundCode(), status: 'open',
     created_at: now.toISOString(), expires_at: expires.toISOString()
   }).select().single();
   if (error) { $('btn-start-round').disabled = false; $('btn-start-round-lb').disabled = false; alert(error.message); return; }
@@ -1298,10 +1475,23 @@ async function finishRound() {
   if ((count || 0) >= 2) await sb.from('rounds').update({ status: 'locked' }).eq('id', currentRound.id);
 
   const newBadges = await maybeAwardBadges(correct);
+  const rankedUpBadge = await maybeAwardRankedUp();
+  if (rankedUpBadge) newBadges.push(rankedUpBadge);
   await recordRoundPlayed();
 
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
+}
+
+// Fires exactly once, the moment someone crosses from "Unranked" into their first
+// real tier — a real congratulatory milestone, not just a quiet threshold crossing.
+async function maybeAwardRankedUp() {
+  const { data: existing } = await sb.from('badges').select('badge_key').eq('username', me).eq('badge_key', 'ranked_up').is('room_id', null).maybeSingle();
+  if (existing) return null;
+  const { data: mine } = await sb.from('global_leaderboard_alltime').select('rounds_played').eq('username', me).maybeSingle();
+  if (!mine || mine.rounds_played < MIN_GAMES_TO_RANK) return null;
+  await sb.from('badges').insert({ username: me, badge_key: 'ranked_up', room_id: null });
+  return '🎓 Ranked Up';
 }
 
 async function recordRoundPlayed() {
@@ -1321,7 +1511,7 @@ async function maybeAwardBadges(correct) {
   const earned = [];
   if (correct === roundWords.length) {
     const { data: existing } = await sb.from('badges').select('*').eq('username', me).eq('badge_key', 'flawless_scroll').eq('room_id', currentRoom.id).maybeSingle();
-    if (!existing) { await sb.from('badges').insert({ username: me, badge_key: 'flawless_scroll', room_id: currentRoom.id }); earned.push('🏆 Flawless Scroll'); }
+    if (!existing) { await sb.from('badges').insert({ username: me, badge_key: 'flawless_scroll', room_id: currentRoom.id }); earned.push('✨ Flawless Scroll'); }
   }
   return earned;
 }
@@ -1380,17 +1570,7 @@ async function renderScorecard(correct, points, newBadges) {
     }
   }
 
-  dareBackBtn.onclick = async () => {
-    dareBackBtn.disabled = true;
-    const wordIds = await pickRoundWords();
-    const now = new Date();
-    const { data: round, error } = await sb.from('rounds').insert({
-      room_id: currentRoom.id, creator_username: me, target_username: currentRound.creator_username, via_challenge_back: true, word_ids: wordIds,
-      short_code: shortRoundCode(), status: 'open', created_at: now.toISOString(), expires_at: new Date(now.getTime() + DARE_EXPIRY_MS).toISOString()
-    }).select().single();
-    if (error) { dareBackBtn.disabled = false; alert(error.message); return; }
-    startRound(round);
-  };
+  dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(currentRound.creator_username, true); };
 
   renderOtherDares();
 }
@@ -1406,17 +1586,13 @@ async function renderOtherDares() {
   if (open.length === 0) return;
   const title = document.createElement('div');
   title.className = 'dare-sub';
-  title.textContent = `${open.length} more open challenge${open.length > 1 ? 's' : ''} in this Game Room:`;
+  title.textContent = `${open.length} more open Trial${open.length > 1 ? 's' : ''} in this Game Room:`;
   holder.appendChild(title);
   open.slice(0, 3).forEach(r => {
     const div = document.createElement('div');
-    div.className = 'dare-card';
-    div.innerHTML = `<div class="dare-title">${displayName(r.creator_username)}'s challenge</div><div class="dare-sub">${timeLeft(r.expires_at)}</div>`;
-    const btn = document.createElement('button');
-    btn.className = 'btn-secondary';
-    btn.textContent = 'Play it';
-    btn.onclick = () => startRound(r);
-    div.appendChild(btn);
+    div.className = 'trial-card';
+    div.onclick = () => openTrialScreen(r);
+    div.innerHTML = `<div class="trial-card-number">📜 Trial #${r.trial_number}</div><div class="trial-tags"><span class="trial-tag">started by ${displayName(r.creator_username)}</span></div><div class="dare-sub">${timeLeft(r.expires_at)}</div>`;
     holder.appendChild(div);
   });
 }

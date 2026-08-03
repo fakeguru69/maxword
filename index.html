@@ -131,7 +131,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    feel — this is the "excitement" layer, so it should visually say so. */
 .trial-card { border: 1px solid var(--gold-soft); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: rgba(212,175,55,0.05); cursor: pointer; }
 .trial-card:active { border-color: var(--gold); }
-.trial-card-number { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.trial-card.state-losing { border-color: var(--danger); background: rgba(192,85,74,0.06); }
+.trial-card.state-champion { border-color: var(--line); background: var(--ink-raised); }
+.trial-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+.trial-card-number { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; }
+.trial-card-byline { font-size: 11px; color: var(--cream-dim); margin-bottom: 6px; }
+.trial-status-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); white-space: nowrap; flex-shrink: 0; }
+.trial-status-badge.losing { border-color: var(--danger); color: #F0A898; }
+.trial-status-badge.champion { border-color: var(--line); color: var(--cream-dim); }
 .trial-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .trial-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--cream-dim); }
 .trial-tag.mine { border-color: var(--gold); color: var(--gold); }
@@ -483,6 +490,11 @@ function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i-
 // everywhere in the UI to match the Cinzel/seal aesthetic — visual only,
 // never affects storage, matching, or login.
 function displayName(u) { return (u || '').toUpperCase(); }
+// Same idea, but for the one spot (a button sitting in an otherwise normal
+// sentence) where all-caps clashes with the rest of the label instead of
+// reading as a stylistic seal — e.g. "Challenge Apple back," not the jarring
+// "Challenge APPLE back."
+function titleCaseName(u) { u = u || ''; return u.charAt(0).toUpperCase() + u.slice(1).toLowerCase(); }
 
 async function shareText(text) {
   if (navigator.share) {
@@ -1053,32 +1065,51 @@ async function loadDares() {
   $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
 
   if (myToken !== daresLoadToken) return;
-  list.innerHTML = '';
-  if (all.length === 0) { list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; }
+  if (all.length === 0) { list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
+
+  // Fetch + compute state for every Trial first, so we can sort by what actually
+  // needs attention — unplayed, then losing, then settled/champion — instead of
+  // just chronological order burying actionable ones under old history.
+  const withState = [];
   for (const r of all) {
     if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
-
     const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', r.id).order('rank');
     if (myToken !== daresLoadToken) return;
     const rows = lb || [];
     const myRow = rows.find(row => row.username === me);
     const champ = rows[0] || null;
+    const state = !myRow ? 'unplayed' : (myRow.rank === 1 ? 'champion' : 'losing');
+    withState.push({ r, rows, myRow, champ, state });
+  }
+  const statePriority = { unplayed: 0, losing: 1, champion: 2 };
+  withState.sort((a, b) => statePriority[a.state] - statePriority[b.state]);
 
+  list.innerHTML = '';
+  for (const { r, rows, myRow, champ, state } of withState) {
     const div = document.createElement('div');
-    div.className = 'trial-card';
+    div.className = `trial-card state-${state}`;
     div.onclick = () => openTrialScreen(r);
 
-    const tags = [`<span class="trial-tag">started by ${displayName(r.creator_username)}</span>`];
-    let statusLine;
-    if (myRow) {
-      if (myRow.rank === 1) { tags.push(`<span class="trial-tag mine">👑 you hold the throne</span>`); statusLine = `${myRow.score_points} pts`; }
-      else { tags.push(`<span class="trial-tag mine">😤 #${myRow.rank} of ${rows.length}</span>`); statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts`; }
+    let badge = null, statusLine;
+    if (state === 'champion') {
+      badge = '👑 you hold the throne';
+      statusLine = `${myRow.score_points} pts`;
+    } else if (state === 'losing') {
+      badge = `😤 losing to ${displayName(champ.username)}`;
+      statusLine = `${champ.score_points} pts · you're #${myRow.rank} of ${rows.length}`;
     } else {
-      if (r.target_username === me) tags.push(`<span class="trial-tag mine">${r.via_challenge_back ? 'challenged you back' : 'aimed at you'}</span>`);
-      statusLine = champ ? `${champ.score_points} pts to beat` : 'nobody has played yet';
+      if (r.target_username === me) badge = r.via_challenge_back ? 'challenged you back' : 'aimed at you';
+      statusLine = champ ? `${displayName(champ.username)}'s ${champ.score_points} pts to beat` : 'nobody has played yet';
     }
+    const badgeClass = state === 'losing' ? 'losing' : (state === 'champion' ? 'champion' : '');
 
-    div.innerHTML = `<div class="trial-card-number">📜 Trial #${r.trial_number}</div><div class="trial-tags">${tags.join('')}</div><div class="dare-sub">${statusLine} · played by ${rows.length}</div>`;
+    div.innerHTML = `
+      <div class="trial-card-top">
+        <div class="trial-card-number">📜 Trial #${r.trial_number}</div>
+        ${badge ? `<span class="trial-status-badge ${badgeClass}">${badge}</span>` : ''}
+      </div>
+      <div class="trial-card-byline">started by ${displayName(r.creator_username)}</div>
+      <div class="dare-sub">${statusLine} · played by ${rows.length}</div>`;
     list.appendChild(div);
   }
 
@@ -1164,7 +1195,7 @@ async function openTrialScreen(round) {
     playBtn.onclick = () => startRound(round);
   } else if (myRow.rank !== 1) {
     playBtn.classList.remove('hidden');
-    playBtn.textContent = `Challenge ${displayName(champ.username)} back`;
+    playBtn.textContent = '⚔️ Challenge back';
     playBtn.onclick = () => startNewRound(champ.username, true);
   } else {
     playBtn.classList.add('hidden'); // you're already champion — nothing to challenge
@@ -1624,7 +1655,7 @@ async function renderScorecard(correct, points, newBadges) {
   } else {
     dareBackBtn.classList.remove('hidden');
     dareBackBtn.className = 'btn-primary';
-    dareBackBtn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
+    dareBackBtn.textContent = `Challenge ${titleCaseName(currentRound.creator_username)} back`;
     $('btn-challenge-others').className = 'btn-secondary';
   }
 
@@ -1648,9 +1679,9 @@ async function renderOtherDares() {
   holder.appendChild(title);
   open.slice(0, 3).forEach(r => {
     const div = document.createElement('div');
-    div.className = 'trial-card';
+    div.className = 'trial-card state-unplayed';
     div.onclick = () => openTrialScreen(r);
-    div.innerHTML = `<div class="trial-card-number">📜 Trial #${r.trial_number}</div><div class="trial-tags"><span class="trial-tag">started by ${displayName(r.creator_username)}</span></div><div class="dare-sub">${timeLeft(r.expires_at)}</div>`;
+    div.innerHTML = `<div class="trial-card-top"><div class="trial-card-number">📜 Trial #${r.trial_number}</div></div><div class="trial-card-byline">started by ${displayName(r.creator_username)}</div>`;
     holder.appendChild(div);
   });
 }

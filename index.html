@@ -186,7 +186,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .badge-showcase { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .notif-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; margin-bottom: 12px; background: rgba(79,182,168,0.08); border: 1px solid var(--teal-dim); font-size: 13px; }
 .notif-banner button { width: auto; padding: 8px 14px; font-size: 13px; flex-shrink: 0; }
-.modal-notif-nudge { display: block; text-align: center; font-size: 12px; color: var(--teal); text-decoration: underline; margin: -6px 0 16px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -265,7 +264,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="mastery-section-holder"></div>
     <div id="activity-section-holder"></div>
     <div id="badge-showcase-holder"></div>
-    <div id="notif-banner-holder"></div>
     <div id="a2hs-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
     <div id="rooms-list"></div>
@@ -408,16 +406,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
   </div>
 
-  <!-- RANK REMINDER MODAL -->
-  <div class="modal-overlay hidden" id="reminder-modal">
-    <div class="card modal-card">
-      <h2 class="display" style="margin-bottom:10px;">🏅 Almost ranked!</h2>
-      <p id="reminder-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
-      <button class="btn-primary" id="btn-reminder-play">Play now</button>
-      <button class="link-btn" id="btn-reminder-later" style="margin-top:10px;">Later</button>
-    </div>
-  </div>
-
   <!-- DETHRONED MODAL -->
   <div class="modal-overlay hidden" id="dethroned-modal">
     <div class="card modal-card">
@@ -505,7 +493,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // ---------------------------------------------------------------
 const SUPABASE_URL = "https://dowhlyoufjmespcwyrke.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_2ggFlbGiuJIDnSmlyNidaw_I9Mymwa-";
-const VAPID_PUBLIC_KEY = "YOUR_VAPID_PUBLIC_KEY";
 const POINTS_PER_CORRECT = 100;
 const QUESTIONS_PER_ROUND = 10;
 const HARD_WORD_MIN_SAMPLE = 5;   // min times a word must've been answered before we trust its difficulty
@@ -748,8 +735,10 @@ $('btn-login').onclick = async () => {
   const err = $('login-error');
   err.classList.add('hidden');
   const pin_hash = await sha256(pin + username);
-  const { data, error } = await sb.from('profiles').select('username, pin_hash').eq('username', username).maybeSingle();
-  if (error || !data || data.pin_hash !== pin_hash) { err.textContent = 'Wrong username or PIN.'; err.classList.remove('hidden'); return; }
+  // Credential check happens server-side via a SECURITY DEFINER function —
+  // the client never sees pin_hash for any account, its own or anyone else's.
+  const { data: ok, error } = await sb.rpc('login_check', { p_username: username, p_pin_hash: pin_hash });
+  if (error || !ok) { err.textContent = 'Wrong username or PIN.'; err.classList.remove('hidden'); return; }
   me = username;
   localStorage.setItem('mw_session_username', username);
   afterLogin();
@@ -757,9 +746,9 @@ $('btn-login').onclick = async () => {
 
 $('btn-forgot-lookup').onclick = async () => {
   const username = $('forgot-username').value.trim().toLowerCase();
-  const { data } = await sb.from('profiles').select('security_question').eq('username', username).maybeSingle();
-  if (!data) { $('forgot-error').textContent = 'No such username.'; $('forgot-error').classList.remove('hidden'); return; }
-  $('forgot-question-label').textContent = data.security_question;
+  const { data: question } = await sb.rpc('get_security_question', { p_username: username });
+  if (!question) { $('forgot-error').textContent = 'No such username.'; $('forgot-error').classList.remove('hidden'); return; }
+  $('forgot-question-label').textContent = question;
   $('forgot-question-block').classList.remove('hidden');
   $('btn-forgot-reset').dataset.username = username;
 };
@@ -771,11 +760,13 @@ $('btn-forgot-reset').onclick = async () => {
   const err = $('forgot-error');
   err.classList.add('hidden');
   if (!/^\d{4}$/.test(newPin)) { err.textContent = 'PIN must be 4 digits.'; err.classList.remove('hidden'); return; }
-  const { data } = await sb.from('profiles').select('security_answer_hash').eq('username', username).maybeSingle();
   const answerHash = await sha256(answer);
-  if (!data || data.security_answer_hash !== answerHash) { err.textContent = 'Answer did not match.'; err.classList.remove('hidden'); return; }
   const pin_hash = await sha256(newPin + username);
-  await sb.from('profiles').update({ pin_hash }).eq('username', username);
+  // Answer verification AND the pin_hash write both happen inside this one
+  // server-side function — the client never reads security_answer_hash, and
+  // there's no longer a direct anon UPDATE path to profiles at all.
+  const { data: ok } = await sb.rpc('reset_pin', { p_username: username, p_answer_hash: answerHash, p_new_pin_hash: pin_hash });
+  if (!ok) { err.textContent = 'Answer did not match.'; err.classList.remove('hidden'); return; }
   show('view-login');
 };
 
@@ -793,7 +784,6 @@ async function afterLogin() {
   await renderBadgeShowcase();
   await renderMasterySection();
   await renderActivitySection();
-  renderNotifBanner();
   renderHomeScreenBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
@@ -801,16 +791,9 @@ async function afterLogin() {
   await checkNewChallenges();
 }
 
-// One-time-each nudge, shown the moment Home or a room is opened (login, resuming a
-// session, or returning from a finished round) — fires once after the 1st game
-// ("2 more to get ranked") and once after the 2nd ("1 more"), never again after that,
-// and never once they've actually crossed MIN_GAMES_TO_RANK. Only ONE primary action
-// button (smart-routed), plus a plain dismiss — not a menu of choices.
-let reminderAction = null;
-
 // Reusable "explain this the very first time it happens, then get out of the way
-// forever" popup — server-tracked via reminders_shown, same pattern as the rank
-// reminders above. Pass a callback to run once the person dismisses it (or
+// forever" popup — server-tracked via reminders_shown. Pass a callback to run
+// once the person dismisses it (or
 // immediately, if they've already seen this one before) so a flow that needs to
 // wait for acknowledgment (e.g. don't start the quiz until they've read the tip)
 // can do so safely either way.
@@ -848,7 +831,6 @@ async function checkDethronements() {
   }
   $('dethroned-modal-text').textContent = text;
   $('dethroned-modal').classList.remove('hidden');
-  appendNotifNudgeToModal('dethroned-modal');
 }
 $('btn-dethroned-ok').onclick = () => $('dethroned-modal').classList.add('hidden');
 
@@ -878,7 +860,6 @@ async function checkNewChallenges() {
   }
   $('challenged-modal-text').textContent = text;
   $('challenged-modal').classList.remove('hidden');
-  appendNotifNudgeToModal('challenged-modal');
 }
 $('btn-challenged-ok').onclick = () => $('challenged-modal').classList.add('hidden');
 
@@ -892,61 +873,6 @@ async function awardBadgeOnce(key) {
   return true;
 }
 
-// A quiet secondary line under a "something happened" popup (dethroned / challenged) —
-// ties the notification ask to a real concrete moment instead of a cold abstract pitch.
-// Only appears while the permission is still unanswered; removes any stale copy of
-// itself first so re-showing the same modal doesn't stack duplicates.
-function appendNotifNudgeToModal(modalId) {
-  const modal = $(modalId);
-  const old = modal.querySelector('.modal-notif-nudge');
-  if (old) old.remove();
-  if (!('Notification' in window) || Notification.permission !== 'default') return;
-  const nudge = document.createElement('span');
-  nudge.className = 'modal-notif-nudge';
-  nudge.textContent = '🔔 Turn on notifications so you catch this the moment it happens';
-  nudge.onclick = async () => { nudge.remove(); await enablePush(); };
-  const btn = modal.querySelector('.btn-primary');
-  btn.parentNode.insertBefore(nudge, btn);
-}
-
-async function checkRankReminder() {
-  const { data: mine } = await sb.from('global_leaderboard_alltime').select('rounds_played').eq('username', me).maybeSingle();
-  const played = mine ? mine.rounds_played : 0;
-  if (played < 1 || played >= MIN_GAMES_TO_RANK) return;
-  const reminderKey = `rank_reminder_${played}`;
-  const { data: existing } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', reminderKey).maybeSingle();
-  if (existing) return;
-  await sb.from('reminders_shown').insert({ username: me, reminder_key: reminderKey });
-  const remaining = MIN_GAMES_TO_RANK - played;
-
-  // Find the single most useful thing for them to do next: a challenge already
-  // aimed at them (any room), if one exists — otherwise just start one here.
-  const now = new Date().toISOString();
-  const { data: targeted } = await sb.from('rounds').select('*, rooms!inner(*)').eq('target_username', me).gt('expires_at', now).order('created_at', { ascending: false });
-  let targetRound = null;
-  if (targeted && targeted.length > 0) {
-    const roundIds = targeted.map(r => r.id);
-    const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', roundIds);
-    const playedIds = new Set((myScores || []).map(s => s.round_id));
-    targetRound = targeted.find(r => !playedIds.has(r.id)) || null;
-  }
-
-  if (targetRound) {
-    $('reminder-modal-text').textContent = `${remaining} more round${remaining > 1 ? 's' : ''} to get ranked — ${displayName(targetRound.creator_username)} is waiting for you!`;
-    $('btn-reminder-play').textContent = 'Play it now';
-    reminderAction = async () => { await openRoom(targetRound.rooms); startRound(targetRound); };
-  } else {
-    $('reminder-modal-text').textContent = `${remaining} more round${remaining > 1 ? 's' : ''} to get ranked!`;
-    $('btn-reminder-play').textContent = 'Start a Trial';
-    // If this fired while already inside a room (the common case now that it also
-    // checks right after finishing a game), stay there instead of bouncing back to
-    // Home and costing an extra tap to re-enter the room they were already in.
-    reminderAction = currentRoom ? (() => openRoom(currentRoom)) : (() => show('view-home'));
-  }
-  $('reminder-modal').classList.remove('hidden');
-}
-$('btn-reminder-later').onclick = () => $('reminder-modal').classList.add('hidden');
-$('btn-reminder-play').onclick = () => { $('reminder-modal').classList.add('hidden'); if (reminderAction) reminderAction(); };
 
 // rarity: how prominently a badge should surface on Home's capped display — higher
 // surfaces first. Hard-won badges should never get crowded out by trivial ones.
@@ -960,7 +886,6 @@ const BADGE_META = {
   flawless_scroll: { emoji: '✨', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.', rarity: 3 },
   ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 2 games played.', rarity: 1 },
   home_screen: { emoji: '📲', label: 'Home Base', req: 'Add MaxWord to your Home Screen.', rarity: 2 },
-  notifications_enabled: { emoji: '🔔', label: 'Always On', req: 'Turn on notifications.', rarity: 2 },
 };
 
 // Tier reflects skill (global all-time average), separate from streak (consistency).
@@ -1169,34 +1094,12 @@ async function joinRoomRow(room) {
   if (!existing) await sb.from('room_members').insert({ room_id: room.id, username: me, role: 'member' });
 }
 
-async function enablePush() {
-  try {
-    const reg = await navigator.serviceWorker.register('sw.js');
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { renderNotifBanner(); return; }
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: VAPID_PUBLIC_KEY });
-    await sb.from('push_subscriptions').upsert({ username: me, endpoint: sub.endpoint, subscription: sub.toJSON() });
-    await awardBadgeOnce('notifications_enabled');
-  } catch (e) { alert('Could not enable notifications: ' + e.message); }
-  renderNotifBanner();
-}
-
-// Shown until the person has answered the permission prompt (granted or denied) —
-// disappears either way so it doesn't nag once they've made a choice.
-function renderNotifBanner() {
-  const holder = $('notif-banner-holder');
-  holder.innerHTML = '';
-  if (!('Notification' in window) || Notification.permission !== 'default') return;
-  const banner = document.createElement('div');
-  banner.className = 'notif-banner';
-  banner.innerHTML = `<span>🔔 Don't miss a challenge — turn on notifications</span>`;
-  const btn = document.createElement('button');
-  btn.className = 'btn-primary';
-  btn.textContent = 'Enable';
-  btn.onclick = enablePush;
-  banner.appendChild(btn);
-  holder.appendChild(banner);
-}
+// Registered unconditionally at boot (not tied to any permission ask) — a
+// registered service worker is one of the signals Chrome's installability
+// heuristic looks at, so this helps the Add-to-Home-Screen prompt actually
+// fire reliably. See sw.js — kept intentionally minimal now that the
+// browser-push feature has been removed.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 // ---------------------------------------------------------------
 // ADD TO HOME SCREEN
@@ -1387,12 +1290,18 @@ async function loadDares() {
   // needs attention — a retaliation aimed at you first, then a fresh callout, then
   // generic open ones, then losing, then settled/champion last — instead of just
   // chronological order burying the most personal, urgent items under old history.
+  // One batched query for every Trial's leaderboard rows, grouped client-side —
+  // used to be one round-trip PER Trial in a loop, which visibly slowed down as
+  // a room's Trial count grew past a couple dozen.
+  const roundIds = all.map(r => r.id);
+  const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', roundIds).order('rank');
+  if (myToken !== daresLoadToken) return;
+  const lbByRound = {};
+  (allLb || []).forEach(row => { (lbByRound[row.round_id] = lbByRound[row.round_id] || []).push(row); });
+
   const withState = [];
   for (const r of all) {
-    if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
-    const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', r.id).order('rank');
-    if (myToken !== daresLoadToken) return;
-    const rows = lb || [];
+    const rows = lbByRound[r.id] || [];
     const myRow = rows.find(row => row.username === me);
     const champ = rows[0] || null;
     let state;
@@ -1828,6 +1737,8 @@ async function startRound(round) {
   roundWords = round.word_ids.map(id => wordById[id]).filter(Boolean);
   roundAnswers = [];
   qIndex = 0;
+  finishingRound = false;
+  $('btn-next-word').disabled = false;
 
   // Fires before the very first Trial this person has EVER played, however they
   // got here — self-created, tapped from the list, a WhatsApp link, or a reminder.
@@ -1891,11 +1802,19 @@ function selectAnswer(chosen, w, btnEl, optDiv) {
 
 $('btn-next-word').onclick = () => {
   qIndex++;
-  if (qIndex >= roundWords.length) { finishRound(); }
+  if (qIndex >= roundWords.length) { $('btn-next-word').disabled = true; finishRound(); }
   else { renderQuestion(); }
 };
 
+// Reentrancy guard: a fast double-tap on "See result" used to be able to fire
+// finishRound() twice concurrently — the second round_scores insert silently
+// failed (its error was never checked), but badge/streak logic still ran a
+// second time regardless. The button-disable above covers the common case;
+// this covers any other path that might call finishRound() directly.
+let finishingRound = false;
 async function finishRound() {
+  if (finishingRound) return;
+  finishingRound = true;
   $('progress-fill').style.width = '100%';
   const correct = roundAnswers.filter(Boolean).length;
   const points = correct * POINTS_PER_CORRECT;
@@ -2041,6 +1960,12 @@ async function renderScorecard(correct, points, newBadges) {
   const normalActions = $('normal-scorecard-actions');
   forcedHolder.innerHTML = '';
 
+  // A genuinely solo room (nobody else has joined yet) used to dead-end the forced
+  // flow: game 1's "Choose a challenger" opened a picker with nothing in it. Now
+  // detected once here and threaded through both branches below instead.
+  const { count: otherMembers } = await sb.from('room_members').select('*', { count: 'exact', head: true }).eq('room_id', currentRoom.id).neq('username', me);
+  const soloRoom = (otherMembers || 0) === 0;
+
   if (roundsPlayedNow === 1) {
     normalActions.classList.add('hidden');
     const card = document.createElement('div');
@@ -2051,6 +1976,15 @@ async function renderScorecard(correct, points, newBadges) {
       btn.className = 'btn-primary';
       btn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
       btn.onclick = () => { btn.disabled = true; startNewRound(currentRound.creator_username, true); };
+      card.appendChild(btn);
+    } else if (soloRoom) {
+      // Nobody to pick from — skip the picker dead-end entirely and go straight
+      // into round two as another open Trial, no target.
+      card.innerHTML = `<div class="forced-flow-text">Nice! Ready for round two? You're the only one in this room so far, so this one's open for whenever someone joins.</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.textContent = 'Play round two';
+      btn.onclick = () => { btn.disabled = true; startNewRound(); };
       card.appendChild(btn);
     } else {
       card.innerHTML = `<div class="forced-flow-text">Nice! Ready for round two? Pick someone in the room to challenge next.</div>`;
@@ -2065,12 +1999,35 @@ async function renderScorecard(correct, points, newBadges) {
     normalActions.classList.add('hidden');
     const card = document.createElement('div');
     card.className = 'forced-flow-card';
-    card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! Every Trial you play feeds your overall average, and that average is what your Leaderboard position is based on.</div>`;
-    const btn = document.createElement('button');
-    btn.className = 'btn-primary';
-    btn.textContent = 'See my Game Room';
-    btn.onclick = () => openRoom(currentRoom);
-    card.appendChild(btn);
+    if (soloRoom) {
+      // The real "before she quits" moment for a solo player specifically — she's
+      // just done the full onboarding arc alone. A Trial only gets exciting once
+      // someone else is in it, so the ask here is to invite, not just "see room."
+      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! But a Trial's no fun alone — invite someone to make it a real contest.</div>`;
+      const shareBtn = document.createElement('button');
+      shareBtn.className = 'btn-primary';
+      shareBtn.textContent = '⤴ Challenge others';
+      shareBtn.onclick = () => {
+        const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
+        shareText(`Join my Game Room "${currentRoom.name}" on MaxWord — think you can out-word me? ${url}`);
+      };
+      card.appendChild(shareBtn);
+      const laterBtn = document.createElement('button');
+      laterBtn.className = 'link-btn';
+      laterBtn.style.display = 'block';
+      laterBtn.style.textAlign = 'center';
+      laterBtn.style.marginTop = '10px';
+      laterBtn.textContent = 'See my Game Room';
+      laterBtn.onclick = () => openRoom(currentRoom);
+      card.appendChild(laterBtn);
+    } else {
+      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! Every Trial you play feeds your overall average, and that average is what your Leaderboard position is based on.</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.textContent = 'See my Game Room';
+      btn.onclick = () => openRoom(currentRoom);
+      card.appendChild(btn);
+    }
     forcedHolder.appendChild(card);
   } else {
     normalActions.classList.remove('hidden');
@@ -2095,11 +2052,13 @@ async function renderOtherDares() {
   title.className = 'dare-sub';
   title.textContent = `${open.length} more open Trial${open.length > 1 ? 's' : ''} in this Game Room:`;
   holder.appendChild(title);
-  for (const r of open.slice(0, 3)) {
-    if (myToken !== otherDaresLoadToken) return;
-    const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', r.id).order('rank');
-    if (myToken !== otherDaresLoadToken) return;
-    const champ = (lb || [])[0] || null;
+  const shown = open.slice(0, 3);
+  const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', shown.map(r => r.id)).eq('rank', 1);
+  if (myToken !== otherDaresLoadToken) return;
+  const champByRound = {};
+  (allLb || []).forEach(row => { champByRound[row.round_id] = row; });
+  for (const r of shown) {
+    const champ = champByRound[r.id] || null;
     let badge, badgeClass;
     if (r.target_username === me) {
       if (r.via_challenge_back) { badge = '🎯 counter challenge'; badgeClass = 'challenged-back'; }
@@ -2155,7 +2114,7 @@ async function handleDeepLink() {
 (async function boot() {
   const saved = localStorage.getItem('mw_session_username');
   if (saved) {
-    const { data } = await sb.from('profiles').select('username').eq('username', saved).maybeSingle();
+    const { data } = await sb.from('public_profiles').select('username').eq('username', saved).maybeSingle();
     if (data) { me = saved; afterLogin(); return; }
     localStorage.removeItem('mw_session_username');
   }

@@ -787,6 +787,12 @@ async function afterLogin() {
   await updateStreakOnOpen();
   await loadRoomsList();
   await renderStatusRow();
+  // If she's here in standalone mode at all, the app IS on her home screen —
+  // regardless of HOW she got there (our own "Add" button, or Chrome's own
+  // native install menu, which never gives our appinstalled listener a
+  // chance to fire). Catches that gap retroactively so the badge/banner
+  // state stays correct everywhere, not just through our own button.
+  if (isStandalone()) await awardBadgeOnce('home_screen');
   await renderBadgeShowcase();
   await renderMasterySection();
   await renderActivitySection();
@@ -1889,7 +1895,7 @@ async function recordRoundPlayed() {
   await sb.from('streaks').update({ current_streak: newStreak, best_streak: Math.max(newStreak, s.best_streak), last_played_date: today }).eq('username', me);
   const earnedKeys = [];
   for (const [n, key] of [[3, 'streak_3'], [7, 'streak_7'], [30, 'streak_30']]) {
-    if (newStreak === n) { await sb.from('badges').upsert({ username: me, badge_key: key, room_id: null }); earnedKeys.push(key); }
+    if (newStreak === n) { const already = await hasBadge(key); if (!already) { await sb.from('badges').insert({ username: me, badge_key: key, room_id: null }); earnedKeys.push(key); } }
   }
   return earnedKeys;
 }

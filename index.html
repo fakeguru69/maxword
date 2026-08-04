@@ -94,6 +94,11 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .scorecard .score-comment { font-size: 17px; font-weight: 600; color: var(--cream); margin-bottom: 10px; }
 .scorecard .score-verdict { font-size: 15px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold-soft); color: var(--gold); }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
+.badge-chip-more { cursor: pointer; background: transparent; border-style: dashed; color: var(--cream-dim); }
+.badge-earned-card { text-align: left; border: 1px solid var(--gold); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: rgba(212,175,55,0.08); }
+.badge-earned-title { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.badge-earned-req { font-size: 12px; color: var(--cream-dim); }
+.badge-earned-next { font-size: 12px; color: var(--teal); margin-top: 6px; font-weight: 600; }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
 .error-text { color: var(--danger); font-size: 13px; margin-top: -8px; margin-bottom: 10px; }
@@ -137,12 +142,12 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-card-number { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; }
 .trial-card-byline { font-size: 11px; color: var(--cream-dim); margin-bottom: 6px; }
 .trial-card-byline-name { color: var(--cream); font-weight: 600; }
-.trial-status-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); white-space: nowrap; flex-shrink: 0; }
+.trial-status-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1.5px solid var(--gold); color: var(--gold); white-space: nowrap; flex-shrink: 0; background: transparent; font-weight: 600; }
 .trial-status-badge.losing { border-color: var(--danger); color: #F0A898; }
-.trial-status-badge.champion { background: var(--gold); border-color: var(--gold); color: #1A1300; font-weight: 700; }
-.trial-status-badge.targeted { background: rgba(212,175,55,0.15); font-weight: 600; }
-.trial-status-badge.challenged-back { background: rgba(212,175,55,0.3); border-color: var(--gold); color: var(--gold); font-weight: 700; box-shadow: 0 0 8px rgba(212,175,55,0.25); }
-.trial-status-badge.open-invite { border-color: var(--teal-dim); color: var(--teal); font-weight: 500; opacity: 0.85; }
+.trial-status-badge.champion { font-weight: 700; }
+.trial-status-badge.targeted { }
+.trial-status-badge.challenged-back { font-weight: 700; box-shadow: 0 0 8px rgba(212,175,55,0.25); }
+.trial-status-badge.open-invite { border-color: var(--teal-dim); color: var(--teal); }
 .trial-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .trial-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--cream-dim); }
 .trial-tag.mine { border-color: var(--gold); color: var(--gold); }
@@ -161,6 +166,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .status-row { font-size: 14px; color: var(--cream); font-weight: 600; margin: 8px 0 12px; }
 .mastery-section { margin-bottom: 4px; }
 .mastery-line { font-size: 13px; color: var(--teal); margin-bottom: 8px; }
+.mastery-line.prominent { font-size: 16px; font-weight: 700; color: var(--gold); }
 .room-item { padding: 18px 16px; }
 .room-item .room-name { font-size: 18px; font-family: 'Cinzel', serif; color: var(--gold); }
 .target-badge { display: inline-block; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--danger); color: var(--cream); vertical-align: middle; }
@@ -248,6 +254,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
     <div id="status-row-holder"></div>
     <div id="mastery-section-holder"></div>
+    <div id="activity-section-holder"></div>
     <div id="badge-showcase-holder"></div>
     <div id="notif-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
@@ -294,8 +301,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <button class="btn-ghost" id="btn-invite-room" style="margin:12px 0;">Invite to Game Room</button>
 
     <div class="tabs">
-      <div class="tab active" data-panel="dares" id="tab-challenges">Trials</div>
-      <div class="tab" data-panel="leaderboard">Leaderboard</div>
+      <div class="tab active" data-panel="dares" id="tab-challenges">📜 Trials</div>
+      <div class="tab" data-panel="leaderboard">🏆 Leaderboard</div>
     </div>
 
     <div id="panel-dares">
@@ -359,11 +366,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 
   <!-- PLAYER PROFILE — bragging rights: tap any name on a leaderboard to see their
        public stats and your lifetime Duel Record with them. Mastery stays private
-       and never appears here, even though it shows on your own Home. -->
+       and never appears here, except when viewing your own profile. -->
   <section id="view-player-profile" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-player-profile-back">&larr; Back</button>
     <div class="account-name-line" id="player-profile-name"></div>
     <div id="player-profile-status-holder"></div>
+    <div id="player-profile-activity-holder"></div>
+    <div id="player-profile-mastery-holder"></div>
+    <div id="player-profile-badges-holder"></div>
     <div id="player-profile-duel-holder"></div>
   </section>
 
@@ -500,6 +510,7 @@ let playerProfileReturnView = 'view-home';
 async function openPlayerProfile(username) {
   playerProfileReturnView = currentVisibleViewId();
   show('view-player-profile');
+  const isSelf = username === me;
   $('player-profile-name').textContent = displayName(username);
 
   const { data: rows } = await sb.from('global_leaderboard_alltime').select('*');
@@ -507,15 +518,64 @@ async function openPlayerProfile(username) {
   const theirIndex = sorted.findIndex(r => r.username === username);
   const { data: streak } = await sb.from('streaks').select('*').eq('username', username).maybeSingle();
   const { count: crowns } = await sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', username).eq('rank', 1);
-  const { count: firstFights } = await sb.from('first_fighters').select('*', { count: 'exact', head: true }).eq('username', username);
+  const { data: lifetimeWinRows } = await sb.from('lifetime_wins').select('round_id').eq('username', username);
+  const lifetimeWins = new Set((lifetimeWinRows || []).map(r => r.round_id)).size;
+  const { count: played } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', username);
 
   const parts = [];
   if (theirIndex !== -1) parts.push(`🌍 Global #${theirIndex + 1}`);
   if (streak && streak.current_streak > 0) parts.push(`🔥 ${streak.current_streak}-day streak`);
   if (crowns) parts.push(`👑 ${crowns} Crown${crowns === 1 ? '' : 's'} Held`);
-  if (firstFights) parts.push(`☝️ ${firstFights} first fight${firstFights === 1 ? '' : 's'}`);
   $('player-profile-status-holder').innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '<div class="empty-state">No games played yet.</div>';
 
+  // Lifetime Wins is deliberately separate from the live "Crowns Held" above —
+  // this one only ever grows, a permanent record even after a crown is lost.
+  const lifetimeLines = [];
+  if (played) lifetimeLines.push(`📜 ${played} Trial${played === 1 ? '' : 's'} played`);
+  if (lifetimeWins) lifetimeLines.push(`🏆 ${lifetimeWins} lifetime win${lifetimeWins === 1 ? '' : 's'}`);
+  const lifetimeHtml = lifetimeLines.length ? `<div class="mastery-section">${lifetimeLines.map(l => `<div class="mastery-line prominent">${l}</div>`).join('')}</div>` : '';
+
+  // Bragging rights are the whole point of this screen — give Activity more visual
+  // weight here than the quieter version on your own Home page.
+  const stats = await computeActivityStats(username);
+  const activityLines = [];
+  if (stats.challenges) activityLines.push(`⚔️ ${stats.challenges} challenge${stats.challenges === 1 ? '' : 's'}`);
+  if (stats.challengeBacks) activityLines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
+  if (stats.firstFights) activityLines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
+  $('player-profile-activity-holder').innerHTML = (lifetimeHtml || activityLines.length)
+    ? `<div class="section-label">Activity</div>${lifetimeHtml}<div class="mastery-section">${activityLines.map(l => `<div class="mastery-line prominent">${l}</div>`).join('')}</div>` : '';
+
+  // Mastery is strictly self-only — never fetched or shown for anyone else.
+  const masteryHolder = $('player-profile-mastery-holder');
+  if (isSelf) {
+    const { data: mRows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
+    const list = mRows || [];
+    const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
+    if (totalAnswered > 0) {
+      const mastered = list.filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
+      const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
+      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="mastery-section"><div class="mastery-line">📖 ${mastered} words mastered</div><div class="mastery-line">🎯 ${accuracy}% accuracy</div></div>`;
+    } else { masteryHolder.innerHTML = ''; }
+  } else {
+    masteryHolder.innerHTML = '';
+  }
+
+  // Full badge list — every badge, always paired with what it actually took to
+  // earn it. This is the "always explain yourself" screen; compact chips
+  // elsewhere are fine staying terse because this is where people go to check.
+  const { data: badgeRows } = await sb.from('badges').select('badge_key').eq('username', username);
+  const uniqueBadgeKeys = [...new Set((badgeRows || []).map(r => r.badge_key))];
+  uniqueBadgeKeys.sort((a, b) => (BADGE_META[b]?.rarity || 0) - (BADGE_META[a]?.rarity || 0));
+  const badgesHolder = $('player-profile-badges-holder');
+  badgesHolder.innerHTML = uniqueBadgeKeys.length ? `<div class="section-label">Badges</div>` +
+    uniqueBadgeKeys.map(key => { const meta = BADGE_META[key] || { emoji: '🏅', label: key, req: '' };
+      return `<div class="badge-earned-card"><div class="badge-earned-title">${meta.emoji} ${meta.label}</div><div class="badge-earned-req">${meta.req}</div></div>`; }).join('') : '';
+
+  // Duel Record doesn't apply to your own profile — nothing to compare against yourself.
+  if (isSelf) {
+    $('player-profile-duel-holder').innerHTML = '';
+    return;
+  }
   const record = await computeDuelRecordLifetime(me, username);
   $('player-profile-duel-holder').innerHTML = record.total > 0
     ? `<div class="duel-record">⚔️ Your Duel Record vs. ${displayName(username)}: ${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>`
@@ -695,6 +755,7 @@ async function afterLogin() {
   await renderStatusRow();
   await renderBadgeShowcase();
   await renderMasterySection();
+  await renderActivitySection();
   renderNotifBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
@@ -788,13 +849,17 @@ async function checkRankReminder() {
 $('btn-reminder-later').onclick = () => $('reminder-modal').classList.add('hidden');
 $('btn-reminder-play').onclick = () => { $('reminder-modal').classList.add('hidden'); if (reminderAction) reminderAction(); };
 
+// rarity: how prominently a badge should surface on Home's capped display — higher
+// surfaces first. Hard-won badges should never get crowded out by trivial ones.
+// tier/nextKey: only set on naturally-tiered badges (streaks) — lets the earning
+// moment say "N more for the next one" without inventing a fake goal for one-offs.
 const BADGE_META = {
-  showed_up: { emoji: '👋', label: 'Showed Up', req: 'Play your first round, ever.' },
-  streak_3: { emoji: '🔥', label: '3-Day Streak', req: 'Play 3 days in a row.' },
-  streak_7: { emoji: '🔥', label: '7-Day Streak', req: 'Play 7 days in a row.' },
-  streak_30: { emoji: '🔥', label: '30-Day Streak', req: 'Play 30 days in a row.' },
-  flawless_scroll: { emoji: '✨', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.' },
-  ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 3 games played (matches MIN_GAMES_TO_RANK).' },
+  showed_up: { emoji: '👋', label: 'Showed Up', req: 'Play your first round, ever.', rarity: 1 },
+  streak_3: { emoji: '🔥', label: '3-Day Streak', req: 'Play 3 days in a row.', rarity: 2, tier: 3, nextKey: 'streak_7' },
+  streak_7: { emoji: '🔥', label: '7-Day Streak', req: 'Play 7 days in a row.', rarity: 3, tier: 7, nextKey: 'streak_30' },
+  streak_30: { emoji: '🔥', label: '30-Day Streak', req: 'Play 30 days in a row.', rarity: 4, tier: 30, nextKey: null },
+  flawless_scroll: { emoji: '✨', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.', rarity: 3 },
+  ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 3 games played (matches MIN_GAMES_TO_RANK).', rarity: 1 },
 };
 
 // Tier reflects skill (global all-time average), separate from streak (consistency).
@@ -839,29 +904,37 @@ async function renderStatusRow() {
   holder.innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '';
 }
 
+const HOME_BADGE_CAP = 4;
 async function renderBadgeShowcase() {
   const holder = $('badge-showcase-holder');
   holder.innerHTML = '';
   const { data: rows } = await sb.from('badges').select('badge_key').eq('username', me);
   const uniqueKeys = [...new Set((rows || []).map(r => r.badge_key))];
   if (uniqueKeys.length === 0) return;
+  // Rarest/hardest-won first, so a trivial badge never crowds out a real one.
+  uniqueKeys.sort((a, b) => (BADGE_META[b]?.rarity || 0) - (BADGE_META[a]?.rarity || 0));
   const row = document.createElement('div');
   row.className = 'badge-showcase';
-  uniqueKeys.forEach(key => {
+  uniqueKeys.slice(0, HOME_BADGE_CAP).forEach(key => {
     const meta = BADGE_META[key] || { emoji: '🏅', label: key };
     const chip = document.createElement('span');
     chip.className = 'badge-chip';
     chip.textContent = `${meta.emoji} ${meta.label}`;
     row.appendChild(chip);
   });
+  if (uniqueKeys.length > HOME_BADGE_CAP) {
+    const more = document.createElement('span');
+    more.className = 'badge-chip badge-chip-more';
+    more.textContent = `+${uniqueKeys.length - HOME_BADGE_CAP} more`;
+    more.onclick = () => openPlayerProfile(me);
+    row.appendChild(more);
+  }
   holder.appendChild(row);
 }
 
-// Mastery section — visually separate from Status on purpose. Word progress and
-// accuracy stay fully private (never shown on anyone else's profile — the whole
-// point is a signal that doesn't depend on competition). First fights is the one
-// exception: it's meant to be public/braggable, shown here and on other people's
-// profile pages alike.
+// Mastery section — strictly private, personal-learning signal only. Never shown
+// on anyone else's profile, and never includes the total word-bank size (400) —
+// that's deliberately not something to advertise.
 async function renderMasterySection() {
   const holder = $('mastery-section-holder');
   const { data: rows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
@@ -871,11 +944,27 @@ async function renderMasterySection() {
   const mastered = list.filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
   const totalCorrect = list.reduce((s, r) => s + r.correct_count, 0);
   const accuracy = Math.round((totalCorrect / totalAnswered) * 100);
-  const { count: firstFights } = await sb.from('first_fighters').select('*', { count: 'exact', head: true }).eq('username', me);
+  holder.innerHTML = `<div class="section-label">Mastery</div><div class="mastery-section"><div class="mastery-line">📖 ${mastered} words mastered</div><div class="mastery-line">🎯 ${accuracy}% accuracy</div></div>`;
+}
 
-  const lines = [`📖 ${mastered} of ${WORDS.length} words mastered`, `🎯 ${accuracy}% accuracy`];
-  if (firstFights) lines.push(`☝️ ${firstFights} first fight${firstFights === 1 ? '' : 's'}`);
-  holder.innerHTML = `<div class="section-label">Mastery</div><div class="mastery-section">${lines.map(l => `<div class="mastery-line">${l}</div>`).join('')}</div>`;
+// Activity — public/braggable, unlike Mastery. Shown here AND on other people's
+// profile pages (with slightly more visual weight there, since bragging rights
+// matter more when someone else is actually looking).
+async function computeActivityStats(username) {
+  const { count: firstFights } = await sb.from('first_fighters').select('*', { count: 'exact', head: true }).eq('username', username);
+  const { count: challenges } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', false);
+  const { count: challengeBacks } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', true);
+  return { firstFights: firstFights || 0, challenges: challenges || 0, challengeBacks: challengeBacks || 0 };
+}
+async function renderActivitySection() {
+  const holder = $('activity-section-holder');
+  const stats = await computeActivityStats(me);
+  if (stats.firstFights + stats.challenges + stats.challengeBacks === 0) { holder.innerHTML = ''; return; }
+  const lines = [];
+  if (stats.challenges) lines.push(`⚔️ ${stats.challenges} challenge${stats.challenges === 1 ? '' : 's'}`);
+  if (stats.challengeBacks) lines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
+  if (stats.firstFights) lines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
+  holder.innerHTML = `<div class="section-label">Activity</div><div class="mastery-section">${lines.map(l => `<div class="mastery-line">${l}</div>`).join('')}</div>`;
 }
 
 async function updateStreakOnOpen() {
@@ -894,7 +983,16 @@ async function loadRoomsList() {
   list.innerHTML = '';
   if (roomIds.length === 0) { list.innerHTML = '<div class="empty-state">No Game Rooms yet — create one or join with a code.</div>'; return; }
   const { data: rooms } = await sb.from('rooms').select('*').in('id', roomIds);
-  for (const room of rooms) {
+
+  // Most active/recently-touched room first — "latest Trial created in this room"
+  // as the activity signal, falling back to the room's own creation date for one
+  // that's never had a Trial yet.
+  const { data: latestRounds } = await sb.from('rounds').select('room_id, created_at').in('room_id', roomIds).order('created_at', { ascending: false });
+  const lastActivity = {};
+  (latestRounds || []).forEach(r => { if (!lastActivity[r.room_id]) lastActivity[r.room_id] = r.created_at; });
+  const sortedRooms = (rooms || []).slice().sort((a, b) => new Date(lastActivity[b.id] || b.created_at) - new Date(lastActivity[a.id] || a.created_at));
+
+  for (const room of sortedRooms) {
     const div = document.createElement('div');
     div.className = 'room-item';
     div.innerHTML = `<div><div class="room-name">${room.name} <span id="room-target-badge-${room.id}"></span></div><div class="room-meta">${room.code} · ${room.is_open ? 'Open' : 'Closed'}</div></div><div class="room-item-summary" id="room-summary-${room.id}">…</div>`;
@@ -1081,7 +1179,7 @@ async function loadDares() {
   const all = rounds || [];
   $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
 
-  if (all.length === 0) { $('tab-challenges').textContent = 'Trials'; list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
+  if (all.length === 0) { $('tab-challenges').textContent = '📜 Trials'; list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
 
   // Fetch + compute state for every Trial first, so we can sort by what actually
   // needs attention — a retaliation aimed at you first, then a fresh callout, then
@@ -1109,7 +1207,7 @@ async function loadDares() {
   // one someone else made, so it counts too now, matching what the card list
   // itself already visually says (a red "losing" card either way).
   const actionableCount = withState.filter(w => w.state !== 'champion').length;
-  $('tab-challenges').textContent = actionableCount > 0 ? `Trials (${actionableCount})` : 'Trials';
+  $('tab-challenges').textContent = actionableCount > 0 ? `📜 Trials (${actionableCount})` : '📜 Trials';
 
   list.innerHTML = '';
   for (const { r, rows, myRow, champ, state } of withState) {
@@ -1609,7 +1707,8 @@ async function finishRound() {
   const newBadges = await maybeAwardBadges(correct);
   const rankedUpBadge = await maybeAwardRankedUp();
   if (rankedUpBadge) newBadges.push(rankedUpBadge);
-  await recordRoundPlayed();
+  const streakBadges = await recordRoundPlayed();
+  newBadges.push(...streakBadges);
 
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
@@ -1628,27 +1727,29 @@ async function maybeAwardRankedUp() {
   const { data: mine } = await sb.from('global_leaderboard_alltime').select('rounds_played').eq('username', me).maybeSingle();
   if (!mine || mine.rounds_played < MIN_GAMES_TO_RANK) return null;
   await sb.from('badges').insert({ username: me, badge_key: 'ranked_up', room_id: null });
-  return '🎓 Ranked Up';
+  return 'ranked_up';
 }
 
 async function recordRoundPlayed() {
   const today = new Date().toISOString().slice(0, 10);
   const { data: s } = await sb.from('streaks').select('*').eq('username', me).maybeSingle();
-  if (!s) { await sb.from('streaks').insert({ username: me, current_streak: 1, best_streak: 1, last_played_date: today }); return; }
-  if (s.last_played_date === today) return; // already counted today
+  if (!s) { await sb.from('streaks').insert({ username: me, current_streak: 1, best_streak: 1, last_played_date: today }); return []; }
+  if (s.last_played_date === today) return []; // already counted today
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const newStreak = s.last_played_date === yesterday ? s.current_streak + 1 : 1;
   await sb.from('streaks').update({ current_streak: newStreak, best_streak: Math.max(newStreak, s.best_streak), last_played_date: today }).eq('username', me);
+  const earnedKeys = [];
   for (const [n, key] of [[3, 'streak_3'], [7, 'streak_7'], [30, 'streak_30']]) {
-    if (newStreak === n) await sb.from('badges').upsert({ username: me, badge_key: key, room_id: null });
+    if (newStreak === n) { await sb.from('badges').upsert({ username: me, badge_key: key, room_id: null }); earnedKeys.push(key); }
   }
+  return earnedKeys;
 }
 
 async function maybeAwardBadges(correct) {
   const earned = [];
   if (correct === roundWords.length) {
     const { data: existing } = await sb.from('badges').select('*').eq('username', me).eq('badge_key', 'flawless_scroll').eq('room_id', currentRoom.id).maybeSingle();
-    if (!existing) { await sb.from('badges').insert({ username: me, badge_key: 'flawless_scroll', room_id: currentRoom.id }); earned.push('✨ Flawless Scroll'); }
+    if (!existing) { await sb.from('badges').insert({ username: me, badge_key: 'flawless_scroll', room_id: currentRoom.id }); earned.push('flawless_scroll'); }
   }
   return earned;
 }
@@ -1659,7 +1760,19 @@ async function renderScorecard(correct, points, newBadges) {
   $('score-comment').textContent = commentForScore(points);
   const badgeDiv = $('score-badges');
   badgeDiv.innerHTML = '';
-  newBadges.forEach(b => { const chip = document.createElement('span'); chip.className = 'badge-chip'; chip.textContent = b; badgeDiv.appendChild(chip); });
+  newBadges.forEach(key => {
+    const meta = BADGE_META[key] || { emoji: '🏅', label: key, req: '' };
+    const card = document.createElement('div');
+    card.className = 'badge-earned-card';
+    let html = `<div class="badge-earned-title">${meta.emoji} ${meta.label}</div><div class="badge-earned-req">${meta.req}</div>`;
+    if (meta.nextKey && BADGE_META[meta.nextKey]) {
+      const next = BADGE_META[meta.nextKey];
+      const remaining = next.tier - meta.tier;
+      html += `<div class="badge-earned-next">${remaining} more day${remaining === 1 ? '' : 's'} for ${next.emoji} ${next.label}!</div>`;
+    }
+    card.innerHTML = html;
+    badgeDiv.appendChild(card);
+  });
 
   // Win/lose verdict — only meaningful when you just accepted SOMEONE ELSE's challenge
   // (there's a score to compare against). Your own fresh round has nothing to beat yet.
@@ -1706,26 +1819,41 @@ async function renderScorecard(correct, points, newBadges) {
   renderOtherDares();
 }
 
+let otherDaresLoadToken = 0;
 async function renderOtherDares() {
+  const myToken = ++otherDaresLoadToken;
   const holder = $('other-dares-holder');
   holder.innerHTML = '';
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*').eq('room_id', currentRoom.id).gt('expires_at', now).neq('id', currentRound.id).order('created_at', { ascending: false }).limit(5);
   const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me);
+  if (myToken !== otherDaresLoadToken) return; // a newer call has since started — abandon this one
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const open = (rounds || []).filter(r => !playedIds.has(r.id) && r.creator_username !== me);
   if (open.length === 0) return;
+  holder.innerHTML = ''; // clear again — a newer call may have already started filling this since the awaits above
   const title = document.createElement('div');
   title.className = 'dare-sub';
   title.textContent = `${open.length} more open Trial${open.length > 1 ? 's' : ''} in this Game Room:`;
   holder.appendChild(title);
-  open.slice(0, 3).forEach(r => {
+  for (const r of open.slice(0, 3)) {
+    if (myToken !== otherDaresLoadToken) return;
+    const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', r.id).order('rank');
+    if (myToken !== otherDaresLoadToken) return;
+    const champ = (lb || [])[0] || null;
+    let badge, badgeClass;
+    if (r.target_username === me) {
+      if (r.via_challenge_back) { badge = '🎯 counter challenge'; badgeClass = 'challenged-back'; }
+      else { badge = '🎯 challenge you'; badgeClass = 'targeted'; }
+    } else {
+      badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
+    }
     const div = document.createElement('div');
     div.className = 'trial-card state-unplayed';
     div.onclick = () => openTrialScreen(r);
-    div.innerHTML = `<div class="trial-card-top"><div class="trial-card-number">📜 Trial #${r.trial_number}</div></div><div class="trial-card-byline">started by ${displayName(r.creator_username)}</div>`;
+    div.innerHTML = `<div class="trial-card-top"><div class="trial-card-number">📜 Trial #${r.trial_number}</div><span class="trial-status-badge ${badgeClass}">${badge}</span></div><div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>`;
     holder.appendChild(div);
-  });
+  }
 }
 
 $('btn-back-to-room').onclick = () => { currentRound = null; openRoom(currentRoom); };

@@ -659,7 +659,7 @@ async function shareRound(r) {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${r.short_code}`;
   const { data: creatorScore } = await sb.from('round_scores').select('score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
   const scorePart = creatorScore ? `scored ${creatorScore.score_points} pts` : `posted it`;
-  shareText(`${displayName(r.creator_username)} ${scorePart} on Trial #${r.trial_number} in MaxWord's "${currentRoom.name}" — beat it? ${url}`);
+  shareText(`🎯 ${displayName(r.creator_username)} ${scorePart} on Trial #${r.trial_number} in MaxWord's "${currentRoom.name}" — beat it?\n\n⚔️ ⚔️ ⚔️ ${url}`);
 }
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
@@ -1032,8 +1032,9 @@ async function loadRoomsList() {
 }
 
 // Shows a small "🎯 N" badge on a room card when N challenges are aimed
-// specifically at you in that room and you haven't played them yet — the
-// in-app substitute for a push notification until real push exists.
+// specifically at you in that room and you haven't played them yet — an
+// always-visible signal that doesn't depend on catching a popup at the
+// right moment.
 async function loadRoomTargetBadge(roomId) {
   const el = $(`room-target-badge-${roomId}`);
   if (!el) return;
@@ -1250,7 +1251,7 @@ async function renderMemberLine() {
   $('link-manage-members').onclick = () => { show('view-members'); loadMembers(); };
   $('link-invite-room').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-    shareText(`Join my Game Room "${currentRoom.name}" on MaxWord — ${url}`);
+    shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord\n\n🔗 🔗 🔗 ${url}`);
   };
 }
 
@@ -1412,7 +1413,11 @@ async function openTrialScreen(round) {
   // completionist line
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
   const totalMembers = (members || []).length;
-  $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${totalMembers} in the room have played this Trial</div>`;
+  // Guarded with Math.max: if someone plays a Trial and later leaves the room,
+  // their score stays (leaving only removes the room_members row) but they no
+  // longer count toward totalMembers — without this, that could read as a
+  // nonsensical "3 of 2 have played."
+  $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Trial</div>`;
 
   // duel record — only when this Trial is a direct callout between two specific people, and I'm one of them
   const duelHolder = $('trial-duel-holder');
@@ -1696,17 +1701,21 @@ function renderRankBanner(rows, bannerId, keyBase, period) {
 async function openTargetPicker() {
   show('view-choose-target');
   $('btn-target-anyone').disabled = false;
+  // Always wire this up before the early-return below — it used to only get
+  // assigned AFTER the empty-room check, so a solo room's "Or just open it to
+  // anyone" button was visibly enabled but completely dead (no handler at all).
+  $('btn-target-anyone').onclick = () => { disableAllPickerButtons(); startNewRound(); };
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id).neq('username', me);
   const list = $('target-member-list');
   list.innerHTML = '';
-  if (!members || members.length === 0) {
-    list.innerHTML = '<div class="empty-state">No one else has joined this Game Room yet.</div>';
-    return;
-  }
   const disableAllPickerButtons = () => {
     $('btn-target-anyone').disabled = true;
     list.querySelectorAll('button').forEach(b => b.disabled = true);
   };
+  if (!members || members.length === 0) {
+    list.innerHTML = '<div class="empty-state">No one else has joined this Game Room yet.</div>';
+    return;
+  }
   members.forEach(m => {
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
@@ -1715,7 +1724,6 @@ async function openTargetPicker() {
     btn.onclick = () => { disableAllPickerButtons(); startNewRound(m.username); };
     list.appendChild(btn);
   });
-  $('btn-target-anyone').onclick = () => { disableAllPickerButtons(); startNewRound(); };
 }
 $('btn-choose-target-back').onclick = () => show('view-room');
 
@@ -1931,7 +1939,7 @@ async function renderScorecard(correct, points, newBadges) {
 
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
-    shareText(`I scored ${points} pts on MaxWord's "${currentRoom.name}" — think you can beat me? ${url}`);
+    shareText(`🎯 I scored ${points} pts on MaxWord's "${currentRoom.name}" — think you can beat me?\n\n⚔️ ⚔️ ⚔️ ${url}`);
   };
 
   // Challenge-back only exists when there's someone to challenge: hidden entirely on
@@ -2009,7 +2017,7 @@ async function renderScorecard(correct, points, newBadges) {
       shareBtn.textContent = '⤴ Challenge others';
       shareBtn.onclick = () => {
         const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-        shareText(`Join my Game Room "${currentRoom.name}" on MaxWord — think you can out-word me? ${url}`);
+        shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord — think you can out-word me?\n\n🔗 🔗 🔗 ${url}`);
       };
       card.appendChild(shareBtn);
       const laterBtn = document.createElement('button');

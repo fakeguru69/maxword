@@ -2040,11 +2040,16 @@ async function renderScorecard(correct, points, newBadges) {
 
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
-    // If this round has a specific named target — win, lose, or a fresh callout
-    // you just sent — the share message calls them out by name directly, instead
-    // of the generic broadcast used for an open Trial nobody's aimed at.
-    if (currentRound.target_username) {
-      shareText(`🎯 ${displayName(me)} challenges ${displayName(currentRound.target_username)} — ${points} pts on Trial #${currentRound.trial_number} in MaxWord's "${currentRoom.name}". Can you beat it?\n\n⚔️ ${url}`);
+    // The person I actually just competed against is NOT always target_username —
+    // that field just records who the round was aimed at when CREATED, which can
+    // be a totally different third person if I played someone else's targeted
+    // Trial. The real opponent: if this is my own round, whoever I called out
+    // when creating it (target_username); otherwise the creator, whose score I
+    // actually just compared against for the verdict above. Same resolution
+    // already used for Duel Record on the Trial screen.
+    const opponent = isOwnRound ? currentRound.target_username : currentRound.creator_username;
+    if (opponent) {
+      shareText(`🎯 ${displayName(me)} challenges ${displayName(opponent)} — ${points} pts on Trial #${currentRound.trial_number} in MaxWord's "${currentRoom.name}". Can you beat it?\n\n⚔️ ${url}`);
     } else {
       shareText(`🎯 I, ${displayName(me)}, scored ${points} pts on MaxWord's "${currentRoom.name}" — can you beat me?\n\n⚔️ ${url}`);
     }

@@ -90,7 +90,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .reveal-sentence { margin-top: 14px; font-size: 14px; color: var(--cream-dim); border-left: 2px solid var(--gold-soft); padding-left: 12px; }
 .scorecard { text-align: center; padding: 28px 16px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--gold); }
-.scorecard .grid-emoji { font-size: 20px; letter-spacing: 4px; margin: 14px 0; }
+.scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
 .scorecard .score-comment { font-size: 17px; font-weight: 600; color: var(--cream); margin-bottom: 10px; }
 .scorecard .score-verdict { font-size: 15px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold-soft); color: var(--gold); }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
@@ -159,6 +159,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .champion-banner .crown { font-size: 26px; }
 .champion-banner .champ-name { font-family: 'Cinzel', serif; color: var(--gold); font-size: 18px; margin-top: 2px; }
 .dethroned-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(192,85,74,0.15); border: 1px solid var(--danger); color: #F0A898; font-weight: 600; }
+.challenged-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.12); border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
 .completionist-line { font-size: 12px; color: var(--cream-dim); text-align: center; margin-bottom: 10px; }
 .urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
 .duel-record { text-align: center; font-size: 14px; color: var(--cream); margin-bottom: 14px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
@@ -185,6 +186,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .badge-showcase { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .notif-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; margin-bottom: 12px; background: rgba(79,182,168,0.08); border: 1px solid var(--teal-dim); font-size: 13px; }
 .notif-banner button { width: auto; padding: 8px 14px; font-size: 13px; flex-shrink: 0; }
+.modal-notif-nudge { display: block; text-align: center; font-size: 12px; color: var(--teal); text-decoration: underline; margin: -6px 0 16px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -264,6 +266,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="activity-section-holder"></div>
     <div id="badge-showcase-holder"></div>
     <div id="notif-banner-holder"></div>
+    <div id="a2hs-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
     <div id="rooms-list"></div>
     <div class="btn-row" style="margin-top:10px;">
@@ -424,6 +427,26 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
   </div>
 
+  <!-- CHALLENGED MODAL — mirrors the Dethroned modal, for the moment someone
+       targets YOU with a fresh Trial (not yet played by you) -->
+  <div class="modal-overlay hidden" id="challenged-modal">
+    <div class="card modal-card">
+      <div class="challenged-banner" style="margin-bottom:14px;">🎯 Challenged</div>
+      <p id="challenged-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
+      <button class="btn-primary" id="btn-challenged-ok">Got it</button>
+    </div>
+  </div>
+
+  <!-- ADD TO HOME SCREEN MODAL -->
+  <div class="modal-overlay hidden" id="a2hs-modal">
+    <div class="card modal-card">
+      <h2 class="display" style="margin-bottom:10px;">📲 Add to Home Screen</h2>
+      <p id="a2hs-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
+      <button class="btn-primary" id="btn-a2hs-add">Add to Home Screen</button>
+      <button class="link-btn" id="btn-a2hs-later" style="margin-top:10px;">Not now</button>
+    </div>
+  </div>
+
   <!-- ONBOARDING TIP MODAL — reused for every "first time ever" explainer -->
   <div class="modal-overlay hidden" id="onboarding-modal">
     <div class="card modal-card">
@@ -461,7 +484,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="forced-flow-holder"></div>
     <div id="normal-scorecard-actions">
       <div class="btn-row" style="margin-top:10px;">
-        <button class="btn-primary" id="btn-challenge-others">Challenge others</button>
+        <button class="btn-primary" id="btn-challenge-others">⤴ Challenge others</button>
       </div>
       <div class="btn-row" style="margin-top:10px;">
         <button class="btn-secondary" id="btn-dare-back">Challenge back</button>
@@ -771,9 +794,11 @@ async function afterLogin() {
   await renderMasterySection();
   await renderActivitySection();
   renderNotifBanner();
+  renderHomeScreenBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
   await checkDethronements();
+  await checkNewChallenges();
 }
 
 // One-time-each nudge, shown the moment Home or a room is opened (login, resuming a
@@ -823,8 +848,66 @@ async function checkDethronements() {
   }
   $('dethroned-modal-text').textContent = text;
   $('dethroned-modal').classList.remove('hidden');
+  appendNotifNudgeToModal('dethroned-modal');
 }
 $('btn-dethroned-ok').onclick = () => $('dethroned-modal').classList.add('hidden');
+
+// Mirrors checkDethronements() — the other half of "something happened that you'd
+// want to know about live." Fires for a Trial someone's aimed straight at you,
+// checked the same way (Home/Room load), each round marked notified so it's shown
+// exactly once. Filters out anything you've already played in the meantime (rare,
+// but possible if you played it mid-session before this check ran).
+async function checkNewChallenges() {
+  const now = new Date().toISOString();
+  const { data: rounds } = await sb.from('rounds').select('*').eq('target_username', me).eq('target_notified', false).gt('expires_at', now).order('created_at', { ascending: true });
+  if (!rounds || rounds.length === 0) return;
+  const ids = rounds.map(r => r.id);
+  await sb.from('rounds').update({ target_notified: true }).in('id', ids);
+  // A round you've already played (e.g. you got to it before this check ran) isn't
+  // a fresh callout anymore — drop those from the popup, but they're still marked
+  // notified above so we never re-check them.
+  const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', ids);
+  const alreadyPlayed = new Set((myScores || []).map(s => s.round_id));
+  const fresh = rounds.filter(r => !alreadyPlayed.has(r.id));
+  if (fresh.length === 0) return;
+  let text;
+  if (fresh.length === 1) {
+    text = `${displayName(fresh[0].creator_username)} challenged you to Trial #${fresh[0].trial_number}.`;
+  } else {
+    text = `${fresh.length} new challenges are waiting for you — open your Game Rooms to see them.`;
+  }
+  $('challenged-modal-text').textContent = text;
+  $('challenged-modal').classList.remove('hidden');
+  appendNotifNudgeToModal('challenged-modal');
+}
+$('btn-challenged-ok').onclick = () => $('challenged-modal').classList.add('hidden');
+
+async function hasBadge(key) {
+  const { data } = await sb.from('badges').select('badge_key').eq('username', me).eq('badge_key', key).is('room_id', null).maybeSingle();
+  return !!data;
+}
+async function awardBadgeOnce(key) {
+  if (await hasBadge(key)) return false;
+  await sb.from('badges').insert({ username: me, badge_key: key, room_id: null });
+  return true;
+}
+
+// A quiet secondary line under a "something happened" popup (dethroned / challenged) —
+// ties the notification ask to a real concrete moment instead of a cold abstract pitch.
+// Only appears while the permission is still unanswered; removes any stale copy of
+// itself first so re-showing the same modal doesn't stack duplicates.
+function appendNotifNudgeToModal(modalId) {
+  const modal = $(modalId);
+  const old = modal.querySelector('.modal-notif-nudge');
+  if (old) old.remove();
+  if (!('Notification' in window) || Notification.permission !== 'default') return;
+  const nudge = document.createElement('span');
+  nudge.className = 'modal-notif-nudge';
+  nudge.textContent = '🔔 Turn on notifications so you catch this the moment it happens';
+  nudge.onclick = async () => { nudge.remove(); await enablePush(); };
+  const btn = modal.querySelector('.btn-primary');
+  btn.parentNode.insertBefore(nudge, btn);
+}
 
 async function checkRankReminder() {
   const { data: mine } = await sb.from('global_leaderboard_alltime').select('rounds_played').eq('username', me).maybeSingle();
@@ -876,6 +959,8 @@ const BADGE_META = {
   streak_30: { emoji: '🔥', label: '30-Day Streak', req: 'Play 30 days in a row.', rarity: 4, tier: 30, nextKey: null },
   flawless_scroll: { emoji: '✨', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.', rarity: 3 },
   ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 2 games played.', rarity: 1 },
+  home_screen: { emoji: '📲', label: 'Home Base', req: 'Add MaxWord to your Home Screen.', rarity: 2 },
+  notifications_enabled: { emoji: '🔔', label: 'Always On', req: 'Turn on notifications.', rarity: 2 },
 };
 
 // Tier reflects skill (global all-time average), separate from streak (consistency).
@@ -1091,6 +1176,7 @@ async function enablePush() {
     if (perm !== 'granted') { renderNotifBanner(); return; }
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: VAPID_PUBLIC_KEY });
     await sb.from('push_subscriptions').upsert({ username: me, endpoint: sub.endpoint, subscription: sub.toJSON() });
+    await awardBadgeOnce('notifications_enabled');
   } catch (e) { alert('Could not enable notifications: ' + e.message); }
   renderNotifBanner();
 }
@@ -1113,6 +1199,83 @@ function renderNotifBanner() {
 }
 
 // ---------------------------------------------------------------
+// ADD TO HOME SCREEN
+// ---------------------------------------------------------------
+// Android/Chrome fires this instead of letting us trigger install directly — we
+// stash it and replay it later from our own button, since the browser's native
+// mini-infobar is easy to miss and doesn't fit our own "ask once, then a quiet
+// persistent reminder" pattern.
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; });
+// Only a reliable completion signal on Android/Chrome — iOS Safari has no such
+// event, which is why the iOS path below awards the badge on "shown you how"
+// instead of a verified install (see maybeShowA2HSPopup/btn-a2hs-add).
+window.addEventListener('appinstalled', async () => { await awardBadgeOnce('home_screen'); renderHomeScreenBanner(); });
+
+function isStandalone() { return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream; }
+
+function setA2HSModalContent() {
+  $('a2hs-modal-text').textContent = isIOS()
+    ? `Tap the Share icon in your browser bar, then "Add to Home Screen." Five seconds, and you'll never lose MaxWord in a pile of browser tabs again.`
+    : `Keep MaxWord one tap away — add it to your Home Screen like a real app, so you never lose it in a pile of browser tabs.`;
+  $('btn-a2hs-add').textContent = isIOS() ? 'Show me how' : 'Add to Home Screen';
+}
+
+// One-time popup, fired right after the "Reading the room" tip on the landing
+// right after game 2 — the moment onboarding just ended and a tab could get
+// closed for good. Silently skips if already installed or already badged.
+async function maybeShowA2HSPopup() {
+  if (isStandalone()) return;
+  if (await hasBadge('home_screen')) return;
+  const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'a2hs_prompt').maybeSingle();
+  if (seenBefore) { renderHomeScreenBanner(); return; }
+  await sb.from('reminders_shown').insert({ username: me, reminder_key: 'a2hs_prompt' });
+  setA2HSModalContent();
+  $('a2hs-modal').classList.remove('hidden');
+}
+$('btn-a2hs-add').onclick = async () => {
+  if (isIOS()) {
+    // No install-confirmation event exists on iOS Safari — we can only confirm we
+    // SHOWED her how, not that she actually did it, so the badge fires on this tap.
+    $('a2hs-modal').classList.add('hidden');
+    await awardBadgeOnce('home_screen');
+    renderHomeScreenBanner();
+  } else if (deferredInstallPrompt) {
+    $('a2hs-modal').classList.add('hidden');
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice; // badge itself awarded by the 'appinstalled' listener above, only if she actually accepts
+    deferredInstallPrompt = null;
+    renderHomeScreenBanner();
+  } else {
+    // Browser doesn't support the install prompt (or it already fired once and
+    // wasn't recaptured) — nothing we can trigger programmatically, just close.
+    $('a2hs-modal').classList.add('hidden');
+  }
+};
+$('btn-a2hs-later').onclick = () => { $('a2hs-modal').classList.add('hidden'); renderHomeScreenBanner(); };
+
+// Persistent quiet reminder on Home, same pattern as the notification banner —
+// this is what makes the ask "occasional" without any nag/snooze logic: it just
+// sits there, low-friction, until she acts (or the badge is earned, or the app's
+// already installed), then disappears for good.
+async function renderHomeScreenBanner() {
+  const holder = $('a2hs-banner-holder');
+  holder.innerHTML = '';
+  if (isStandalone()) return;
+  if (await hasBadge('home_screen')) return;
+  const banner = document.createElement('div');
+  banner.className = 'notif-banner';
+  banner.innerHTML = `<span>📲 Add to Home Screen — earn a badge</span>`;
+  const btn = document.createElement('button');
+  btn.className = 'btn-primary';
+  btn.textContent = isIOS() ? 'Show me' : 'Add';
+  btn.onclick = () => { setA2HSModalContent(); $('a2hs-modal').classList.remove('hidden'); };
+  banner.appendChild(btn);
+  holder.appendChild(banner);
+}
+
+// ---------------------------------------------------------------
 // ROOM VIEW
 // ---------------------------------------------------------------
 async function openRoom(room) {
@@ -1123,6 +1286,7 @@ async function openRoom(room) {
   await loadDares();
   await renderMemberLine();
   await checkDethronements();
+  await checkNewChallenges();
   await maybeShowRoomVocabTip();
   subscribeRoomRealtime(room.id);
 }
@@ -1130,6 +1294,9 @@ async function openRoom(room) {
 // One-time, fires the moment she lands back in a room right after her 2nd-ever
 // game (the point our forced onboarding flow routes her to) — explains the four
 // card badges she's now looking at. Silently skips at any other games-played count.
+// Chains straight into the Add-to-Home-Screen popup once dismissed — this landing
+// is the real "before she quits" moment (onboarding just ended, tab could just get
+// closed), so it's the one place worth a second, separate ask right after the first.
 async function maybeShowRoomVocabTip() {
   const { count: played } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
   if (played !== 2) return;
@@ -1138,7 +1305,7 @@ async function maybeShowRoomVocabTip() {
      <div class="tip-list-item">⚔️ let's fight! — an open invitation, no pressure</div>
      <div class="tip-list-item">☝️ be the first — nobody's played it yet</div>
      <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
-    () => {});
+    () => maybeShowA2HSPopup());
 }
 
 // Keeps the Challenges/Leaderboard tabs current while you're actually looking at them —
@@ -1148,7 +1315,7 @@ let roomChannel = null;
 function subscribeRoomRealtime(roomId) {
   unsubscribeRoomRealtime();
   roomChannel = sb.channel(`room-${roomId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `room_id=eq.${roomId}` }, () => refreshActiveRoomPanel())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `room_id=eq.${roomId}` }, () => { refreshActiveRoomPanel(); checkNewChallengesLive(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'round_scores' }, () => { refreshActiveRoomPanel(); checkDethronementsLive(); })
     .subscribe();
 }
@@ -1158,6 +1325,10 @@ function subscribeRoomRealtime(roomId) {
 // next time you open a room, instead of being lost.
 function checkDethronementsLive() {
   if ($('view-game').classList.contains('hidden')) checkDethronements();
+}
+// Same idea, for a fresh challenge landing on you while you're browsing the room.
+function checkNewChallengesLive() {
+  if ($('view-game').classList.contains('hidden')) checkNewChallenges();
 }
 function unsubscribeRoomRealtime() {
   if (roomChannel) { sb.removeChannel(roomChannel); roomChannel = null; }
@@ -1752,6 +1923,7 @@ async function finishRound() {
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
   await checkDethronements(); // catches anything that happened while you were mid-quiz and got skipped live
+  await checkNewChallenges();
   // The generic "first badge earned" explainer is suppressed during the forced
   // 2-game onboarding window (renderScorecard already shows its own tailored
   // forced-flow card there) — stacking a second modal on top would be exactly
@@ -1800,7 +1972,7 @@ async function maybeAwardBadges(correct) {
 
 async function renderScorecard(correct, points, newBadges) {
   $('score-big').textContent = `${points} pts`;
-  $('score-grid').textContent = roundAnswers.map(a => a ? '🟩' : '⬛').join('');
+  $('score-grid').innerHTML = roundAnswers.map(a => `<span>${a ? '🟩' : '⬛'}</span>`).join('');
   $('score-comment').textContent = commentForScore(points);
   const badgeDiv = $('score-badges');
   badgeDiv.innerHTML = '';
@@ -1854,7 +2026,7 @@ async function renderScorecard(correct, points, newBadges) {
   } else {
     dareBackBtn.classList.remove('hidden');
     dareBackBtn.className = 'btn-primary';
-    dareBackBtn.textContent = `Challenge ${titleCaseName(currentRound.creator_username)} back`;
+    dareBackBtn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
     $('btn-challenge-others').className = 'btn-secondary';
   }
 
@@ -1877,7 +2049,7 @@ async function renderScorecard(correct, points, newBadges) {
       card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Trial, aimed straight at whoever just beat you.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
-      btn.textContent = `Challenge ${titleCaseName(currentRound.creator_username)} back`;
+      btn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
       btn.onclick = () => { btn.disabled = true; startNewRound(currentRound.creator_username, true); };
       card.appendChild(btn);
     } else {

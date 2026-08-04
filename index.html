@@ -659,7 +659,13 @@ async function shareRound(r) {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${r.short_code}`;
   const { data: creatorScore } = await sb.from('round_scores').select('score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
   const scorePart = creatorScore ? `scored ${creatorScore.score_points} pts` : `posted it`;
-  shareText(`🎯 ${displayName(r.creator_username)} ${scorePart} on Trial #${r.trial_number} in MaxWord's "${currentRoom.name}" — beat it?\n\n⚔️ ⚔️ ⚔️ ${url}`);
+  // Sharing your OWN Trial reads as a first-person callout ("I, X, scored...
+  // can you beat ME?"); sharing someone ELSE's reads as pointing at their
+  // score from the outside ("X scored... can you beat IT?").
+  const isMine = r.creator_username === me;
+  const subject = isMine ? `I, ${displayName(me)},` : displayName(r.creator_username);
+  const ask = isMine ? 'can you beat me?' : 'can you beat it?';
+  shareText(`🎯 ${subject} ${scorePart} on Trial #${r.trial_number} in MaxWord's "${currentRoom.name}" — ${ask}\n\n⚔️ ${url}`);
 }
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
@@ -1251,7 +1257,7 @@ async function renderMemberLine() {
   $('link-manage-members').onclick = () => { show('view-members'); loadMembers(); };
   $('link-invite-room').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-    shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord\n\n🔗 🔗 🔗 ${url}`);
+    shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord\n\n🔗 ${url}`);
   };
 }
 
@@ -1939,7 +1945,7 @@ async function renderScorecard(correct, points, newBadges) {
 
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
-    shareText(`🎯 I scored ${points} pts on MaxWord's "${currentRoom.name}" — think you can beat me?\n\n⚔️ ⚔️ ⚔️ ${url}`);
+    shareText(`🎯 I, ${displayName(me)}, scored ${points} pts on MaxWord's "${currentRoom.name}" — can you beat me?\n\n⚔️ ${url}`);
   };
 
   // Challenge-back only exists when there's someone to challenge: hidden entirely on
@@ -2017,7 +2023,7 @@ async function renderScorecard(correct, points, newBadges) {
       shareBtn.textContent = '📤 Share challenge';
       shareBtn.onclick = () => {
         const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-        shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord — think you can out-word me?\n\n🔗 🔗 🔗 ${url}`);
+        shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord — think you can out-word me?\n\n🔗 ${url}`);
       };
       card.appendChild(shareBtn);
       const laterBtn = document.createElement('button');

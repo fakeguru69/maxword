@@ -472,7 +472,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="forced-flow-holder"></div>
     <div id="normal-scorecard-actions">
       <div class="btn-row" style="margin-top:10px;">
-        <button class="btn-primary" id="btn-challenge-others">⤴ Challenge others</button>
+        <button class="btn-primary" id="btn-challenge-others">📤 Share challenge</button>
       </div>
       <div class="btn-row" style="margin-top:10px;">
         <button class="btn-secondary" id="btn-dare-back">Challenge back</button>
@@ -2014,7 +2014,7 @@ async function renderScorecard(correct, points, newBadges) {
       card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! But a Trial's no fun alone — invite someone to make it a real contest.</div>`;
       const shareBtn = document.createElement('button');
       shareBtn.className = 'btn-primary';
-      shareBtn.textContent = '⤴ Challenge others';
+      shareBtn.textContent = '📤 Share challenge';
       shareBtn.onclick = () => {
         const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
         shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord — think you can out-word me?\n\n🔗 🔗 🔗 ${url}`);
@@ -2054,7 +2054,16 @@ async function renderOtherDares() {
   if (myToken !== otherDaresLoadToken) return; // a newer call has since started — abandon this one
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const open = (rounds || []).filter(r => !playedIds.has(r.id) && r.creator_username !== me);
-  if (open.length === 0) return;
+  if (open.length === 0) {
+    // No outstanding live game to jump into — give a way to start one instead
+    // of just leaving this slot on the scorecard empty.
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.textContent = 'Start a new Trial';
+    btn.onclick = () => openTargetPicker();
+    holder.appendChild(btn);
+    return;
+  }
   holder.innerHTML = ''; // clear again — a newer call may have already started filling this since the awaits above
   const title = document.createElement('div');
   title.className = 'dare-sub';

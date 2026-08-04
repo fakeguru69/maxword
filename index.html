@@ -1569,17 +1569,45 @@ async function renderRivalryCard() {
   const rival = await computeMyRivalries();
   if (!rival) return;
   const { opponent, record, net } = rival;
+
+  // Don't offer "Settle the score" again if a Trial between us is already
+  // sitting out there unanswered — without this check, the card looks
+  // identical on every visit (the tie/deficit doesn't change until the
+  // opponent actually plays back), so it's easy to tap it repeatedly and
+  // leave a pile of duplicate unanswered Trials aimed at the same person.
+  const now = new Date().toISOString();
+  const { data: pendingRounds } = await sb.from('rounds').select('id')
+    .eq('room_id', currentRoom.id)
+    .gt('expires_at', now)
+    .or(`and(creator_username.eq.${me},target_username.eq.${opponent}),and(creator_username.eq.${opponent},target_username.eq.${me})`);
+  let pending = false;
+  if (pendingRounds && pendingRounds.length > 0) {
+    const { data: theirScores } = await sb.from('round_scores').select('round_id').eq('username', opponent).in('round_id', pendingRounds.map(r => r.id));
+    const answeredIds = new Set((theirScores || []).map(s => s.round_id));
+    pending = pendingRounds.some(r => !answeredIds.has(r.id));
+  }
+
   const card = document.createElement('div');
   card.className = net === 0 ? 'rivalry-card tied' : 'rivalry-card';
   const label = net === 0
-    ? `Dead even with <span class="opponent-name">${displayName(opponent)}</span> — <span class="rivalry-score">${record.wins}–${record.losses}</span>. Break the tie.`
+    ? `Dead even with <span class="opponent-name">${displayName(opponent)}</span> — <span class="rivalry-score">${record.wins}–${record.losses}</span>.${pending ? '' : ' Break the tie.'}`
     : `⚔️ Down <span class="rivalry-score">${record.wins}–${record.losses}</span> against <span class="opponent-name">${displayName(opponent)}</span>.`;
   card.innerHTML = `<div class="rivalry-text">${label}</div>`;
-  const btn = document.createElement('button');
-  btn.className = 'btn-primary';
-  btn.textContent = 'Settle the score';
-  btn.onclick = () => { btn.disabled = true; startNewRound(opponent); };
-  card.appendChild(btn);
+  if (pending) {
+    const waiting = document.createElement('div');
+    waiting.className = 'rivalry-text';
+    waiting.style.marginBottom = '0';
+    waiting.style.color = 'var(--cream-dim)';
+    waiting.style.fontSize = '13px';
+    waiting.textContent = `⏳ Waiting for ${displayName(opponent)} to respond to your last Trial.`;
+    card.appendChild(waiting);
+  } else {
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.textContent = 'Settle the score';
+    btn.onclick = () => { btn.disabled = true; startNewRound(opponent); };
+    card.appendChild(btn);
+  }
   holder.appendChild(card);
 }
 

@@ -131,14 +131,18 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    feel — this is the "excitement" layer, so it should visually say so. */
 .trial-card { border: 1px solid var(--gold-soft); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: rgba(212,175,55,0.05); cursor: pointer; }
 .trial-card:active { border-color: var(--gold); }
-.trial-card.state-losing { border-color: var(--danger); background: rgba(192,85,74,0.06); }
-.trial-card.state-champion { border-color: var(--line); background: var(--ink-raised); }
+.trial-card.state-targeted { border-color: var(--gold); border-style: solid; background: rgba(212,175,55,0.1); }
+.trial-card.state-settled { border-color: var(--line); background: var(--ink-raised); }
 .trial-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
 .trial-card-number { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; }
 .trial-card-byline { font-size: 11px; color: var(--cream-dim); margin-bottom: 6px; }
+.trial-card-byline-name { color: var(--cream); font-weight: 600; }
 .trial-status-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); white-space: nowrap; flex-shrink: 0; }
 .trial-status-badge.losing { border-color: var(--danger); color: #F0A898; }
-.trial-status-badge.champion { border-color: var(--line); color: var(--cream-dim); }
+.trial-status-badge.champion { background: var(--gold); border-color: var(--gold); color: #1A1300; font-weight: 700; }
+.trial-status-badge.targeted { background: rgba(212,175,55,0.15); font-weight: 600; }
+.trial-status-badge.challenged-back { background: rgba(212,175,55,0.3); border-color: var(--gold); color: var(--gold); font-weight: 700; box-shadow: 0 0 8px rgba(212,175,55,0.25); }
+.trial-status-badge.open-invite { border-color: var(--teal-dim); color: var(--teal); font-weight: 500; opacity: 0.85; }
 .trial-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .trial-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--cream-dim); }
 .trial-tag.mine { border-color: var(--gold); color: var(--gold); }
@@ -154,6 +158,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
+.status-row { font-size: 14px; color: var(--cream); font-weight: 600; margin: 8px 0 12px; }
+.mastery-section { margin-bottom: 4px; }
 .mastery-line { font-size: 13px; color: var(--teal); margin-bottom: 8px; }
 .room-item { padding: 18px 16px; }
 .room-item .room-name { font-size: 18px; font-family: 'Cinzel', serif; color: var(--gold); }
@@ -240,10 +246,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="account-name-line" id="account-username-display">Signed in</div>
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
-    <div id="tier-rank-holder"></div>
-    <div id="championships-holder"></div>
-    <div id="streak-chip-holder"></div>
-    <div id="mastery-holder"></div>
+    <div id="status-row-holder"></div>
+    <div id="mastery-section-holder"></div>
     <div id="badge-showcase-holder"></div>
     <div id="notif-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
@@ -353,6 +357,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="leaderboard-list-global"></div>
   </section>
 
+  <!-- PLAYER PROFILE — bragging rights: tap any name on a leaderboard to see their
+       public stats and your lifetime Duel Record with them. Mastery stays private
+       and never appears here, even though it shows on your own Home. -->
+  <section id="view-player-profile" class="card hidden">
+    <button class="link-btn breadcrumb" id="btn-player-profile-back">&larr; Back</button>
+    <div class="account-name-line" id="player-profile-name"></div>
+    <div id="player-profile-status-holder"></div>
+    <div id="player-profile-duel-holder"></div>
+  </section>
 
   <!-- MEMBERS (separate screen, not a tab — kept out of the main loop) -->
   <section id="view-members" class="card hidden">
@@ -478,6 +491,61 @@ const catLabel = key => CATEGORIES.find(c => c.key === key)?.label || key;
 // ---------------------------------------------------------------
 const $ = id => document.getElementById(id);
 const show = id => { document.querySelectorAll('#app > section').forEach(s => s.classList.add('hidden')); $(id).classList.remove('hidden'); };
+const currentVisibleViewId = () => { const el = [...document.querySelectorAll('#app > section')].find(s => !s.classList.contains('hidden')); return el ? el.id : 'view-home'; };
+
+// Tappable player profile — public stats + your LIFETIME Duel Record with them
+// (every room you've ever shared a direct Trial in, not just the current one).
+// Mastery is deliberately never fetched or shown here — it stays private.
+let playerProfileReturnView = 'view-home';
+async function openPlayerProfile(username) {
+  playerProfileReturnView = currentVisibleViewId();
+  show('view-player-profile');
+  $('player-profile-name').textContent = displayName(username);
+
+  const { data: rows } = await sb.from('global_leaderboard_alltime').select('*');
+  const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
+  const theirIndex = sorted.findIndex(r => r.username === username);
+  const { data: streak } = await sb.from('streaks').select('*').eq('username', username).maybeSingle();
+  const { count: crowns } = await sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', username).eq('rank', 1);
+  const { count: firstFights } = await sb.from('first_fighters').select('*', { count: 'exact', head: true }).eq('username', username);
+
+  const parts = [];
+  if (theirIndex !== -1) parts.push(`🌍 Global #${theirIndex + 1}`);
+  if (streak && streak.current_streak > 0) parts.push(`🔥 ${streak.current_streak}-day streak`);
+  if (crowns) parts.push(`👑 ${crowns} Crown${crowns === 1 ? '' : 's'} Held`);
+  if (firstFights) parts.push(`☝️ ${firstFights} first fight${firstFights === 1 ? '' : 's'}`);
+  $('player-profile-status-holder').innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '<div class="empty-state">No games played yet.</div>';
+
+  const record = await computeDuelRecordLifetime(me, username);
+  $('player-profile-duel-holder').innerHTML = record.total > 0
+    ? `<div class="duel-record">⚔️ Your Duel Record vs. ${displayName(username)}: ${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>`
+    : `<div class="empty-state">You haven't had a direct Trial with ${displayName(username)} yet.</div>`;
+}
+$('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
+
+// Same idea as computeDuelRecord, but across every room you've ever shared a
+// direct Trial in — a profile page has no "current room" to scope to, and
+// "our whole history together" is the more meaningful number here anyway.
+async function computeDuelRecordLifetime(userA, userB) {
+  const { data: rounds } = await sb.from('rounds').select('id')
+    .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`);
+  const roundIds = (rounds || []).map(r => r.id);
+  let wins = 0, losses = 0, ties = 0;
+  if (roundIds.length > 0) {
+    const { data: scores } = await sb.from('round_scores').select('round_id, username, score_points').in('round_id', roundIds);
+    const byRound = {};
+    (scores || []).forEach(s => { (byRound[s.round_id] = byRound[s.round_id] || []).push(s); });
+    Object.values(byRound).forEach(pair => {
+      const a = pair.find(s => s.username === userA);
+      const b = pair.find(s => s.username === userB);
+      if (!a || !b) return;
+      if (a.score_points > b.score_points) wins++;
+      else if (a.score_points < b.score_points) losses++;
+      else ties++;
+    });
+  }
+  return { wins, losses, ties, total: wins + losses + ties };
+}
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -624,11 +692,9 @@ async function afterLogin() {
   await updateStreakOnOpen();
   await maybeAwardShowedUp();
   await loadRoomsList();
-  await renderStreakChip();
-  await renderTierAndRank();
+  await renderStatusRow();
   await renderBadgeShowcase();
-  await renderChampionships();
-  await renderMastery();
+  await renderMasterySection();
   renderNotifBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
@@ -755,52 +821,22 @@ function commentForScore(points) {
   return band.lines[Math.floor(Math.random() * band.lines.length)];
 }
 
-async function renderTierAndRank() {
-  const holder = $('tier-rank-holder');
-  holder.innerHTML = '';
+// Global rank, streak, and Crowns Held — three self-explanatory facts, one
+// compact row. "Crowns Held" deliberately echoes the same "crown holder" badge
+// language already used on Trial cards, so it doesn't need its own explainer.
+async function renderStatusRow() {
+  const holder = $('status-row-holder');
   const { data: rows } = await sb.from('global_leaderboard_alltime').select('*');
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
-  const mine = sorted.find(r => r.username === me);
   const myIndex = sorted.findIndex(r => r.username === me);
+  const { data: streak } = await sb.from('streaks').select('*').eq('username', me).maybeSingle();
+  const { count: crowns } = await sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', me).eq('rank', 1);
 
-  const pillRow = document.createElement('div');
-  pillRow.style.display = 'flex';
-  pillRow.style.alignItems = 'center';
-  pillRow.style.flexWrap = 'wrap';
-
-  const tierPill = document.createElement('span');
-  tierPill.className = 'tier-pill';
-  tierPill.textContent = (mine && mine.rounds_played >= MIN_GAMES_TO_RANK) ? `🏅 ${tierForScore(mine.avg_score)}` : '🏅 Unranked';
-  pillRow.appendChild(tierPill);
-
-  if (myIndex !== -1) {
-    const rankPill = document.createElement('span');
-    rankPill.className = 'global-rank-pill';
-    rankPill.textContent = `🌍 Global #${myIndex + 1}`;
-    pillRow.appendChild(rankPill);
-  }
-
-  const infoBtn = document.createElement('button');
-  infoBtn.className = 'info-toggle-btn';
-  infoBtn.textContent = 'ⓘ';
-  infoBtn.title = 'What do these mean?';
-  infoBtn.onclick = () => $('tier-info-box').classList.toggle('hidden');
-  pillRow.appendChild(infoBtn);
-
-  holder.appendChild(pillRow);
-
-  const infoBox = document.createElement('div');
-  infoBox.id = 'tier-info-box';
-  infoBox.className = 'tier-info-box hidden';
-  const tierList = TIER_BANDS.slice().reverse().map(t => `<li>${t.name} — ${t.min}+ avg</li>`).join('');
-  const badgeList = Object.values(BADGE_META).map(b => `<li>${b.emoji} ${b.label} — ${b.req}</li>`).join('');
-  infoBox.innerHTML = `
-    <div class="tier-info-title">Tiers (global all-time average, ${MIN_GAMES_TO_RANK}+ games needed)</div>
-    <ul>${tierList}</ul>
-    <div class="tier-info-title">Badges</div>
-    <ul>${badgeList}</ul>
-  `;
-  holder.appendChild(infoBox);
+  const parts = [];
+  if (myIndex !== -1) parts.push(`🌍 Global #${myIndex + 1}`);
+  if (streak && streak.current_streak > 0) parts.push(`🔥 ${streak.current_streak}-day streak`);
+  if (crowns) parts.push(`👑 ${crowns} Crown${crowns === 1 ? '' : 's'} Held`);
+  holder.innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '';
 }
 
 async function renderBadgeShowcase() {
@@ -821,39 +857,25 @@ async function renderBadgeShowcase() {
   holder.appendChild(row);
 }
 
-// Lifetime, ever-increasing count of Trials this person has won — only counts
-// SETTLED Trials (past expiry), so it never flickers as new players join in
-// and never shrinks even after being dethroned somewhere else.
-// Live, not permanent: how many Trials you currently hold the #1 spot on, right
-// now — same as everything else in the app (rank, throne), this can go up OR
-// down as other people play. A "settled/permanent" version doesn't make sense
-// anymore now that Trials don't expire — there'd never be a moment to settle at.
-async function renderChampionships() {
-  const holder = $('championships-holder');
-  const { count } = await sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', me).eq('rank', 1);
-  holder.innerHTML = count ? `<div class="championships-line">🏆 ${count} Championship${count === 1 ? '' : 's'}</div>` : '';
-}
-
-// Mastery track: private, competition-free — words answered correctly at least
-// once and never missed. No leaderboard on purpose; it's the one signal that
-// keeps working even when nobody else is playing.
-async function renderMastery() {
-  const holder = $('mastery-holder');
+// Mastery section — visually separate from Status on purpose. Word progress and
+// accuracy stay fully private (never shown on anyone else's profile — the whole
+// point is a signal that doesn't depend on competition). First fights is the one
+// exception: it's meant to be public/braggable, shown here and on other people's
+// profile pages alike.
+async function renderMasterySection() {
+  const holder = $('mastery-section-holder');
   const { data: rows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
-  const mastered = (rows || []).filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
-  holder.innerHTML = mastered ? `<div class="mastery-line">📖 ${mastered} word${mastered === 1 ? '' : 's'} mastered</div>` : '';
-}
+  const list = rows || [];
+  const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
+  if (totalAnswered === 0) { holder.innerHTML = ''; return; }
+  const mastered = list.filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
+  const totalCorrect = list.reduce((s, r) => s + r.correct_count, 0);
+  const accuracy = Math.round((totalCorrect / totalAnswered) * 100);
+  const { count: firstFights } = await sb.from('first_fighters').select('*', { count: 'exact', head: true }).eq('username', me);
 
-async function renderStreakChip() {
-  const { data } = await sb.from('streaks').select('*').eq('username', me).maybeSingle();
-  const holder = $('streak-chip-holder');
-  holder.innerHTML = '';
-  if (data && data.current_streak > 0) {
-    const chip = document.createElement('div');
-    chip.className = 'streak-chip';
-    chip.textContent = `🔥 ${data.current_streak} day streak (best: ${data.best_streak})`;
-    holder.appendChild(chip);
-  }
+  const lines = [`📖 ${mastered} of ${WORDS.length} words mastered`, `🎯 ${accuracy}% accuracy`];
+  if (firstFights) lines.push(`☝️ ${firstFights} first fight${firstFights === 1 ? '' : 's'}`);
+  holder.innerHTML = `<div class="section-label">Mastery</div><div class="mastery-section">${lines.map(l => `<div class="mastery-line">${l}</div>`).join('')}</div>`;
 }
 
 async function updateStreakOnOpen() {
@@ -1055,21 +1077,16 @@ async function loadDares() {
   list.innerHTML = '<div class="empty-state">Loading…</div>';
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*').eq('room_id', currentRoom.id).gt('expires_at', now).order('created_at', { ascending: false });
-  const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me);
   if (myToken !== daresLoadToken) return; // a newer loadDares() call has since started — abandon this one
-  const playedIds = new Set((myScores || []).map(s => s.round_id));
   const all = rounds || [];
-  const unplayedCount = all.filter(r => !playedIds.has(r.id) && r.creator_username !== me).length;
-
-  $('tab-challenges').textContent = unplayedCount > 0 ? `Trials (${unplayedCount})` : 'Trials';
   $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
 
-  if (myToken !== daresLoadToken) return;
-  if (all.length === 0) { list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
+  if (all.length === 0) { $('tab-challenges').textContent = 'Trials'; list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
 
   // Fetch + compute state for every Trial first, so we can sort by what actually
-  // needs attention — unplayed, then losing, then settled/champion — instead of
-  // just chronological order burying actionable ones under old history.
+  // needs attention — a retaliation aimed at you first, then a fresh callout, then
+  // generic open ones, then losing, then settled/champion last — instead of just
+  // chronological order burying the most personal, urgent items under old history.
   const withState = [];
   for (const r of all) {
     if (myToken !== daresLoadToken) return; // abandon mid-loop if superseded
@@ -1078,37 +1095,59 @@ async function loadDares() {
     const rows = lb || [];
     const myRow = rows.find(row => row.username === me);
     const champ = rows[0] || null;
-    const state = !myRow ? 'unplayed' : (myRow.rank === 1 ? 'champion' : 'losing');
+    let state;
+    if (myRow) state = myRow.rank === 1 ? 'champion' : 'losing';
+    else if (r.target_username === me) state = r.via_challenge_back ? 'challenged_back' : 'targeted';
+    else state = 'unplayed';
     withState.push({ r, rows, myRow, champ, state });
   }
-  const statePriority = { unplayed: 0, losing: 1, champion: 2 };
+  const statePriority = { challenged_back: 0, targeted: 1, unplayed: 2, losing: 3, champion: 4 };
   withState.sort((a, b) => statePriority[a.state] - statePriority[b.state]);
+
+  // "Needs your move" = everything except already-holding-the-throne — regardless
+  // of who created it. Being dethroned on your OWN Trial is just as actionable as
+  // one someone else made, so it counts too now, matching what the card list
+  // itself already visually says (a red "losing" card either way).
+  const actionableCount = withState.filter(w => w.state !== 'champion').length;
+  $('tab-challenges').textContent = actionableCount > 0 ? `Trials (${actionableCount})` : 'Trials';
 
   list.innerHTML = '';
   for (const { r, rows, myRow, champ, state } of withState) {
     const div = document.createElement('div');
-    div.className = `trial-card state-${state}`;
+    // Both played-states get the same neutral, settled border — the card itself
+    // isn't the thing to act on anymore (you can't replay it either way); color
+    // lives in the badge alone. Loud/colored card borders are reserved for states
+    // where tapping THIS card is the direct next step.
+    const cardState = (state === 'champion' || state === 'losing') ? 'settled' : (state === 'challenged_back' || state === 'targeted') ? 'targeted' : state;
+    div.className = `trial-card state-${cardState}`;
     div.onclick = () => openTrialScreen(r);
 
-    let badge = null, statusLine;
+    let badge, badgeClass, statusLine;
     if (state === 'champion') {
-      badge = '👑 you hold the throne';
+      badge = '👑 crown holder'; badgeClass = 'champion';
       statusLine = `${myRow.score_points} pts`;
     } else if (state === 'losing') {
-      badge = `😤 losing to ${displayName(champ.username)}`;
-      statusLine = `${champ.score_points} pts · you're #${myRow.rank} of ${rows.length}`;
+      badge = '👎 lost your crown'; badgeClass = 'losing';
+      statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts · #${myRow.rank} of ${rows.length}`;
+    } else if (state === 'challenged_back') {
+      badge = '🎯 counter challenge'; badgeClass = 'challenged-back';
+      statusLine = champ ? `${displayName(champ.username)}'s ${champ.score_points} pts to beat` : 'nobody has played yet';
+    } else if (state === 'targeted') {
+      badge = '🎯 challenge you'; badgeClass = 'targeted';
+      statusLine = champ ? `${displayName(champ.username)}'s ${champ.score_points} pts to beat` : 'nobody has played yet';
     } else {
-      if (r.target_username === me) badge = r.via_challenge_back ? 'challenged you back' : 'aimed at you';
+      // Generic open Trial — still worth a nudge, just a lighter-touch one than a
+      // personal callout: an invitation, not a demand.
+      badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
       statusLine = champ ? `${displayName(champ.username)}'s ${champ.score_points} pts to beat` : 'nobody has played yet';
     }
-    const badgeClass = state === 'losing' ? 'losing' : (state === 'champion' ? 'champion' : '');
 
     div.innerHTML = `
       <div class="trial-card-top">
         <div class="trial-card-number">📜 Trial #${r.trial_number}</div>
-        ${badge ? `<span class="trial-status-badge ${badgeClass}">${badge}</span>` : ''}
+        <span class="trial-status-badge ${badgeClass}">${badge}</span>
       </div>
-      <div class="trial-card-byline">started by ${displayName(r.creator_username)}</div>
+      <div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>
       <div class="dare-sub">${statusLine} · played by ${rows.length}</div>`;
     list.appendChild(div);
   }
@@ -1182,6 +1221,7 @@ async function openTrialScreen(round) {
     const div = document.createElement('div');
     div.className = 'trial-lb-row' + (row.rank === 1 ? ' champion' : '');
     div.innerHTML = `<div class="lb-rank">#${row.rank}</div><div class="lb-name">${displayName(row.username)}</div><div class="lb-score">${row.score_points} pts</div>`;
+    if (row.username !== me) { div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(row.username); }
     lbList.appendChild(div);
   });
 
@@ -1390,6 +1430,7 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
     div.className = 'lb-row' + (r.username === me ? ' me' : '');
     const champTag = i === 0 ? `<span class="champion-tag">👑 champion</span>` : (r.username === defendingChamp ? `<span class="champion-tag defending" style="--decay:${decay}">🛡️ defending champ</span>` : '');
     div.innerHTML = `<div class="lb-rank">${i + 1}</div><div class="lb-name">${displayName(r.username)} ${champTag}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
+    if (r.username !== me) { div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(r.username); }
     list.appendChild(div);
   });
 
@@ -1402,6 +1443,7 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
       const div = document.createElement('div');
       div.className = 'lb-row' + (r.username === me ? ' me' : '');
       div.innerHTML = `<div class="lb-rank unranked-label">Unranked</div><div class="lb-name">${displayName(r.username)}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
+      if (r.username !== me) { div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(r.username); }
       list.appendChild(div);
     });
   }

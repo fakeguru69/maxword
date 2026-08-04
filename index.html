@@ -72,7 +72,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .lb-rank { font-family: 'Cinzel', serif; color: var(--gold); width: 28px; font-weight: 700; }
 .lb-rank.unranked-label { width: auto; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600; color: var(--cream-dim); }
 .lb-section-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cream-dim); margin: 14px 0 4px; padding-top: 8px; border-top: 1px solid var(--line); }
-.lb-name { flex: 1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lb-name { flex: 1; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 700; font-size: 15px; color: var(--cream); }
 .lb-score { color: var(--teal); font-weight: 600; }
 .lb-sub { font-size: 11px; color: var(--cream-dim); }
 .lb-row.me { background: rgba(79,182,168,0.08); border-radius: 8px; }
@@ -144,10 +144,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-card-byline-name { color: var(--cream); font-weight: 600; }
 .trial-status-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1.5px solid var(--gold); color: var(--gold); white-space: nowrap; flex-shrink: 0; background: transparent; font-weight: 600; }
 .trial-status-badge.losing { border-color: var(--danger); color: #F0A898; }
-.trial-status-badge.champion { font-weight: 700; }
-.trial-status-badge.targeted { }
-.trial-status-badge.challenged-back { font-weight: 700; box-shadow: 0 0 8px rgba(212,175,55,0.25); }
-.trial-status-badge.open-invite { border-color: var(--teal-dim); color: var(--teal); }
 .trial-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .trial-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--cream-dim); }
 .trial-tag.mine { border-color: var(--gold); color: var(--gold); }
@@ -249,7 +245,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <!-- HOME -->
   <section id="view-home" class="card hidden">
     <div class="account-header" style="display:flex; justify-content:space-between; align-items:center;">
-      <div class="account-name-line" id="account-username-display">Signed in</div>
+      <div class="account-name-line" id="account-username-display" style="cursor:pointer;">Signed in</div>
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
     <div id="status-row-holder"></div>
@@ -749,6 +745,7 @@ $('btn-logout').onclick = () => { unsubscribeRoomRealtime(); me = null; currentR
 // ---------------------------------------------------------------
 async function afterLogin() {
   $('account-username-display').textContent = displayName(me);
+  $('account-username-display').onclick = () => openPlayerProfile(me);
   await updateStreakOnOpen();
   await maybeAwardShowedUp();
   await loadRoomsList();
@@ -1319,7 +1316,7 @@ async function openTrialScreen(round) {
     const div = document.createElement('div');
     div.className = 'trial-lb-row' + (row.rank === 1 ? ' champion' : '');
     div.innerHTML = `<div class="lb-rank">#${row.rank}</div><div class="lb-name">${displayName(row.username)}</div><div class="lb-score">${row.score_points} pts</div>`;
-    if (row.username !== me) { div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(row.username); }
+    div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(row.username);
     lbList.appendChild(div);
   });
 
@@ -1528,7 +1525,7 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
     div.className = 'lb-row' + (r.username === me ? ' me' : '');
     const champTag = i === 0 ? `<span class="champion-tag">👑 champion</span>` : (r.username === defendingChamp ? `<span class="champion-tag defending" style="--decay:${decay}">🛡️ defending champ</span>` : '');
     div.innerHTML = `<div class="lb-rank">${i + 1}</div><div class="lb-name">${displayName(r.username)} ${champTag}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
-    if (r.username !== me) { div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(r.username); }
+    div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(r.username);
     list.appendChild(div);
   });
 
@@ -1541,7 +1538,7 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
       const div = document.createElement('div');
       div.className = 'lb-row' + (r.username === me ? ' me' : '');
       div.innerHTML = `<div class="lb-rank unranked-label">Unranked</div><div class="lb-name">${displayName(r.username)}</div><div class="lb-score">${Math.round(r.avg_score)} avg</div>`;
-      if (r.username !== me) { div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(r.username); }
+      div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(r.username);
       list.appendChild(div);
     });
   }

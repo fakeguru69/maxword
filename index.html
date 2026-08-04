@@ -168,6 +168,12 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .duel-record-vs { font-size: 13px; color: var(--cream); margin-bottom: 8px; }
 .duel-record-vs .opponent-name { color: var(--cream); }
 .duel-record-score { font-family: 'Cinzel', serif; font-size: 34px; font-weight: 900; color: var(--gold); letter-spacing: 0.06em; line-height: 1; }
+.rivalry-card { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 18px; border: 1px solid var(--danger); background: rgba(192,85,74,0.08); }
+.rivalry-card.tied { border-color: var(--gold); background: rgba(212,175,55,0.08); }
+.rivalry-text { font-size: 14px; color: var(--cream); margin-bottom: 10px; }
+.rivalry-text .opponent-name { font-weight: 700; color: var(--cream); }
+.rivalry-text .rivalry-score { font-weight: 700; }
+.rivalry-card .btn-primary { width: 100%; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
@@ -307,6 +313,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div class="room-meta" id="room-code-display"></div>
     <div class="member-line" id="member-count-line"></div>
     <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
+    <div id="rivalry-holder"></div>
 
     <div id="trials-count-label" class="section-label" style="margin-top:16px;"></div>
     <div id="panel-dares">
@@ -467,6 +474,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="grid-emoji" id="score-grid"></div>
       <div class="score-comment" id="score-comment"></div>
       <div class="score-verdict hidden" id="score-verdict"></div>
+      <div id="score-duel-holder"></div>
       <div id="score-badges"></div>
     </div>
     <div id="forced-flow-holder"></div>
@@ -611,6 +619,10 @@ $('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
 // direct Trial in — a profile page has no "current room" to scope to, and
 // "our whole history together" is the more meaningful number here anyway.
 async function computeDuelRecordLifetime(userA, userB) {
+  // Duel is deliberately EXCLUSIVE — it only counts a Trial toward this pair's
+  // head-to-head if one of them directly called the other out (challenged or
+  // challenged back). Just co-existing on the same open/multiplayer Trial does
+  // NOT create Duel history between two people; that's what Trial rank is for.
   const { data: rounds } = await sb.from('rounds').select('id')
     .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`);
   const roundIds = (rounds || []).map(r => r.id);
@@ -630,6 +642,16 @@ async function computeDuelRecordLifetime(userA, userB) {
   }
   return { wins, losses, ties, total: wins + losses + ties };
 }
+// Shared by the Dethroned/Challenged popups (single-opponent case only) — turns
+// a bare stat drop into a rivalry beat when real Duel history exists, and stays
+// silent (no forced number) if this is the first time these two have crossed
+// paths in a direct callout.
+async function duelSuffix(opponent) {
+  const record = await computeDuelRecordLifetime(me, opponent);
+  if (record.total === 0) return '';
+  return ` — you're ${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''} against them`;
+}
+
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -830,7 +852,7 @@ async function checkDethronements() {
   let text;
   if (events.length === 1) {
     const e = events[0];
-    text = `${displayName(e.dethroned_by_username)} just took Trial #${e.rounds.trial_number} from you.`;
+    text = `${displayName(e.dethroned_by_username)} just took Trial #${e.rounds.trial_number} from you${await duelSuffix(e.dethroned_by_username)}.`;
   } else {
     text = `You've been dethroned on ${events.length} Trials — open your Game Rooms to see who got you.`;
   }
@@ -866,7 +888,7 @@ async function checkNewChallenges() {
   if (fresh.length === 0) return;
   let text;
   if (fresh.length === 1) {
-    text = `${displayName(fresh[0].creator_username)} challenged you to Trial #${fresh[0].trial_number}.`;
+    text = `${displayName(fresh[0].creator_username)} challenged you to Trial #${fresh[0].trial_number}${await duelSuffix(fresh[0].creator_username)}.`;
   } else {
     text = `${fresh.length} new challenges are waiting for you — open your Game Rooms to see them.`;
   }
@@ -1201,6 +1223,7 @@ async function openRoom(room) {
   show('view-room');
   await loadDares();
   await renderMemberLine();
+  await renderRivalryCard();
   await checkDethronements();
   await checkNewChallenges();
   await maybeShowRoomVocabTip();
@@ -1479,6 +1502,8 @@ async function openTrialScreen(round) {
 // Head-to-head tally between two people, scoped to this room, across every direct
 // Trial between them that both have actually played.
 async function computeDuelRecord(userA, userB) {
+  // Same exclusive creator/target-only logic as the lifetime version, scoped to
+  // this room.
   const { data: rounds } = await sb.from('rounds').select('id')
     .eq('room_id', currentRoom.id)
     .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`);
@@ -1498,6 +1523,52 @@ async function computeDuelRecord(userA, userB) {
     });
   }
   return { wins, losses, ties, total: wins + losses + ties };
+}
+
+// Nemesis card — surfaces the one person in this room you're most behind
+// against (or, failing that, dead-even with), with a one-tap way to act on it.
+// Requires at least 2 played duels against them so a single fluke loss can't
+// masquerade as a rivalry. Always paired with the visible record (never a
+// bare "Nemesis" label with no number behind it) — the number IS the
+// explanation, no need to expose the picking logic itself.
+async function computeMyRivalries() {
+  const { data: rounds } = await sb.from('rounds').select('creator_username, target_username')
+    .eq('room_id', currentRoom.id)
+    .not('target_username', 'is', null);
+  const opponents = new Set();
+  (rounds || []).forEach(r => {
+    if (r.creator_username === me && r.target_username !== me) opponents.add(r.target_username);
+    else if (r.target_username === me && r.creator_username !== me) opponents.add(r.creator_username);
+  });
+  let best = null; // "best" candidate to feature, i.e. most worth acting on
+  for (const opp of opponents) {
+    const record = await computeDuelRecord(me, opp);
+    if (record.total < 2) continue; // floor: at least 2 duels before this counts as a real pattern
+    const net = record.losses - record.wins; // positive = I'm behind
+    if (net < 0) continue; // ahead of them — not a rivalry to feature here
+    const candidate = { opponent: opp, record, net };
+    if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = candidate;
+  }
+  return best;
+}
+async function renderRivalryCard() {
+  const holder = $('rivalry-holder');
+  holder.innerHTML = '';
+  const rival = await computeMyRivalries();
+  if (!rival) return;
+  const { opponent, record, net } = rival;
+  const card = document.createElement('div');
+  card.className = net === 0 ? 'rivalry-card tied' : 'rivalry-card';
+  const label = net === 0
+    ? `Dead even with <span class="opponent-name">${displayName(opponent)}</span> — <span class="rivalry-score">${record.wins}–${record.losses}</span>. Break the tie.`
+    : `⚔️ Down <span class="rivalry-score">${record.wins}–${record.losses}</span> against <span class="opponent-name">${displayName(opponent)}</span>.`;
+  card.innerHTML = `<div class="rivalry-text">${label}</div>`;
+  const btn = document.createElement('button');
+  btn.className = 'btn-primary';
+  btn.textContent = 'Settle the score';
+  btn.onclick = () => { btn.disabled = true; startNewRound(opponent); };
+  card.appendChild(btn);
+  holder.appendChild(card);
 }
 
 $('btn-trial-back').onclick = () => { currentTrialRound = null; show('view-room'); loadDares(); };
@@ -1949,9 +2020,34 @@ async function renderScorecard(correct, points, newBadges) {
     verdictEl.classList.add('hidden');
   }
 
+  // Duel Record on the scorecard — same exclusive gate as everywhere else: only
+  // when THIS round was itself a direct callout (a Challenge or Challenge Back)
+  // and I'm one of the two named in it, never for an own-round or an open Trial
+  // someone just happened to join.
+  const duelHolder = $('score-duel-holder');
+  duelHolder.innerHTML = '';
+  if (currentRound.target_username && (me === currentRound.creator_username || me === currentRound.target_username)) {
+    const opponent = me === currentRound.creator_username ? currentRound.target_username : currentRound.creator_username;
+    const record = await computeDuelRecordLifetime(me, opponent);
+    if (record.total > 0) {
+      duelHolder.innerHTML = `<div class="duel-record-card">
+        <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
+        <div class="duel-record-vs">You vs. <span class="opponent-name">${displayName(opponent)}</span></div>
+        <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
+      </div>`;
+    }
+  }
+
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
-    shareText(`🎯 I, ${displayName(me)}, scored ${points} pts on MaxWord's "${currentRoom.name}" — can you beat me?\n\n⚔️ ${url}`);
+    // If this round has a specific named target — win, lose, or a fresh callout
+    // you just sent — the share message calls them out by name directly, instead
+    // of the generic broadcast used for an open Trial nobody's aimed at.
+    if (currentRound.target_username) {
+      shareText(`🎯 ${displayName(me)} challenges ${displayName(currentRound.target_username)} — ${points} pts on Trial #${currentRound.trial_number} in MaxWord's "${currentRoom.name}". Can you beat it?\n\n⚔️ ${url}`);
+    } else {
+      shareText(`🎯 I, ${displayName(me)}, scored ${points} pts on MaxWord's "${currentRoom.name}" — can you beat me?\n\n⚔️ ${url}`);
+    }
   };
 
   // Challenge-back only exists when there's someone to challenge: hidden entirely on

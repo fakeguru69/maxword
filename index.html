@@ -99,6 +99,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .badge-earned-title { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; margin-bottom: 3px; }
 .badge-earned-req { font-size: 12px; color: var(--cream-dim); }
 .badge-earned-next { font-size: 12px; color: var(--teal); margin-top: 6px; font-weight: 600; }
+.forced-flow-card { text-align: left; border: 1px solid var(--gold); border-radius: 12px; padding: 14px; margin: 10px 0; background: rgba(212,175,55,0.08); }
+.forced-flow-card .forced-flow-text { font-size: 14px; color: var(--cream); margin-bottom: 12px; line-height: 1.5; }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
 .error-text { color: var(--danger); font-size: 13px; margin-top: -8px; margin-bottom: 10px; }
@@ -305,7 +307,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div id="my-open-challenges"></div>
       <div id="dares-list"></div>
       <div class="dare-sub" id="dare-cap-note" style="margin-top:6px;"></div>
-      <button class="btn-primary" id="btn-start-round" style="margin-top:10px;">Start a game</button>
+      <button class="btn-primary" id="btn-start-round" style="margin-top:10px;">Start a Trial</button>
     </div>
 
     <div id="panel-leaderboard" class="hidden">
@@ -316,7 +318,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
         <div class="tab" data-room-period="alltime">All-time</div>
       </div>
       <div id="leaderboard-list"></div>
-      <button class="btn-primary" id="btn-start-round-lb" style="margin-top:14px;">Start a game</button>
+      <button class="btn-primary" id="btn-start-round-lb" style="margin-top:14px;">Start a Trial</button>
     </div>
   </section>
 
@@ -447,14 +449,17 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="score-verdict hidden" id="score-verdict"></div>
       <div id="score-badges"></div>
     </div>
-    <div class="btn-row" style="margin-top:10px;">
-      <button class="btn-primary" id="btn-challenge-others">Challenge others</button>
+    <div id="forced-flow-holder"></div>
+    <div id="normal-scorecard-actions">
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn-primary" id="btn-challenge-others">Challenge others</button>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn-secondary" id="btn-dare-back">Challenge back</button>
+      </div>
+      <div id="other-dares-holder" style="margin-top:14px;"></div>
+      <button class="btn-ghost" id="btn-back-to-room" style="margin-top:10px;">Back to room</button>
     </div>
-    <div class="btn-row" style="margin-top:10px;">
-      <button class="btn-secondary" id="btn-dare-back">Challenge back</button>
-    </div>
-    <div id="other-dares-holder" style="margin-top:14px;"></div>
-    <button class="btn-ghost" id="btn-back-to-room" style="margin-top:10px;">Back to room</button>
   </section>
 
   <div class="footnote">Fake Guru™ — Upgrade your Words, Upgrade your Style.</div>
@@ -747,7 +752,6 @@ async function afterLogin() {
   $('account-username-display').textContent = displayName(me);
   $('account-username-display').onclick = () => openPlayerProfile(me);
   await updateStreakOnOpen();
-  await maybeAwardShowedUp();
   await loadRoomsList();
   await renderStatusRow();
   await renderBadgeShowcase();
@@ -757,7 +761,6 @@ async function afterLogin() {
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
   await checkDethronements();
-  await checkRankReminder();
 }
 
 // One-time-each nudge, shown the moment Home or a room is opened (login, resuming a
@@ -838,7 +841,7 @@ async function checkRankReminder() {
     reminderAction = async () => { await openRoom(targetRound.rooms); startRound(targetRound); };
   } else {
     $('reminder-modal-text').textContent = `${remaining} more round${remaining > 1 ? 's' : ''} to get ranked!`;
-    $('btn-reminder-play').textContent = 'Start a game';
+    $('btn-reminder-play').textContent = 'Start a Trial';
     // If this fired while already inside a room (the common case now that it also
     // checks right after finishing a game), stay there instead of bouncing back to
     // Home and costing an extra tap to re-enter the room they were already in.
@@ -859,12 +862,12 @@ const BADGE_META = {
   streak_7: { emoji: '🔥', label: '7-Day Streak', req: 'Play 7 days in a row.', rarity: 3, tier: 7, nextKey: 'streak_30' },
   streak_30: { emoji: '🔥', label: '30-Day Streak', req: 'Play 30 days in a row.', rarity: 4, tier: 30, nextKey: null },
   flawless_scroll: { emoji: '✨', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.', rarity: 3 },
-  ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 3 games played.', rarity: 1 },
+  ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 2 games played.', rarity: 1 },
 };
 
 // Tier reflects skill (global all-time average), separate from streak (consistency).
 // Gated behind a minimum sample size so one lucky round can't buy "Grandmaster."
-const MIN_GAMES_TO_RANK = 3; // shared threshold: tier display AND leaderboard rank both gate on this
+const MIN_GAMES_TO_RANK = 2; // shared threshold: tier display AND leaderboard rank both gate on this — matches the forced 2-game onboarding window exactly, so finishing it means you're immediately ranked, not left in limbo waiting for an un-forced 3rd game
 const TIER_BANDS = [
   { min: 900, name: 'Grandmaster' },
   { min: 700, name: 'Sage' },
@@ -973,7 +976,9 @@ async function updateStreakOnOpen() {
 
 async function maybeAwardShowedUp() {
   const { data } = await sb.from('badges').select('badge_key').eq('username', me).eq('badge_key', 'showed_up').is('room_id', null).maybeSingle();
-  if (!data) await sb.from('badges').insert({ username: me, badge_key: 'showed_up', room_id: null });
+  if (data) return null;
+  await sb.from('badges').insert({ username: me, badge_key: 'showed_up', room_id: null });
+  return 'showed_up';
 }
 
 async function loadRoomsList() {
@@ -1106,8 +1111,19 @@ async function openRoom(room) {
   await loadDares();
   await renderMemberLine();
   await checkDethronements();
-  await checkRankReminder();
+  await maybeShowRoomVocabTip();
   subscribeRoomRealtime(room.id);
+}
+
+// One-time, fires the moment she lands back in a room right after her 2nd-ever
+// game (the point our forced onboarding flow routes her to) — explains the four
+// card badges she's now looking at. Silently skips at any other games-played count.
+async function maybeShowRoomVocabTip() {
+  const { count: played } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
+  if (played !== 2) return;
+  await showOnboardingTipOnce('room_card_vocab', '📜 Reading the room',
+    `🎯 challenge you / counter challenge — someone's calling you out directly. ⚔️ let's fight! — an open invitation, no pressure. ☝️ be the first — nobody's played it yet. 👑/👎 — you've already played that one.`,
+    () => {});
 }
 
 // Keeps the Challenges/Leaderboard tabs current while you're actually looking at them —
@@ -1705,6 +1721,8 @@ async function finishRound() {
   if ((count || 0) >= 2) await sb.from('rounds').update({ status: 'locked' }).eq('id', currentRound.id);
 
   const newBadges = await maybeAwardBadges(correct);
+  const showedUpBadge = await maybeAwardShowedUp();
+  if (showedUpBadge) newBadges.push(showedUpBadge);
   const rankedUpBadge = await maybeAwardRankedUp();
   if (rankedUpBadge) newBadges.push(rankedUpBadge);
   const streakBadges = await recordRoundPlayed();
@@ -1713,8 +1731,12 @@ async function finishRound() {
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
   await checkDethronements(); // catches anything that happened while you were mid-quiz and got skipped live
-  await checkRankReminder(); // was previously only checked at login/room-entry — meant a first-game-in-one-session player like a brand new WhatsApp arrival never saw it until they navigated away and back
-  if (newBadges.length > 0) {
+  // The generic "first badge earned" explainer is suppressed during the forced
+  // 2-game onboarding window (renderScorecard already shows its own tailored
+  // forced-flow card there) — stacking a second modal on top would be exactly
+  // the over-explaining we're trying to avoid. It resumes normally from game 3 on.
+  const { count: roundsPlayedSoFar } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
+  if (newBadges.length > 0 && roundsPlayedSoFar > 2) {
     await showOnboardingTipOnce('first_badge_earned', '🏅 Your First Badge!',
       `Badges are a running collection — check your Game Rooms page anytime to see all the ones you've earned.`);
   }
@@ -1817,7 +1839,50 @@ async function renderScorecard(correct, points, newBadges) {
 
   dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(currentRound.creator_username, true); };
 
-  renderOtherDares();
+  // First two games ever: replace the normal button row entirely with a single
+  // tailored next step, rather than a menu of choices — this is the one place a
+  // genuinely NEW player still expects to be guided. From game 3 on, she's fully
+  // free and sees the normal scorecard exactly as everyone else does.
+  const { count: roundsPlayedNow } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
+  const forcedHolder = $('forced-flow-holder');
+  const normalActions = $('normal-scorecard-actions');
+  forcedHolder.innerHTML = '';
+
+  if (roundsPlayedNow === 1) {
+    normalActions.classList.add('hidden');
+    const card = document.createElement('div');
+    card.className = 'forced-flow-card';
+    if (iWon === false) {
+      card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Trial, aimed straight at whoever just beat you.</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.textContent = `Challenge ${titleCaseName(currentRound.creator_username)} back`;
+      btn.onclick = () => { btn.disabled = true; startNewRound(currentRound.creator_username, true); };
+      card.appendChild(btn);
+    } else {
+      card.innerHTML = `<div class="forced-flow-text">Nice! Ready for round two? Pick someone in the room to challenge next.</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.textContent = 'Choose a challenger';
+      btn.onclick = () => openTargetPicker();
+      card.appendChild(btn);
+    }
+    forcedHolder.appendChild(card);
+  } else if (roundsPlayedNow === 2) {
+    normalActions.classList.add('hidden');
+    const card = document.createElement('div');
+    card.className = 'forced-flow-card';
+    card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! Every Trial you play feeds your overall average, and that average is what your Leaderboard position is based on.</div>`;
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.textContent = 'See my Game Room';
+    btn.onclick = () => openRoom(currentRoom);
+    card.appendChild(btn);
+    forcedHolder.appendChild(card);
+  } else {
+    normalActions.classList.remove('hidden');
+    renderOtherDares();
+  }
 }
 
 let otherDaresLoadToken = 0;

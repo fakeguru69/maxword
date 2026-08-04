@@ -101,6 +101,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .badge-earned-next { font-size: 12px; color: var(--teal); margin-top: 6px; font-weight: 600; }
 .forced-flow-card { text-align: left; border: 1px solid var(--gold); border-radius: 12px; padding: 14px; margin: 10px 0; background: rgba(212,175,55,0.08); }
 .forced-flow-card .forced-flow-text { font-size: 14px; color: var(--cream); margin-bottom: 12px; line-height: 1.5; }
+.tip-list-item { font-size: 14px; color: var(--cream); line-height: 1.5; margin-bottom: 10px; }
+.tip-list-item:last-child { margin-bottom: 0; }
+.room-leaderboard-btn { width: 100%; background: var(--ink-raised); border: 1px solid var(--gold-soft); border-radius: 12px; padding: 14px; font-family: 'Cinzel', serif; font-size: 18px; font-weight: 700; color: var(--gold); cursor: pointer; margin-bottom: 4px; }
+.room-leaderboard-btn:active { border-color: var(--gold); }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
 .error-text { color: var(--danger); font-size: 13px; margin-top: -8px; margin-bottom: 10px; }
@@ -297,29 +301,30 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div class="room-meta" id="room-code-display"></div>
     <div class="member-line" id="member-count-line"></div>
     <button class="btn-ghost" id="btn-invite-room" style="margin:12px 0;">Invite to Game Room</button>
+    <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
 
-    <div class="tabs">
-      <div class="tab active" data-panel="dares" id="tab-challenges">📜 Trials</div>
-      <div class="tab" data-panel="leaderboard">🏆 Leaderboard</div>
-    </div>
-
+    <div id="trials-count-label" class="section-label" style="margin-top:16px;"></div>
     <div id="panel-dares">
       <div id="my-open-challenges"></div>
       <div id="dares-list"></div>
       <div class="dare-sub" id="dare-cap-note" style="margin-top:6px;"></div>
       <button class="btn-primary" id="btn-start-round" style="margin-top:10px;">Start a Trial</button>
     </div>
+  </section>
 
-    <div id="panel-leaderboard" class="hidden">
-      <div id="rank-banner" class="rank-banner hidden"></div>
-      <div class="tabs-sub">
-        <div class="tab" data-room-period="weekly">Week</div>
-        <div class="tab active" data-room-period="monthly">Month</div>
-        <div class="tab" data-room-period="alltime">All-time</div>
-      </div>
-      <div id="leaderboard-list"></div>
-      <button class="btn-primary" id="btn-start-round-lb" style="margin-top:14px;">Start a Trial</button>
+  <!-- ROOM LEADERBOARD (its own screen now, not a tab — matches how Global Leaderboard
+       already works, and keeps it a quieter secondary status check rather than
+       competing for the same attention as the Trials list) -->
+  <section id="view-room-leaderboard" class="card hidden">
+    <button class="link-btn breadcrumb" id="btn-room-lb-back">&larr; Back to Trials</button>
+    <h2 class="display" id="room-lb-title" style="margin-bottom:14px;">Leaderboard</h2>
+    <div id="rank-banner" class="rank-banner hidden"></div>
+    <div class="tabs-sub">
+      <div class="tab" data-room-period="weekly">Week</div>
+      <div class="tab active" data-room-period="monthly">Month</div>
+      <div class="tab" data-room-period="alltime">All-time</div>
     </div>
+    <div id="leaderboard-list"></div>
   </section>
 
   <!-- CHOOSE TARGET (direct callout is the default/prominent path — "anyone" is the fallback) -->
@@ -781,7 +786,7 @@ async function showOnboardingTipOnce(key, title, text, onDismiss) {
   if (existing) { if (onDismiss) onDismiss(); return; }
   await sb.from('reminders_shown').insert({ username: me, reminder_key: key });
   $('onboarding-modal-title').textContent = title;
-  $('onboarding-modal-text').textContent = text;
+  $('onboarding-modal-text').innerHTML = text; // innerHTML, not textContent — lets tips use real line breaks/lists instead of one cramped paragraph; safe since every call site passes a hardcoded string we wrote, never user input
   $('btn-onboarding-ok').onclick = () => { $('onboarding-modal').classList.add('hidden'); if (onDismiss) onDismiss(); };
   $('onboarding-modal').classList.remove('hidden');
 }
@@ -1107,7 +1112,6 @@ async function openRoom(room) {
   $('room-title').textContent = room.name;
   $('room-code-display').textContent = `${room.code} · ${room.is_open ? 'Open room' : 'Closed room'}`;
   show('view-room');
-  switchRoomPanel('dares');
   await loadDares();
   await renderMemberLine();
   await checkDethronements();
@@ -1122,7 +1126,10 @@ async function maybeShowRoomVocabTip() {
   const { count: played } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
   if (played !== 2) return;
   await showOnboardingTipOnce('room_card_vocab', '📜 Reading the room',
-    `🎯 challenge you / counter challenge — someone's calling you out directly. ⚔️ let's fight! — an open invitation, no pressure. ☝️ be the first — nobody's played it yet. 👑/👎 — you've already played that one.`,
+    `<div class="tip-list-item">🎯 challenge you / counter challenge — someone's calling you out directly</div>
+     <div class="tip-list-item">⚔️ let's fight! — an open invitation, no pressure</div>
+     <div class="tip-list-item">☝️ be the first — nobody's played it yet</div>
+     <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
     () => {});
 }
 
@@ -1150,8 +1157,8 @@ function unsubscribeRoomRealtime() {
 function refreshActiveRoomPanel() {
   if (!currentRoom) return;
   if (currentTrialRound && !$('view-trial').classList.contains('hidden')) { openTrialScreen(currentTrialRound); return; }
-  if (!$('panel-dares').classList.contains('hidden')) loadDares();
-  else if (!$('panel-leaderboard').classList.contains('hidden')) loadLeaderboard();
+  if (!$('view-room-leaderboard').classList.contains('hidden')) loadLeaderboard();
+  else if (!$('view-room').classList.contains('hidden')) loadDares();
 }
 
 async function renderMemberLine() {
@@ -1164,16 +1171,12 @@ async function renderMemberLine() {
 $('btn-room-back').onclick = () => { unsubscribeRoomRealtime(); currentRoom = null; show('view-home'); loadRoomsList(); };
 $('btn-members-back').onclick = () => show('view-room');
 
-document.querySelectorAll('#view-room > .tabs')[0].querySelectorAll('.tab').forEach(tab => {
-  tab.onclick = () => switchRoomPanel(tab.dataset.panel);
-});
-function switchRoomPanel(panel) {
-  document.querySelectorAll('#view-room > .tabs')[0].querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.panel === panel));
-  ['dares', 'leaderboard'].forEach(p => $(`panel-${p}`).classList.toggle('hidden', p !== panel));
-  if (panel === 'dares') loadDares();
-  if (panel === 'leaderboard') loadLeaderboard();
-}
-$('btn-start-round-lb').onclick = () => openTargetPicker();
+$('btn-open-room-leaderboard').onclick = () => {
+  $('room-lb-title').textContent = `${currentRoom.name} — Leaderboard`;
+  show('view-room-leaderboard');
+  loadLeaderboard();
+};
+$('btn-room-lb-back').onclick = () => { show('view-room'); loadDares(); };
 
 document.querySelectorAll('[data-room-period]').forEach(tab => {
   tab.onclick = () => { document.querySelectorAll('[data-room-period]').forEach(t => t.classList.remove('active')); tab.classList.add('active'); lbPeriod = tab.dataset.roomPeriod; loadLeaderboard(); };
@@ -1195,7 +1198,7 @@ async function loadDares() {
   const all = rounds || [];
   $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
 
-  if (all.length === 0) { $('tab-challenges').textContent = '📜 Trials'; list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
+  if (all.length === 0) { $('trials-count-label').textContent = '📜 Trials'; list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
 
   // Fetch + compute state for every Trial first, so we can sort by what actually
   // needs attention — a retaliation aimed at you first, then a fresh callout, then
@@ -1223,7 +1226,7 @@ async function loadDares() {
   // one someone else made, so it counts too now, matching what the card list
   // itself already visually says (a red "losing" card either way).
   const actionableCount = withState.filter(w => w.state !== 'champion').length;
-  $('tab-challenges').textContent = actionableCount > 0 ? `📜 Trials (${actionableCount})` : '📜 Trials';
+  $('trials-count-label').textContent = actionableCount > 0 ? `📜 Trials (${actionableCount})` : '📜 Trials';
 
   list.innerHTML = '';
   for (const { r, rows, myRow, champ, state } of withState) {
@@ -1272,7 +1275,6 @@ async function loadDares() {
   const used = count || 0;
   $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} Trials in this Game Room today.`;
   $('btn-start-round').disabled = used >= MAX_OPEN_DARES_PER_DAY;
-  $('btn-start-round-lb').disabled = used >= MAX_OPEN_DARES_PER_DAY;
   $('btn-start-round').onclick = () => openTargetPicker();
 }
 
@@ -1381,7 +1383,7 @@ async function computeDuelRecord(userA, userB) {
   return { wins, losses, ties, total: wins + losses + ties };
 }
 
-$('btn-trial-back').onclick = () => { currentTrialRound = null; switchRoomPanel('dares'); show('view-room'); };
+$('btn-trial-back').onclick = () => { currentTrialRound = null; show('view-room'); loadDares(); };
 
 async function loadMembers() {
   const { data: members } = await sb.from('room_members').select('*').eq('room_id', currentRoom.id).order('joined_at');
@@ -1619,7 +1621,6 @@ $('btn-choose-target-back').onclick = () => show('view-room');
 
 async function startNewRound(targetUsername, viaChallengeBack) {
   $('btn-start-round').disabled = true;
-  $('btn-start-round-lb').disabled = true;
   const wordIds = await pickRoundWords();
   const now = new Date();
   const expires = new Date(now.getTime() + DARE_EXPIRY_MS);
@@ -1627,7 +1628,7 @@ async function startNewRound(targetUsername, viaChallengeBack) {
     room_id: currentRoom.id, creator_username: me, target_username: targetUsername || null, via_challenge_back: !!viaChallengeBack, word_ids: wordIds, short_code: shortRoundCode(), status: 'open',
     created_at: now.toISOString(), expires_at: expires.toISOString()
   }).select().single();
-  if (error) { $('btn-start-round').disabled = false; $('btn-start-round-lb').disabled = false; alert(error.message); return; }
+  if (error) { $('btn-start-round').disabled = false; alert(error.message); return; }
   startRound(round);
 }
 

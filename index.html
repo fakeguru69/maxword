@@ -300,7 +300,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <h2 class="display" id="room-title">Room</h2>
     <div class="room-meta" id="room-code-display"></div>
     <div class="member-line" id="member-count-line"></div>
-    <button class="btn-ghost" id="btn-invite-room" style="margin:12px 0;">Invite to Game Room</button>
     <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
 
     <div id="trials-count-label" class="section-label" style="margin-top:16px;"></div>
@@ -1164,8 +1163,12 @@ function refreshActiveRoomPanel() {
 async function renderMemberLine() {
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
   const n = (members || []).length;
-  $('member-count-line').innerHTML = `${n} member${n === 1 ? '' : 's'} · <span class="manage-link" id="link-manage-members">Manage</span>`;
+  $('member-count-line').innerHTML = `${n} member${n === 1 ? '' : 's'} · <span class="manage-link" id="link-manage-members">Manage</span> · <span class="manage-link" id="link-invite-room">🔗 Invite</span>`;
   $('link-manage-members').onclick = () => { show('view-members'); loadMembers(); };
+  $('link-invite-room').onclick = () => {
+    const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
+    shareText(`Join my Game Room "${currentRoom.name}" on MaxWord — ${url}`);
+  };
 }
 
 $('btn-room-back').onclick = () => { unsubscribeRoomRealtime(); currentRoom = null; show('view-home'); loadRoomsList(); };
@@ -1239,24 +1242,30 @@ async function loadDares() {
     div.className = `trial-card state-${cardState}`;
     div.onclick = () => openTrialScreen(r);
 
-    let badge, badgeClass, statusLine;
+    // statusLine always uses ONE consistent phrase — "X leads with N pts" — whether
+    // you've played and lost, or haven't played yet and it's just the target to beat.
+    // rankLine is kept as its own separate line (never concatenated into statusLine)
+    // so "#R of T" doesn't wrap unpredictably depending on username length — it only
+    // appears once you've actually played and have a rank to show.
+    let badge, badgeClass, statusLine, rankLine = '';
     if (state === 'champion') {
       badge = '👑 crown holder'; badgeClass = 'champion';
       statusLine = `${myRow.score_points} pts`;
     } else if (state === 'losing') {
       badge = '👎 lost your crown'; badgeClass = 'losing';
-      statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts · #${myRow.rank} of ${rows.length}`;
+      statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts`;
+      rankLine = `#${myRow.rank} of ${rows.length}`;
     } else if (state === 'challenged_back') {
       badge = '🎯 counter challenge'; badgeClass = 'challenged-back';
-      statusLine = champ ? `${displayName(champ.username)}'s ${champ.score_points} pts to beat` : 'nobody has played yet';
+      statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     } else if (state === 'targeted') {
       badge = '🎯 challenge you'; badgeClass = 'targeted';
-      statusLine = champ ? `${displayName(champ.username)}'s ${champ.score_points} pts to beat` : 'nobody has played yet';
+      statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     } else {
       // Generic open Trial — still worth a nudge, just a lighter-touch one than a
       // personal callout: an invitation, not a demand.
       badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
-      statusLine = champ ? `${displayName(champ.username)}'s ${champ.score_points} pts to beat` : 'nobody has played yet';
+      statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     }
 
     div.innerHTML = `
@@ -1265,7 +1274,8 @@ async function loadDares() {
         <span class="trial-status-badge ${badgeClass}">${badge}</span>
       </div>
       <div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>
-      <div class="dare-sub">${statusLine} · played by ${rows.length}</div>`;
+      <div class="dare-sub">${statusLine}</div>
+      <div class="dare-sub">${rankLine ? rankLine + ' · ' : ''}played by ${rows.length}</div>`;
     list.appendChild(div);
   }
 
@@ -1277,11 +1287,6 @@ async function loadDares() {
   $('btn-start-round').disabled = used >= MAX_OPEN_DARES_PER_DAY;
   $('btn-start-round').onclick = () => openTargetPicker();
 }
-
-$('btn-invite-room').onclick = () => {
-  const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-  shareText(`Join my Game Room "${currentRoom.name}" on MaxWord — ${url}`);
-};
 
 let currentTrialRound = null;
 async function openTrialScreen(round) {

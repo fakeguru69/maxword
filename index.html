@@ -609,7 +609,7 @@ async function openPlayerProfile(username) {
   $('player-profile-duel-holder').innerHTML = record.total > 0
     ? `<div class="duel-record-card">
         <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
-        <div class="duel-record-vs">You vs. <span class="opponent-name">${displayName(username)}</span></div>
+        <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(username)}</span></div>
         <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
       </div>`
     : `<div class="empty-state">You haven't had a direct Trial with ${displayName(username)} yet.</div>`;
@@ -1475,7 +1475,7 @@ async function openTrialScreen(round) {
     if (record.total > 0) {
       duelHolder.innerHTML = `<div class="duel-record-card">
         <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
-        <div class="duel-record-vs">You vs. <span class="opponent-name">${displayName(opponent)}</span></div>
+        <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponent)}</span></div>
         <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
       </div>`;
     }
@@ -2044,7 +2044,7 @@ async function renderScorecard(correct, points, newBadges) {
     if (record.total > 0) {
       duelHolder.innerHTML = `<div class="duel-record-card">
         <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
-        <div class="duel-record-vs">You vs. <span class="opponent-name">${displayName(opponent)}</span></div>
+        <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponent)}</span></div>
         <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
       </div>`;
     }

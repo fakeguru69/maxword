@@ -839,7 +839,10 @@ async function checkRankReminder() {
   } else {
     $('reminder-modal-text').textContent = `${remaining} more round${remaining > 1 ? 's' : ''} to get ranked!`;
     $('btn-reminder-play').textContent = 'Start a game';
-    reminderAction = () => show('view-home');
+    // If this fired while already inside a room (the common case now that it also
+    // checks right after finishing a game), stay there instead of bouncing back to
+    // Home and costing an extra tap to re-enter the room they were already in.
+    reminderAction = currentRoom ? (() => openRoom(currentRoom)) : (() => show('view-home'));
   }
   $('reminder-modal').classList.remove('hidden');
 }
@@ -856,7 +859,7 @@ const BADGE_META = {
   streak_7: { emoji: '🔥', label: '7-Day Streak', req: 'Play 7 days in a row.', rarity: 3, tier: 7, nextKey: 'streak_30' },
   streak_30: { emoji: '🔥', label: '30-Day Streak', req: 'Play 30 days in a row.', rarity: 4, tier: 30, nextKey: null },
   flawless_scroll: { emoji: '✨', label: 'Flawless Scroll', req: 'Get all 10 correct in a single round.', rarity: 3 },
-  ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 3 games played (matches MIN_GAMES_TO_RANK).', rarity: 1 },
+  ranked_up: { emoji: '🎓', label: 'Ranked Up', req: 'Reach 3 games played.', rarity: 1 },
 };
 
 // Tier reflects skill (global all-time average), separate from streak (consistency).
@@ -1213,7 +1216,7 @@ async function loadDares() {
     // isn't the thing to act on anymore (you can't replay it either way); color
     // lives in the badge alone. Loud/colored card borders are reserved for states
     // where tapping THIS card is the direct next step.
-    const cardState = (state === 'champion' || state === 'losing') ? 'settled' : (state === 'challenged_back' || state === 'targeted') ? 'targeted' : state;
+    const cardState = (state === 'champion' || state === 'losing') ? 'settled' : 'targeted';
     div.className = `trial-card state-${cardState}`;
     div.onclick = () => openTrialScreen(r);
 
@@ -1710,6 +1713,7 @@ async function finishRound() {
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
   await checkDethronements(); // catches anything that happened while you were mid-quiz and got skipped live
+  await checkRankReminder(); // was previously only checked at login/room-entry — meant a first-game-in-one-session player like a brand new WhatsApp arrival never saw it until they navigated away and back
   if (newBadges.length > 0) {
     await showOnboardingTipOnce('first_badge_earned', '🏅 Your First Badge!',
       `Badges are a running collection — check your Game Rooms page anytime to see all the ones you've earned.`);
@@ -1846,7 +1850,7 @@ async function renderOtherDares() {
       badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
     }
     const div = document.createElement('div');
-    div.className = 'trial-card state-unplayed';
+    div.className = 'trial-card state-targeted';
     div.onclick = () => openTrialScreen(r);
     div.innerHTML = `<div class="trial-card-top"><div class="trial-card-number">📜 Trial #${r.trial_number}</div><span class="trial-status-badge ${badgeClass}">${badge}</span></div><div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>`;
     holder.appendChild(div);

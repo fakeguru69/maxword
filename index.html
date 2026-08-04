@@ -506,6 +506,7 @@ const QUESTIONS_PER_ROUND = 10;
 const HARD_WORD_MIN_SAMPLE = 5;   // min times a word must've been answered before we trust its difficulty
 const HARD_WORD_MAX_RATE = 0.5;   // correct_rate at/below this counts as "hard"
 const HARD_WORDS_PER_ROUND = 3;   // how many hard words to force into a round, when enough data exists
+const RECENT_WORD_COOLDOWN_ROUNDS = 2; // never repeat a word THIS player saw in their last N rounds
 const MAX_OPEN_DARES_PER_DAY = 10;
 const DARE_EXPIRY_MS = 100 * 365 * 24 * 60 * 60 * 1000; // effectively permanent — a Trial's card, leaderboard, and championship status now persist indefinitely, so there's no expiry deadline to create urgency around anymore
 
@@ -695,13 +696,24 @@ function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; le
 // Picks the word set for a round. Once enough people have answered a word for its
 // difficulty to mean anything, we force a few "hard" (low correct-rate) words in —
 // otherwise (e.g. a fresh install with no data yet) it's plain random, same as before.
+// Recency cooldown: a word THIS player saw in their last couple rounds is excluded
+// first, regardless of hard/easy — without this, a tiny early "hard" pool (e.g. just
+// ONE qualifying word bank-wide) gets force-repeated into nearly every round anyone
+// plays, which is the opposite of the intent. Falls back to allowing repeats only if
+// the cooldown would leave too few words to fill a round (small-bank edge case).
 async function pickRoundWords() {
+  const { data: recentAnswers } = await sb.from('word_answers').select('word_id').eq('username', me).order('answered_at', { ascending: false }).limit(QUESTIONS_PER_ROUND * RECENT_WORD_COOLDOWN_ROUNDS);
+  const recentIds = new Set((recentAnswers || []).map(a => a.word_id));
+
   const { data: stats } = await sb.from('word_stats').select('*').gte('times_answered', HARD_WORD_MIN_SAMPLE).lte('correct_rate', HARD_WORD_MAX_RATE);
   const hardIds = new Set((stats || []).map(s => s.word_id));
-  const hardPool = shuffle(WORDS.filter(w => hardIds.has(w.id)));
+  const hardPool = shuffle(WORDS.filter(w => hardIds.has(w.id) && !recentIds.has(w.id)));
   const hardPicks = hardPool.slice(0, HARD_WORDS_PER_ROUND);
   const pickedIds = new Set(hardPicks.map(w => w.id));
-  const remaining = shuffle(WORDS.filter(w => !pickedIds.has(w.id))).slice(0, QUESTIONS_PER_ROUND - hardPicks.length);
+
+  let pool = WORDS.filter(w => !pickedIds.has(w.id) && !recentIds.has(w.id));
+  if (pool.length < QUESTIONS_PER_ROUND - hardPicks.length) pool = WORDS.filter(w => !pickedIds.has(w.id)); // cooldown would starve the round — allow repeats rather than fail
+  const remaining = shuffle(pool).slice(0, QUESTIONS_PER_ROUND - hardPicks.length);
   return shuffle([...hardPicks, ...remaining]).map(w => w.id);
 }
 function fmtDate(d) { return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }

@@ -1233,12 +1233,13 @@ async function loadDares() {
   const statePriority = { challenged_back: 0, targeted: 1, unplayed: 2, losing: 3, champion: 4 };
   withState.sort((a, b) => statePriority[a.state] - statePriority[b.state]);
 
-  // "Needs your move" = everything except already-holding-the-throne — regardless
-  // of who created it. Being dethroned on your OWN Trial is just as actionable as
-  // one someone else made, so it counts too now, matching what the card list
-  // itself already visually says (a red "losing" card either way).
-  const actionableCount = withState.filter(w => w.state !== 'champion').length;
-  $('trials-count-label').textContent = actionableCount > 0 ? `📜 Trials (${actionableCount})` : '📜 Trials';
+  // "Open" = Trials you haven't played yet — a callout aimed at you, or a generic
+  // open invite nobody's claimed. Once you've played a Trial (win or lose), it's
+  // settled — it stays visible in the list as a status card, but it no longer
+  // counts toward "open," since there's nothing left for you to do on THAT Trial.
+  const openStates = new Set(['challenged_back', 'targeted', 'unplayed']);
+  const openCount = withState.filter(w => openStates.has(w.state)).length;
+  $('trials-count-label').textContent = openCount > 0 ? `📜 Open Trials (${openCount})` : '📜 Trials';
 
   list.innerHTML = '';
   for (const { r, rows, myRow, champ, state } of withState) {
@@ -1260,6 +1261,7 @@ async function loadDares() {
     if (state === 'champion') {
       badge = '👑 crown holder'; badgeClass = 'champion';
       statusLine = `${myRow.score_points} pts`;
+      rankLine = `#1 of ${rows.length}`;
     } else if (state === 'losing') {
       badge = '👎 lost your crown'; badgeClass = 'losing';
       statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts`;

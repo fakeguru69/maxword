@@ -180,9 +180,11 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 0; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 4px -16px 6px -16px; padding: 6px 16px; }
-.room-stat-grid { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
+.room-stat-grid { margin-bottom: 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
-.room-stat-grid .stat-val { color: var(--cream); font-weight: 700; }
+.stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.stat-row .stat-icon { font-size: 15px; }
+.room-stat-grid .stat-val { color: var(--cream); font-weight: 700; text-align: right; }
 .room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--gold); text-decoration: underline; cursor: pointer; margin-top: 6px; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
@@ -605,10 +607,10 @@ async function openPlayerProfile(username) {
   if (played) {
     $('player-profile-activity-holder').innerHTML = `
       <div class="room-stat-grid primary">
-        <span>✨ <span class="stat-val">${globalStats.myFlawless}</span> Flawless${rankSuffix(globalStats.flawlessRank)}</span>
-        <span>📖 <span class="stat-val">${masteredStats.myCount}</span> Words Mastered${rankSuffix(masteredStats.myRank)}</span>
-        <span>🗡️ <span class="stat-val">${played}</span> Matches Played${rankSuffix(globalStats.playedRank)}</span>
-        <span>📅 <span class="stat-val">${globalStats.myActiveDays}</span> Active Days${rankSuffix(globalStats.activeDaysRank)}</span>
+        <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless${rankSuffix(globalStats.flawlessRank)}</span></div>
+        <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
+        <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${played}</span><span>Matches Played${rankSuffix(globalStats.playedRank)}</span></div>
+        <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${globalStats.myActiveDays}</span><span>Active Days${rankSuffix(globalStats.activeDaysRank)}</span></div>
       </div>`;
   } else {
     $('player-profile-activity-holder').innerHTML = '';
@@ -619,18 +621,18 @@ async function openPlayerProfile(username) {
   // and Lifetime Wins (bragging-rights flavored but weaker than the top 4),
   // Dethroned, Words Played, and the Contribution stats.
   const moreHolder = $('player-profile-more-holder');
-  const streakPart = streak && streak.current_streak > 0 ? `<span>🔥 <span class="stat-val">${streak.current_streak}</span> Streak</span>` : '';
-  const crownsHeldPart = crowns ? `<span>👑 <span class="stat-val">${crowns}</span> Crowns Held</span>` : '';
-  const lifetimeWinsPart = lifetimeWins ? `<span>🏆 <span class="stat-val">${lifetimeWins}</span> Lifetime Wins</span>` : '';
+  const streakPart = streak && streak.current_streak > 0 ? `<div class="stat-row"><span class="stat-icon">🔥</span><span class="stat-val">${streak.current_streak}</span><span>Streak</span></div>` : '';
+  const crownsHeldPart = crowns ? `<div class="stat-row"><span class="stat-icon">👑</span><span class="stat-val">${crowns}</span><span>Crowns Held</span></div>` : '';
+  const lifetimeWinsPart = lifetimeWins ? `<div class="stat-row"><span class="stat-icon">🏆</span><span class="stat-val">${lifetimeWins}</span><span>Lifetime Wins</span></div>` : '';
   moreHolder.innerHTML = played ? `
     <div class="room-stat-grid">
       ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-      <span>🔻 <span class="stat-val">${stats.dethroned}</span> Dethroned</span>
-      <span>✍️ <span class="stat-val">${stats.wordsPlayed}</span> Words Played</span>
-      <span>📜 <span class="stat-val">${stats.startMatch}</span> Start Match</span>
-      <span>🎯 <span class="stat-val">${stats.counter}</span> Counter</span>
-      <span>☝️ <span class="stat-val">${stats.firstFights}</span> First Fights</span>
-      <span>⚔️ <span class="stat-val">${stats.joinMatch}</span> Join Match</span>
+      <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${stats.dethroned}</span><span>Dethroned</span></div>
+      <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${stats.wordsPlayed}</span><span>Words Played</span></div>
+      <div class="stat-row"><span class="stat-icon">📜</span><span class="stat-val">${stats.startMatch}</span><span>Start Match</span></div>
+      <div class="stat-row"><span class="stat-icon">🎯</span><span class="stat-val">${stats.counter}</span><span>Counter</span></div>
+      <div class="stat-row"><span class="stat-icon">☝️</span><span class="stat-val">${stats.firstFights}</span><span>First Fights</span></div>
+      <div class="stat-row"><span class="stat-icon">⚔️</span><span class="stat-val">${stats.joinMatch}</span><span>Join Match</span></div>
     </div>` : '';
 
   // Accuracy is strictly self-only — never fetched or shown for anyone else
@@ -645,7 +647,7 @@ async function openPlayerProfile(username) {
     const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
     if (totalAnswered > 0) {
       const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
-      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid"><span>🏹 <span class="stat-val">${accuracy}%</span> Accuracy</span></div>`;
+      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid"><div class="stat-row"><span class="stat-icon">🏹</span><span class="stat-val">${accuracy}%</span><span>Accuracy</span></div></div>`;
     } else { masteryHolder.innerHTML = ''; }
   } else {
     masteryHolder.innerHTML = '';
@@ -1856,18 +1858,18 @@ async function renderRoomStatsHeader() {
     <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
     <div class="room-stat-grid primary">
-      <span>✨ <span class="stat-val">${roomStats.myFlawless}</span> Flawless${rankSuffix(roomStats.flawlessRank)}</span>
-      <span>📖 <span class="stat-val">${masteredStats.myCount}</span> Words Mastered${rankSuffix(masteredStats.myRank)}</span>
-      <span>🗡️ <span class="stat-val">${roomStats.myPlayed}</span> Matches Played${rankSuffix(roomStats.playedRank)}</span>
-      <span>📅 <span class="stat-val">${roomStats.myActiveDays}</span> Active Days${rankSuffix(roomStats.activeDaysRank)}</span>
+      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless${rankSuffix(roomStats.flawlessRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${roomStats.myPlayed}</span><span>Matches Played${rankSuffix(roomStats.playedRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${roomStats.myActiveDays}</span><span>Active Days${rankSuffix(roomStats.activeDaysRank)}</span></div>
     </div>
     <div id="room-stats-more" class="hidden room-stat-grid">
-      <span>🔻 <span class="stat-val">${dethronedCount || 0}</span> Dethroned</span>
-      <span>✍️ <span class="stat-val">${wordsPlayed}</span> Words Played</span>
-      <span>📜 <span class="stat-val">${activity.challenges}</span> Start Match</span>
-      <span>🎯 <span class="stat-val">${activity.challengeBacks}</span> Counter</span>
-      <span>☝️ <span class="stat-val">${activity.firstFights}</span> First Fights</span>
-      <span>⚔️ <span class="stat-val">${joinedMatches}</span> Join Match</span>
+      <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${dethronedCount || 0}</span><span>Dethroned</span></div>
+      <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${wordsPlayed}</span><span>Words Played</span></div>
+      <div class="stat-row"><span class="stat-icon">📜</span><span class="stat-val">${activity.challenges}</span><span>Start Match</span></div>
+      <div class="stat-row"><span class="stat-icon">🎯</span><span class="stat-val">${activity.challengeBacks}</span><span>Counter</span></div>
+      <div class="stat-row"><span class="stat-icon">☝️</span><span class="stat-val">${activity.firstFights}</span><span>First Fights</span></div>
+      <div class="stat-row"><span class="stat-icon">⚔️</span><span class="stat-val">${joinedMatches}</span><span>Join Match</span></div>
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;

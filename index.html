@@ -180,11 +180,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 4px; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-style: italic; color: var(--teal); margin-bottom: 12px; }
-.room-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 6px; font-size: 13px; color: var(--gold); }
+.room-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid .stat-val { color: var(--cream); font-weight: 700; }
-.room-stat-grid.primary .stat-val { color: var(--cream); font-size: 15px; }
-.room-stats-toggle { display: block; text-align: center; font-size: 12px; color: var(--gold); text-decoration: underline; cursor: pointer; margin-top: 6px; }
+.room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--gold); text-decoration: underline; cursor: pointer; margin-top: 6px; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
@@ -610,7 +609,7 @@ async function openPlayerProfile(username) {
     const crownsHeldPart = crowns ? `<span>👑 <span class="stat-val">${crowns}</span> Crowns Held</span>` : '';
     const lifetimeWinsPart = lifetimeWins ? `<span>🏆 <span class="stat-val">${lifetimeWins}</span> Lifetime Wins</span>` : '';
     $('player-profile-activity-holder').innerHTML = `
-      <div class="room-stat-grid">
+      <div class="room-stat-grid primary">
         ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
         <span>📜 <span class="stat-val">${stats.startMatch}</span> Start Match</span>
         <span>🎯 <span class="stat-val">${stats.counter}</span> Counter</span>
@@ -635,7 +634,7 @@ async function openPlayerProfile(username) {
     if (totalAnswered > 0) {
       const mastered = list.filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
       const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
-      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid"><span>📖 <span class="stat-val">${mastered}</span> Words Mastered</span><span>🏹 <span class="stat-val">${accuracy}%</span> Accuracy</span></div>`;
+      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid primary"><span>📖 <span class="stat-val">${mastered}</span> Words Mastered</span><span>🏹 <span class="stat-val">${accuracy}%</span> Accuracy</span></div>`;
     } else { masteryHolder.innerHTML = ''; }
   } else {
     masteryHolder.innerHTML = '';

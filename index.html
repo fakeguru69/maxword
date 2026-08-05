@@ -395,7 +395,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <button class="link-btn breadcrumb" id="btn-player-profile-back">&larr; Back</button>
     <div class="account-name-line" id="player-profile-name"></div>
     <div id="player-profile-status-holder"></div>
-    <div id="player-profile-ticker-holder"></div>
     <div id="player-profile-activity-holder"></div>
     <div id="player-profile-mastery-holder"></div>
     <div id="player-profile-badges-holder"></div>
@@ -583,18 +582,10 @@ async function openPlayerProfile(username) {
     $('player-profile-status-holder').innerHTML = '<div class="empty-state">No games played yet.</div>';
   }
 
-  // Ticker — narrowed to ONLY the near-miss case. Streak-risk was cut: it
-  // used to just repeat the "🔥 N-day streak" fact sitting one line above —
-  // now that streak lives in the grid below instead, this stays cut for the
-  // same reason (no new information over what the grid already states).
-  // No fallback either — silent if there's no real near-miss to report.
-  let ticker = null;
-  if (theirIndex > 0) {
-    const aheadOfThem = sorted[theirIndex - 1];
-    const gap = Math.max(1, Math.round(aheadOfThem.avg_score - sorted[theirIndex].avg_score));
-    ticker = `⚡ ${gap} pts from #${theirIndex}`;
-  }
-  $('player-profile-ticker-holder').innerHTML = ticker ? `<div class="room-ticker">${ticker}</div>` : '';
+  // Ticker removed entirely — its job (surface something otherwise hidden)
+  // doesn't apply here: Profile shows everything open, all the time, so
+  // there's nothing for a ticker to be highlighting. Also awkward in
+  // other-view, where "pts from #2" reads as a fact with no one to act on it.
 
   // Full stat grid — same icon set and 2-column layout as the Room Stats
   // Header, just account-wide instead of room-scoped. Deliberately uses the

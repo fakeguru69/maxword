@@ -581,27 +581,27 @@ async function openPlayerProfile(username) {
   if (lifetimeWins) parts.push(`🏆 ${lifetimeWins} Lifetime Win${lifetimeWins === 1 ? '' : 's'}`);
   $('player-profile-status-holder').innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '<div class="empty-state">No games played yet.</div>';
 
-  // Ticker — one dynamic line, same priority-pick pattern as the Room Stats
-  // Header ticker. Streak-risk only makes sense in first person, so it's
-  // gated to self-view; near-miss/fallback work for viewing anyone.
+  // Ticker — narrowed to ONLY the near-miss case. Streak-risk was cut: it
+  // just repeated the "🔥 N-day streak" fact already sitting in the status
+  // line right above it, one line up — not worth a whole second line for
+  // the same information. No fallback either — silent if there's no real
+  // near-miss to report, rather than filling space with generic flavor text.
   let ticker = null;
-  const todayStr = new Date().toISOString().slice(0, 10);
-  if (isSelf && streak && streak.current_streak > 0 && streak.last_played_date !== todayStr) {
-    ticker = `🔥 Play today or lose your ${streak.current_streak}-day streak`;
-  } else if (theirIndex > 0) {
+  if (theirIndex > 0) {
     const aheadOfThem = sorted[theirIndex - 1];
     const gap = Math.max(1, Math.round(aheadOfThem.avg_score - sorted[theirIndex].avg_score));
     ticker = `⚡ ${gap} pts from #${theirIndex}`;
   }
-  if (!ticker) ticker = `📜 Every Match played sharpens the blade`;
-  $('player-profile-ticker-holder').innerHTML = played ? `<div class="room-ticker">${ticker}</div>` : '';
+  $('player-profile-ticker-holder').innerHTML = ticker ? `<div class="room-ticker">${ticker}</div>` : '';
 
   // Full stat grid — same icon set and 2-column layout as the Room Stats
-  // Header, just account-wide instead of room-scoped. Profile has the most
-  // real estate of any screen, so everything shows at once, no tap-to-expand.
+  // Header, just account-wide instead of room-scoped. Deliberately uses the
+  // QUIET tier styling (no .primary) — the headline above should be the one
+  // bright thing on this screen; a bold grid competed with it since both
+  // were rendering white/cream.
   if (played) {
     $('player-profile-activity-holder').innerHTML = `
-      <div class="room-stat-grid primary">
+      <div class="room-stat-grid">
         <span>📜 <span class="stat-val">${stats.startMatch}</span> Start Match</span>
         <span>🎯 <span class="stat-val">${stats.counter}</span> Counter</span>
         <span>☝️ <span class="stat-val">${stats.firstFights}</span> First Fights</span>

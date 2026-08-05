@@ -588,9 +588,9 @@ async function openPlayerProfile(username) {
   // Headline — two ranks, nothing else, matching Room's exact format/weight.
   const activityPart = activityRank ? `#${activityRank}` : '–';
   if (played && theirIndex !== -1) {
-    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL RANK · 🗡️ ${activityPart} MATCHES PLAYED</div>`;
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL RANK · 🗡️ ${activityPart} PLAYED</div>`;
   } else if (played) {
-    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} MATCHES PLAYED</div>`;
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
   } else {
     $('player-profile-status-holder').innerHTML = '<div class="empty-state">No games played yet.</div>';
   }
@@ -1811,11 +1811,11 @@ async function renderRoomStatsHeader() {
   let headlineLine;
   const activityPart = activityRank ? `#${activityRank}` : '–';
   if (myRank === null) {
-    headlineLine = `UNRANKED · 🗡️ ${activityPart} MATCHES PLAYED`;
+    headlineLine = `UNRANKED · 🗡️ ${activityPart} PLAYED`;
   } else if (myRank === 1) {
-    headlineLine = `👑 #1 RANK · 🗡️ ${activityPart} MATCHES PLAYED`;
+    headlineLine = `👑 #1 RANK · 🗡️ ${activityPart} PLAYED`;
   } else {
-    headlineLine = `🥇 #${myRank} RANK · 🗡️ ${activityPart} MATCHES PLAYED`;
+    headlineLine = `🥇 #${myRank} RANK · 🗡️ ${activityPart} PLAYED`;
   }
 
   $('btn-open-room-leaderboard').innerHTML = myRank ? `🏆 Leaderboard (#${myRank})` : '🏆 Leaderboard';

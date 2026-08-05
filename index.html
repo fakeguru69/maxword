@@ -177,7 +177,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .rivalry-text .rivalry-score { font-weight: 700; }
 .rivalry-card .btn-primary { width: 100%; }
 .room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
-.room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 4px; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-style: italic; color: var(--teal); margin-bottom: 12px; }
 .room-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 6px; font-size: 13px; color: var(--cream-dim); }
@@ -1736,32 +1736,18 @@ async function renderRoomStatsHeader() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const streakAtRisk = !!(streakRow && streakRow.current_streak > 0 && streakRow.last_played_date !== todayStr);
 
-  // ---- Headline ----
-  let headlineMain, headlineSub;
+  // ---- Headline: kept short per explicit instruction — just rank + games
+  // played, no room name (redundant with the page title), no sub-text (the
+  // "down from last visit" signal is already covered by the ticker below,
+  // so nothing is actually lost by dropping it here).
+  let headlineLine;
   if (myRank === null) {
-    const need = Math.max(0, MIN_GAMES_TO_RANK - gamesPlayed);
-    headlineMain = `Unranked in ${currentRoom.name}`;
-    headlineSub = need > 0 ? `${need} more to get ranked` : null;
+    headlineLine = `UNRANKED · ${gamesPlayed} MATCH PLAYED`;
   } else if (myRank === 1) {
-    headlineMain = `👑 You hold #1 in ${currentRoom.name}`;
-    headlineSub = null;
-  } else if (snap && snap.last_rank && snap.last_rank < myRank) {
-    headlineMain = `#${myRank} in ${currentRoom.name}`;
-    headlineSub = `down from #${snap.last_rank} last visit`;
-  } else if (myRank <= 3) {
-    headlineMain = `#${myRank} in ${currentRoom.name}`;
-    headlineSub = `on the podium`;
+    headlineLine = `👑 #1 RANK · ${gamesPlayed} MATCH PLAYED`;
   } else {
-    headlineMain = `#${myRank} in ${currentRoom.name}`;
-    headlineSub = null;
+    headlineLine = `#${myRank} RANK · ${gamesPlayed} MATCH PLAYED`;
   }
-  const gamesDelta = snap && snap.last_rounds_played != null ? gamesPlayed - snap.last_rounds_played : null;
-  const deltaPart = gamesDelta > 0 ? ` (${gamesDelta} since last visit)` : '';
-  const activityPart = activityRank ? ` — (${activityRank} of ${activityTotal})` : '';
-  const gamesLine = `${gamesPlayed} Match${gamesPlayed === 1 ? '' : 'es'} played${deltaPart}${activityPart}`;
-  // One combined line, no separate sub-styled row — matches the same merge
-  // done on Profile's status line.
-  const headlineLine = `${headlineMain}${headlineSub ? ` — ${headlineSub}` : ''} · ${gamesLine}`;
 
   // Leaderboard button shows your current rank inline — a reason to tap,
   // not just a label. Static HTML normally, updated here since this is

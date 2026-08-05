@@ -174,14 +174,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .rivalry-text .opponent-name { font-weight: 700; color: var(--cream); }
 .rivalry-text .rivalry-score { font-weight: 700; }
 .rivalry-card .btn-primary { width: 100%; }
-.room-headline { font-family: 'Cinzel', serif; font-size: 17px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
+.room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-style: italic; color: var(--teal); margin-bottom: 12px; }
-.room-stat-row { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--cream-dim); margin-bottom: 4px; }
-.room-stat-row.primary { font-size: 14px; font-weight: 700; color: var(--cream); }
-.room-stat-row.primary .stat-val { color: var(--gold); font-size: 15px; }
-.room-stat-row .stat-val { color: var(--cream); font-weight: 700; }
-.room-stats-header-block { margin-bottom: 18px; }
+.room-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 6px; font-size: 13px; color: var(--cream-dim); }
+.room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--cream); }
+.room-stat-grid .stat-val { color: var(--cream); font-weight: 700; }
+.room-stat-grid.primary .stat-val { color: var(--gold); font-size: 15px; }
 .room-stats-toggle { display: block; text-align: center; font-size: 12px; color: var(--teal); text-decoration: underline; cursor: pointer; margin-top: 6px; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
@@ -1758,17 +1758,24 @@ async function renderRoomStatsHeader() {
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
-    <div class="account-name-line" style="font-size:18px; margin-bottom:4px;">${displayName(me)}</div>
+    <div class="account-name-line" style="margin-bottom:6px;">${displayName(me)}</div>
     <div class="room-headline">${headlineMain}${headlineSub ? ` <span class="sub">— ${headlineSub}</span>` : ''}</div>
     <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
     <div class="room-ticker">${ticker}</div>
-    <div class="room-stat-row primary">⚔️ <span class="stat-val">${activity.challenges}</span> Matches Started · 🎯 <span class="stat-val">${activity.challengeBacks}</span> Counter</div>
-    <div class="room-stat-row primary">☝️ <span class="stat-val">${activity.firstFights}</span> First Fights · 🚩 <span class="stat-val">${joinedMatches}</span> Join Match</div>
-    <div id="room-stats-more" class="hidden">
-      <div class="room-stat-row">👑 <span class="stat-val">${crownTotal}</span> Crown · 🔻 <span class="stat-val">${crownsTaken}</span> Crowns Taken</div>
-      <div class="room-stat-row">✨ <span class="stat-val">${flawlessCount}</span> Flawless · ✍️ <span class="stat-val">${wordsLearnt}</span> Words Learnt</div>
-      <div class="room-stat-row">📖 <span class="stat-val">${wordsMastered}</span> Words Mastered · 🎯 <span class="stat-val">${roomAccuracy}%</span> Accuracy</div>
-      <div class="room-stat-row">📅 <span class="stat-val">${activeDays}</span> Active Days</div>
+    <div class="room-stat-grid primary">
+      <span>⚔️ <span class="stat-val">${activity.challenges}</span> Matches Started</span>
+      <span>🎯 <span class="stat-val">${activity.challengeBacks}</span> Counter</span>
+      <span>☝️ <span class="stat-val">${activity.firstFights}</span> First Fights</span>
+      <span>🚩 <span class="stat-val">${joinedMatches}</span> Join Match</span>
+    </div>
+    <div id="room-stats-more" class="hidden room-stat-grid">
+      <span>👑 <span class="stat-val">${crownTotal}</span> Crown</span>
+      <span>🔻 <span class="stat-val">${crownsTaken}</span> Crowns Taken</span>
+      <span>✨ <span class="stat-val">${flawlessCount}</span> Flawless</span>
+      <span>✍️ <span class="stat-val">${wordsLearnt}</span> Words Learnt</span>
+      <span>📖 <span class="stat-val">${wordsMastered}</span> Words Mastered</span>
+      <span>🎯 <span class="stat-val">${roomAccuracy}%</span> Accuracy</span>
+      <span>📅 <span class="stat-val">${activeDays}</span> Active Days</span>
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;

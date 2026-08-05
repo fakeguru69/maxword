@@ -182,6 +182,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-stat-row.primary .stat-val { color: var(--gold); font-size: 15px; }
 .room-stat-row .stat-val { color: var(--cream); font-weight: 700; }
 .room-stats-header-block { margin-bottom: 18px; }
+.room-stats-toggle { display: block; text-align: center; font-size: 12px; color: var(--teal); text-decoration: underline; cursor: pointer; margin-top: 6px; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
@@ -322,6 +323,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="room-stats-header"></div>
     <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
     <div id="rivalry-holder"></div>
+    <button class="room-leaderboard-btn" id="btn-quick-start-match" style="margin-top:8px;">📜 Start a Match</button>
 
     <div id="trials-count-label" class="section-label" style="margin-top:16px;"></div>
     <div id="panel-dares">
@@ -576,7 +578,7 @@ async function openPlayerProfile(username) {
   // weight here than the quieter version on your own Home page.
   const stats = await computeActivityStats(username);
   const activityLines = [];
-  if (stats.challenges) activityLines.push(`⚔️ ${stats.challenges} challenge${stats.challenges === 1 ? '' : 's'}`);
+  if (stats.challenges) activityLines.push(`⚔️ ${stats.challenges} Match${stats.challenges === 1 ? '' : 'es'} started`);
   if (stats.challengeBacks) activityLines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
   if (stats.firstFights) activityLines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
   $('player-profile-activity-holder').innerHTML = (lifetimeHtml || activityLines.length)
@@ -1041,7 +1043,7 @@ async function renderActivitySection() {
   const stats = await computeActivityStats(me);
   if (stats.firstFights + stats.challenges + stats.challengeBacks === 0) { holder.innerHTML = ''; return; }
   const lines = [];
-  if (stats.challenges) lines.push(`⚔️ ${stats.challenges} challenge${stats.challenges === 1 ? '' : 's'}`);
+  if (stats.challenges) lines.push(`⚔️ ${stats.challenges} Match${stats.challenges === 1 ? '' : 'es'} started`);
   if (stats.challengeBacks) lines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
   if (stats.firstFights) lines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
   holder.innerHTML = `<div class="section-label">Activity</div><div class="mastery-section">${lines.map(l => `<div class="mastery-line">${l}</div>`).join('')}</div>`;
@@ -1318,6 +1320,7 @@ $('btn-open-room-leaderboard').onclick = () => {
   show('view-room-leaderboard');
   loadLeaderboard();
 };
+$('btn-quick-start-match').onclick = () => openTargetPicker();
 $('btn-room-lb-back').onclick = () => { show('view-room'); loadDares(); };
 
 document.querySelectorAll('[data-room-period]').forEach(tab => {
@@ -1624,8 +1627,6 @@ async function renderRoomStatsHeader() {
   const { data: myPlayedRounds } = await sb.from('round_scores').select('round_id, rounds!inner(room_id, creator_username, target_username)').eq('username', me).eq('rounds.room_id', roomId);
   const joinedMatches = (myPlayedRounds || []).filter(r => r.rounds.creator_username !== me && r.rounds.target_username !== me).length;
 
-  const strongest = await computeStrongestDuel();
-
   const { data: roomRows } = await sb.from('room_leaderboard_alltime').select('username, avg_score, rounds_played').eq('room_id', roomId);
   const { data: allTimeRows } = await sb.from('global_leaderboard_alltime').select('username, rounds_played');
   const totalGamesMap = new Map((allTimeRows || []).map(r => [r.username, r.rounds_played]));
@@ -1674,9 +1675,9 @@ async function renderRoomStatsHeader() {
   const gamesLine = `${gamesPlayed} Match${gamesPlayed === 1 ? '' : 'es'} played${deltaPart}${activityPart}`;
 
   // ---- Ticker: priority order, first match wins, only ONE shown ----
-  // Signature Duel deliberately removed from this pool — it's now a permanent
-  // top-4 chip below, so showing it here too would just repeat a fact that's
-  // already visible on screen instead of surfacing something new.
+  // Signature Duel deliberately NOT a candidate here — it now lives
+  // permanently in the Rivalry card slot instead, so showing it here too
+  // would repeat an already-visible fact rather than surface something new.
   let ticker = null;
   if (streakAtRisk) {
     ticker = `🔥 Play today or lose your ${streakRow.current_streak}-day streak`;
@@ -1700,13 +1701,13 @@ async function renderRoomStatsHeader() {
 
   // ---- Render ----
   // Top 4 = action-drivers (the only way each one grows is by starting a
-  // Challenge, a Counter Challenge, claiming an open Match, or building enough
-  // duel history to have a Signature Duel at all) — bold tier. Everything else
-  // is real but doesn't specifically pull toward a next action — quiet tier,
-  // same card, no tap required, just visually secondary.
-  const signatureDuelText = strongest
-    ? `${strongest.record.wins}–${strongest.record.losses} vs. ${displayName(strongest.opponent)}`
-    : '—';
+  // Match, a Counter Challenge, or claiming an open Match) — bold tier, always
+  // visible. Everything else is real but doesn't specifically pull toward a
+  // next action — quiet tier, collapsed behind a tap (same top-N+overflow
+  // pattern as Home's badge showcase) so the glance stays uncluttered.
+  // Signature Duel deliberately lives in the Rivalry card slot instead of here
+  // now — same duel-status question, one home, not shown twice.
+  const quietCount = 5; // Crown, Crowns Taken, Flawless, Words Learnt, Active Days
 
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
@@ -1714,17 +1715,21 @@ async function renderRoomStatsHeader() {
     <div class="room-headline">${headlineMain}${headlineSub ? ` <span class="sub">— ${headlineSub}</span>` : ''}</div>
     <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
     <div class="room-ticker">${ticker}</div>
-    <div class="room-stat-row primary">⚔️ Challenges <span class="stat-val">${activity.challenges}</span> · 🎯 Counter <span class="stat-val">${activity.challengeBacks}</span></div>
+    <div class="room-stat-row primary">⚔️ Matches Started <span class="stat-val">${activity.challenges}</span> · 🎯 Counter <span class="stat-val">${activity.challengeBacks}</span></div>
     <div class="room-stat-row primary">☝️ First Fights <span class="stat-val">${activity.firstFights}</span> · 🚩 Join Match <span class="stat-val">${joinedMatches}</span></div>
-    <div class="room-stat-row">⚔️ Signature Duel <span class="stat-val">${signatureDuelText}</span></div>
-    <div class="room-stat-row">👑 Crown <span class="stat-val">${crownTotal}</span> · 🔻 Crowns Taken <span class="stat-val">${crownsTaken}</span></div>
-    <div class="room-stat-row">✨ Flawless <span class="stat-val">${flawlessCount}</span> · ✍️ Words Learnt <span class="stat-val">${wordsLearnt}</span> · 📅 Active Days <span class="stat-val">${activeDays}</span></div>
-    <button class="room-leaderboard-btn" id="btn-quick-start-match" style="margin-top:8px;">📜 Start a Match</button>
+    <div id="room-stats-more" class="hidden">
+      <div class="room-stat-row">👑 Crown <span class="stat-val">${crownTotal}</span> · 🔻 Crowns Taken <span class="stat-val">${crownsTaken}</span></div>
+      <div class="room-stat-row">✨ Flawless <span class="stat-val">${flawlessCount}</span> · ✍️ Words Learnt <span class="stat-val">${wordsLearnt}</span></div>
+      <div class="room-stat-row">📅 Active Days <span class="stat-val">${activeDays}</span></div>
+    </div>
+    <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;
   holder.appendChild(block);
-  // Quick-access "Start a Match" up here too — the Trials list can get long,
-  // so this saves a scroll to the bottom button for the same action.
-  $('btn-quick-start-match').onclick = () => openTargetPicker();
+  $('room-stats-toggle').onclick = () => {
+    const more = $('room-stats-more');
+    const collapsed = more.classList.toggle('hidden');
+    $('room-stats-toggle').textContent = collapsed ? `▸ ${quietCount} more stats` : '▾ Show less';
+  };
 
   await sb.from('room_visit_snapshots').upsert({ username: me, room_id: roomId, last_rank: myRank, last_rounds_played: gamesPlayed });
 }
@@ -1753,7 +1758,19 @@ async function renderRivalryCard() {
   const holder = $('rivalry-holder');
   holder.innerHTML = '';
   const rival = await computeMyRivalries();
-  if (!rival) return;
+  if (!rival) {
+    // Nobody to chase down right now — this is the mirror-image moment: show
+    // the duel you're WINNING instead of one you need to fix. Same slot, same
+    // "what's my duel status" question, just the other possible answer —
+    // never shown alongside the top-4 stats too, to avoid saying it twice.
+    const strongest = await computeStrongestDuel();
+    if (!strongest) return;
+    const card = document.createElement('div');
+    card.className = 'rivalry-card tied';
+    card.innerHTML = `<div class="rivalry-text">⚔️ Signature Duel — <span class="rivalry-score">${strongest.record.wins}–${strongest.record.losses}</span> vs. <span class="opponent-name">${displayName(strongest.opponent)}</span>.</div>`;
+    holder.appendChild(card);
+    return;
+  }
   const { opponent, record, net } = rival;
 
   // Don't offer "Settle the score" again if a Trial between us is already

@@ -276,8 +276,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
     <div id="status-row-holder"></div>
-    <div id="mastery-section-holder"></div>
-    <div id="activity-section-holder"></div>
     <div id="badge-showcase-holder"></div>
     <div id="a2hs-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
@@ -552,14 +550,24 @@ async function openPlayerProfile(username) {
   const isSelf = username === me;
   $('player-profile-name').textContent = displayName(username);
 
-  const { data: rows } = await sb.from('global_leaderboard_alltime').select('*');
+  const [
+    { data: rows },
+    { data: streak },
+    { count: crowns },
+    { data: lifetimeWinRows },
+    { count: played },
+    stats,
+  ] = await Promise.all([
+    sb.from('global_leaderboard_alltime').select('*'),
+    sb.from('streaks').select('*').eq('username', username).maybeSingle(),
+    sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', username).eq('rank', 1),
+    sb.from('lifetime_wins').select('round_id').eq('username', username),
+    sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', username),
+    computeFullPlayerStats(username),
+  ]);
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const theirIndex = sorted.findIndex(r => r.username === username);
-  const { data: streak } = await sb.from('streaks').select('*').eq('username', username).maybeSingle();
-  const { count: crowns } = await sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', username).eq('rank', 1);
-  const { data: lifetimeWinRows } = await sb.from('lifetime_wins').select('round_id').eq('username', username);
   const lifetimeWins = new Set((lifetimeWinRows || []).map(r => r.round_id)).size;
-  const { count: played } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', username);
 
   const parts = [];
   if (theirIndex !== -1) parts.push(`🌍 Global #${theirIndex + 1}`);
@@ -567,22 +575,27 @@ async function openPlayerProfile(username) {
   if (crowns) parts.push(`👑 ${crowns} Crown${crowns === 1 ? '' : 's'} Held`);
   $('player-profile-status-holder').innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '<div class="empty-state">No games played yet.</div>';
 
-  // Lifetime Wins is deliberately separate from the live "Crowns Held" above —
-  // this one only ever grows, a permanent record even after a crown is lost.
-  const lifetimeLines = [];
-  if (played) lifetimeLines.push(`📜 ${played} Match${played === 1 ? '' : 'es'} played`);
-  if (lifetimeWins) lifetimeLines.push(`🏆 ${lifetimeWins} lifetime win${lifetimeWins === 1 ? '' : 's'}`);
-  const lifetimeHtml = lifetimeLines.length ? `<div class="mastery-section">${lifetimeLines.map(l => `<div class="mastery-line prominent">${l}</div>`).join('')}</div>` : '';
-
-  // Bragging rights are the whole point of this screen — give Activity more visual
-  // weight here than the quieter version on your own Home page.
-  const stats = await computeActivityStats(username);
-  const activityLines = [];
-  if (stats.challenges) activityLines.push(`⚔️ ${stats.challenges} Start Match`);
-  if (stats.challengeBacks) activityLines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
-  if (stats.firstFights) activityLines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
-  $('player-profile-activity-holder').innerHTML = (lifetimeHtml || activityLines.length)
-    ? `<div class="section-label">Activity</div>${lifetimeHtml}<div class="mastery-section">${activityLines.map(l => `<div class="mastery-line prominent">${l}</div>`).join('')}</div>` : '';
+  // Full stat grid — same icon set and 2-column layout as the Room Stats
+  // Header, just account-wide instead of room-scoped. Profile has the most
+  // real estate of any screen, so everything shows at once, no tap-to-expand.
+  if (played) {
+    const lifetimeLine = `<div class="room-headline sub" style="margin:8px 0;">📜 ${played} Match${played === 1 ? '' : 'es'} Played${lifetimeWins ? ` · 🏆 ${lifetimeWins} Lifetime Win${lifetimeWins === 1 ? '' : 's'}` : ''}</div>`;
+    $('player-profile-activity-holder').innerHTML = `
+      ${lifetimeLine}
+      <div class="room-stat-grid primary">
+        <span>📜 <span class="stat-val">${stats.startMatch}</span> Start Match</span>
+        <span>🎯 <span class="stat-val">${stats.counter}</span> Counter</span>
+        <span>☝️ <span class="stat-val">${stats.firstFights}</span> First Fights</span>
+        <span>⚔️ <span class="stat-val">${stats.joinMatch}</span> Join Match</span>
+        <span>👑 <span class="stat-val">${stats.crownTotal}</span> Crown</span>
+        <span>🔻 <span class="stat-val">${stats.crownsTaken}</span> Crowns Taken</span>
+        <span>✨ <span class="stat-val">${stats.flawlessCount}</span> Flawless</span>
+        <span>✍️ <span class="stat-val">${stats.wordsLearnt}</span> Words Learnt</span>
+        <span>📅 <span class="stat-val">${stats.activeDays}</span> Active Days</span>
+      </div>`;
+  } else {
+    $('player-profile-activity-holder').innerHTML = '';
+  }
 
   // Mastery is strictly self-only — never fetched or shown for anyone else.
   const masteryHolder = $('player-profile-mastery-holder');
@@ -593,7 +606,7 @@ async function openPlayerProfile(username) {
     if (totalAnswered > 0) {
       const mastered = list.filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
       const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
-      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="mastery-section"><div class="mastery-line">📖 ${mastered} words mastered</div><div class="mastery-line">🎯 ${accuracy}% accuracy</div></div>`;
+      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid"><span>📖 <span class="stat-val">${mastered}</span> Words Mastered</span><span>🏹 <span class="stat-val">${accuracy}%</span> Accuracy</span></div>`;
     } else { masteryHolder.innerHTML = ''; }
   } else {
     masteryHolder.innerHTML = '';
@@ -838,8 +851,6 @@ async function afterLogin() {
   // state stays correct everywhere, not just through our own button.
   if (isStandalone()) await awardBadgeOnce('home_screen');
   await renderBadgeShowcase();
-  await renderMasterySection();
-  await renderActivitySection();
   renderHomeScreenBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
@@ -1014,39 +1025,38 @@ async function renderBadgeShowcase() {
   holder.appendChild(row);
 }
 
-// Mastery section — strictly private, personal-learning signal only. Never shown
-// on anyone else's profile, and never includes the total word-bank size (400) —
-// that's deliberately not something to advertise.
-async function renderMasterySection() {
-  const holder = $('mastery-section-holder');
-  const { data: rows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
-  const list = rows || [];
-  const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
-  if (totalAnswered === 0) { holder.innerHTML = ''; return; }
-  const mastered = list.filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
-  const totalCorrect = list.reduce((s, r) => s + r.correct_count, 0);
-  const accuracy = Math.round((totalCorrect / totalAnswered) * 100);
-  holder.innerHTML = `<div class="section-label">Mastery</div><div class="mastery-section"><div class="mastery-line">📖 ${mastered} words mastered</div><div class="mastery-line">🎯 ${accuracy}% accuracy</div></div>`;
-}
-
-// Activity — public/braggable, unlike Mastery. Shown here AND on other people's
-// profile pages (with slightly more visual weight there, since bragging rights
-// matter more when someone else is actually looking).
-async function computeActivityStats(username) {
-  const { count: firstFights } = await sb.from('first_fighters').select('*', { count: 'exact', head: true }).eq('username', username);
-  const { count: challenges } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', false);
-  const { count: challengeBacks } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', true);
-  return { firstFights: firstFights || 0, challenges: challenges || 0, challengeBacks: challengeBacks || 0 };
-}
-async function renderActivitySection() {
-  const holder = $('activity-section-holder');
-  const stats = await computeActivityStats(me);
-  if (stats.firstFights + stats.challenges + stats.challengeBacks === 0) { holder.innerHTML = ''; return; }
-  const lines = [];
-  if (stats.challenges) lines.push(`⚔️ ${stats.challenges} Start Match`);
-  if (stats.challengeBacks) lines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
-  if (stats.firstFights) lines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
-  holder.innerHTML = `<div class="section-label">Activity</div><div class="mastery-section">${lines.map(l => `<div class="mastery-line">${l}</div>`).join('')}</div>`;
+// Full account-wide player stats — the same 9 "public" metrics as the Room
+// Stats Header, just without a room_id filter. Words Mastered/Accuracy are
+// deliberately NOT in here — those stay strictly self-only (see Mastery
+// rendering in openPlayerProfile), everything here is public/braggable.
+async function computeFullPlayerStats(username) {
+  const [
+    { data: myScores },
+    { data: myFirstFights },
+    { count: startMatch },
+    { count: counter },
+    { data: dethronedByMe },
+    { data: myPlayedRounds },
+    { data: myWordAnswers },
+  ] = await Promise.all([
+    sb.from('round_scores').select('correct_count, total_count, played_at').eq('username', username),
+    sb.from('first_fighters').select('round_id').eq('username', username),
+    sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', false),
+    sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', true),
+    sb.from('dethronement_events').select('id').eq('dethroned_by_username', username),
+    sb.from('round_scores').select('round_id, rounds!inner(creator_username, target_username)').eq('username', username),
+    sb.from('word_answers').select('word_id').eq('username', username),
+  ]);
+  const firstFights = (myFirstFights || []).length;
+  const crownsTaken = (dethronedByMe || []).length;
+  const joinMatch = (myPlayedRounds || []).filter(r => r.rounds.creator_username !== username && r.rounds.target_username !== username).length;
+  return {
+    startMatch: startMatch || 0, counter: counter || 0, firstFights, joinMatch,
+    crownTotal: firstFights + crownsTaken, crownsTaken,
+    flawlessCount: (myScores || []).filter(s => s.correct_count === s.total_count).length,
+    activeDays: new Set((myScores || []).map(s => new Date(s.played_at).toISOString().slice(0, 10))).size,
+    wordsLearnt: new Set((myWordAnswers || []).map(w => w.word_id)).size,
+  };
 }
 
 async function updateStreakOnOpen() {
@@ -1608,8 +1618,8 @@ function ordinal(n) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-// Room-scoped mirror of the exact same definitions already used on Home's
-// Activity section (computeActivityStats) — reused unchanged, just joined
+// Room-scoped mirror of the exact same definitions used in computeFullPlayerStats
+// (the account-wide version, powering Home/Profile) — reused unchanged, just joined
 // through rounds.room_id, so a player never has to learn a second meaning
 // for "Challenges" depending on which screen they're looking at.
 async function computeRoomActivityStats(username, roomId) {

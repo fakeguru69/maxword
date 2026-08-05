@@ -177,14 +177,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .rivalry-text .rivalry-score { font-weight: 700; }
 .rivalry-card .btn-primary { width: 100%; }
 .room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
-.room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 4px; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-style: italic; color: var(--teal); margin-bottom: 12px; }
-.room-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 6px; font-size: 13px; color: var(--cream-dim); }
+.room-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 6px; font-size: 13px; color: var(--cream); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--cream); }
-.room-stat-grid .stat-val { color: var(--cream); font-weight: 700; }
+.room-stat-grid .stat-val { color: var(--gold); font-weight: 700; }
 .room-stat-grid.primary .stat-val { color: var(--gold); font-size: 15px; }
-.room-stats-toggle { display: block; text-align: center; font-size: 12px; color: var(--teal); text-decoration: underline; cursor: pointer; margin-top: 6px; }
+.room-stats-toggle { display: block; text-align: center; font-size: 12px; color: var(--cream); text-decoration: underline; cursor: pointer; margin-top: 6px; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
@@ -572,20 +572,23 @@ async function openPlayerProfile(username) {
   const theirIndex = sorted.findIndex(r => r.username === username);
   const lifetimeWins = new Set((lifetimeWinRows || []).map(r => r.round_id)).size;
 
-  // One combined line — no separate status/lifetime rows, no ranking fractions.
-  const parts = [];
-  if (theirIndex !== -1) parts.push(`🌍 Global #${theirIndex + 1}`);
-  if (streak && streak.current_streak > 0) parts.push(`🔥 ${streak.current_streak}-day streak`);
-  if (crowns) parts.push(`👑 ${crowns} Crown${crowns === 1 ? '' : 's'} Held`);
-  if (played) parts.push(`📜 ${played} Match${played === 1 ? '' : 'es'} Played`);
-  if (lifetimeWins) parts.push(`🏆 ${lifetimeWins} Lifetime Win${lifetimeWins === 1 ? '' : 's'}`);
-  $('player-profile-status-holder').innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '<div class="empty-state">No games played yet.</div>';
+  // Headline — Style A (terse, matches Room's exact format/weight), rendered
+  // in white/cream rather than gold per the mockup comparison. Streak/Crowns
+  // Held/Lifetime Wins moved into the stat grid below since this terse format
+  // only has room for 2 facts, same constraint Room's headline has.
+  if (played && theirIndex !== -1) {
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL RANK · 📜 ${played} MATCH PLAYED</div>`;
+  } else if (played) {
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">UNRANKED · 📜 ${played} MATCH PLAYED</div>`;
+  } else {
+    $('player-profile-status-holder').innerHTML = '<div class="empty-state">No games played yet.</div>';
+  }
 
   // Ticker — narrowed to ONLY the near-miss case. Streak-risk was cut: it
-  // just repeated the "🔥 N-day streak" fact already sitting in the status
-  // line right above it, one line up — not worth a whole second line for
-  // the same information. No fallback either — silent if there's no real
-  // near-miss to report, rather than filling space with generic flavor text.
+  // used to just repeat the "🔥 N-day streak" fact sitting one line above —
+  // now that streak lives in the grid below instead, this stays cut for the
+  // same reason (no new information over what the grid already states).
+  // No fallback either — silent if there's no real near-miss to report.
   let ticker = null;
   if (theirIndex > 0) {
     const aheadOfThem = sorted[theirIndex - 1];
@@ -596,17 +599,24 @@ async function openPlayerProfile(username) {
 
   // Full stat grid — same icon set and 2-column layout as the Room Stats
   // Header, just account-wide instead of room-scoped. Deliberately uses the
-  // QUIET tier styling (no .primary) — the headline above should be the one
-  // bright thing on this screen; a bold grid competed with it since both
-  // were rendering white/cream.
+  // QUIET tier styling (no .primary) — the headline above is the one bright
+  // thing on this screen. Streak/Crowns Held/Lifetime Wins added here (moved
+  // out of the old status line). Note: "Crown" (derived lifetime total) uses
+  // 🎖️ here instead of 👑 specifically to avoid colliding with "Crowns Held"
+  // (live count) now sitting in the same grid — two different concepts that
+  // would otherwise share one icon side by side.
   if (played) {
+    const streakPart = streak && streak.current_streak > 0 ? `<span>🔥 <span class="stat-val">${streak.current_streak}</span> Streak</span>` : '';
+    const crownsHeldPart = crowns ? `<span>👑 <span class="stat-val">${crowns}</span> Crowns Held</span>` : '';
+    const lifetimeWinsPart = lifetimeWins ? `<span>🏆 <span class="stat-val">${lifetimeWins}</span> Lifetime Wins</span>` : '';
     $('player-profile-activity-holder').innerHTML = `
       <div class="room-stat-grid">
+        ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
         <span>📜 <span class="stat-val">${stats.startMatch}</span> Start Match</span>
         <span>🎯 <span class="stat-val">${stats.counter}</span> Counter</span>
         <span>☝️ <span class="stat-val">${stats.firstFights}</span> First Fights</span>
         <span>⚔️ <span class="stat-val">${stats.joinMatch}</span> Join Match</span>
-        <span>👑 <span class="stat-val">${stats.crownTotal}</span> Crown</span>
+        <span>🎖️ <span class="stat-val">${stats.crownTotal}</span> Crown</span>
         <span>🔻 <span class="stat-val">${stats.crownsTaken}</span> Crowns Taken</span>
         <span>✨ <span class="stat-val">${stats.flawlessCount}</span> Flawless</span>
         <span>✍️ <span class="stat-val">${stats.wordsLearnt}</span> Words Learnt</span>
@@ -1792,7 +1802,7 @@ async function renderRoomStatsHeader() {
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
-    <div class="account-name-line" style="margin-bottom:0;">${displayName(me)}</div>
+    <div class="account-name-line" id="room-header-username" style="margin-bottom:0; cursor:pointer;">${displayName(me)}</div>
     <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
     <div class="room-stat-grid primary">
@@ -1813,6 +1823,7 @@ async function renderRoomStatsHeader() {
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;
   holder.appendChild(block);
+  $('room-header-username').onclick = () => openPlayerProfile(me);
   $('room-stats-toggle').onclick = () => {
     const more = $('room-stats-more');
     const collapsed = more.classList.toggle('hidden');

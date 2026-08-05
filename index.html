@@ -182,7 +182,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 4px -16px 6px -16px; padding: 6px 16px; }
 .room-stat-grid { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
-.stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; }
+.stat-row:not(:last-child) { border-bottom: 1px solid var(--line); }
+.stat-row:last-child { margin-bottom: 0; padding-bottom: 0; }
 .stat-row .stat-icon { font-size: 15px; }
 .room-stat-grid .stat-val { color: var(--cream); font-weight: 700; text-align: right; }
 .room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--gold); text-decoration: underline; cursor: pointer; margin-top: 6px; }

@@ -1742,11 +1742,11 @@ async function renderRoomStatsHeader() {
   // so nothing is actually lost by dropping it here).
   let headlineLine;
   if (myRank === null) {
-    headlineLine = `UNRANKED · ${gamesPlayed} MATCH PLAYED`;
+    headlineLine = `UNRANKED · 🗡️ ${gamesPlayed} MATCH PLAYED`;
   } else if (myRank === 1) {
-    headlineLine = `👑 #1 RANK · ${gamesPlayed} MATCH PLAYED`;
+    headlineLine = `👑 #1 RANK · 🗡️ ${gamesPlayed} MATCH PLAYED`;
   } else {
-    headlineLine = `#${myRank} RANK · ${gamesPlayed} MATCH PLAYED`;
+    headlineLine = `🥇 #${myRank} RANK · 🗡️ ${gamesPlayed} MATCH PLAYED`;
   }
 
   // Leaderboard button shows your current rank inline — a reason to tap,
@@ -1792,7 +1792,7 @@ async function renderRoomStatsHeader() {
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
-    <div class="account-name-line" style="margin-bottom:6px;">${displayName(me)}</div>
+    <div class="account-name-line" style="margin-bottom:0;">${displayName(me)}</div>
     <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
     <div class="room-stat-grid primary">

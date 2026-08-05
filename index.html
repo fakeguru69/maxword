@@ -104,6 +104,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tip-list-item { font-size: 14px; color: var(--cream); line-height: 1.5; margin-bottom: 10px; }
 .tip-list-item:last-child { margin-bottom: 0; }
 .room-leaderboard-btn { width: 100%; background: var(--ink-raised); border: 1px solid var(--gold-soft); border-radius: 10px; padding: 9px 14px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--gold); cursor: pointer; margin-bottom: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+@keyframes onboarding-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 50% { box-shadow: 0 0 0 8px rgba(212,175,55,0); } }
+.onboarding-pulse { animation: onboarding-pulse 1s ease-out 3; }
 .room-leaderboard-btn:active { border-color: var(--gold); }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
@@ -1301,7 +1303,18 @@ async function maybeShowRoomVocabTip() {
      <div class="tip-list-item">⚔️ let's fight! — an open invitation, no pressure</div>
      <div class="tip-list-item">☝️ be the first — nobody's played it yet</div>
      <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
-    () => maybeShowA2HSPopup());
+    () => {
+      // The room screen got a lot taller once the Stats Header/Leaderboard/
+      // Rivalry card were added — dismissing this tip used to just drop her
+      // back at the top of all that, nowhere near the Match cards it was
+      // just explaining. Scroll straight to them instead of leaving her to
+      // hunt — a navigation fix, not another ask or badge.
+      const target = document.getElementById('trials-count-label');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const startBtn = document.getElementById('btn-quick-start-match');
+      if (startBtn) { startBtn.classList.add('onboarding-pulse'); setTimeout(() => startBtn.classList.remove('onboarding-pulse'), 3200); }
+      maybeShowA2HSPopup();
+    });
 }
 
 // Keeps the Challenges/Leaderboard tabs current while you're actually looking at them —
@@ -1746,6 +1759,14 @@ async function renderRoomStatsHeader() {
   const deltaPart = gamesDelta > 0 ? ` (${gamesDelta} since last visit)` : '';
   const activityPart = activityRank ? ` — (${activityRank} of ${activityTotal})` : '';
   const gamesLine = `${gamesPlayed} Match${gamesPlayed === 1 ? '' : 'es'} played${deltaPart}${activityPart}`;
+  // One combined line, no separate sub-styled row — matches the same merge
+  // done on Profile's status line.
+  const headlineLine = `${headlineMain}${headlineSub ? ` — ${headlineSub}` : ''} · ${gamesLine}`;
+
+  // Leaderboard button shows your current rank inline — a reason to tap,
+  // not just a label. Static HTML normally, updated here since this is
+  // where myRank gets computed.
+  $('btn-open-room-leaderboard').innerHTML = myRank ? `🏆 Leaderboard (#${myRank})` : '🏆 Leaderboard';
 
   // ---- Ticker: priority order, first match wins, only ONE shown ----
   // Signature Duel deliberately NOT a candidate here — it now lives
@@ -1786,8 +1807,7 @@ async function renderRoomStatsHeader() {
   block.className = 'room-stats-header-block';
   block.innerHTML = `
     <div class="account-name-line" style="margin-bottom:6px;">${displayName(me)}</div>
-    <div class="room-headline">${headlineMain}${headlineSub ? ` <span class="sub">— ${headlineSub}</span>` : ''}</div>
-    <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
+    <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
     <div class="room-stat-grid primary">
       <span>📜 <span class="stat-val">${activity.challenges}</span> Start Match</span>

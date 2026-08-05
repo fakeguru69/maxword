@@ -608,7 +608,7 @@ async function openPlayerProfile(username) {
   const rankSuffix = r => r ? ` (#${r})` : '';
   if (played) {
     $('player-profile-activity-holder').innerHTML = `
-      <div class="section-label" style="margin-top:8px;">Stats</div>
+      <div style="margin-top:14px;"></div>
       <div class="room-stat-grid primary">
         <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless${rankSuffix(globalStats.flawlessRank)}</span></div>
         <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
@@ -628,7 +628,7 @@ async function openPlayerProfile(username) {
   const crownsHeldPart = crowns ? `<div class="stat-row"><span class="stat-icon">👑</span><span class="stat-val">${crowns}</span><span>Crowns Held</span></div>` : '';
   const lifetimeWinsPart = lifetimeWins ? `<div class="stat-row"><span class="stat-icon">🏆</span><span class="stat-val">${lifetimeWins}</span><span>Lifetime Wins</span></div>` : '';
   moreHolder.innerHTML = played ? `
-    <div class="room-stat-grid">
+    <div class="room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
       <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${stats.dethroned}</span><span>Dethroned</span></div>
       <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${stats.wordsPlayed}</span><span>Words Played</span></div>
@@ -1860,7 +1860,7 @@ async function renderRoomStatsHeader() {
     <div class="account-name-line" id="room-header-username" style="margin-bottom:0; cursor:pointer;">${displayName(me)}</div>
     <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
-    <div class="section-label" style="margin-top:8px;">Stats</div>
+    <div style="margin-top:14px;"></div>
     <div class="room-stat-grid primary">
       <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless${rankSuffix(roomStats.flawlessRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>

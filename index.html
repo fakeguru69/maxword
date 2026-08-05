@@ -177,10 +177,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .rivalry-text .rivalry-score { font-weight: 700; }
 .rivalry-card .btn-primary { width: 100%; }
 .room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
-.room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 0; }
+.room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 0; line-height: 1.25; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 4px -16px 6px -16px; padding: 6px 16px; }
-.room-stat-grid { margin-bottom: 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
+.room-stat-grid { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
 .stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .stat-row .stat-icon { font-size: 15px; }
@@ -647,7 +647,7 @@ async function openPlayerProfile(username) {
     const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
     if (totalAnswered > 0) {
       const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
-      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid"><div class="stat-row"><span class="stat-icon">🏹</span><span class="stat-val">${accuracy}%</span><span>Accuracy</span></div></div>`;
+      masteryHolder.innerHTML = `<div class="room-stat-grid"><div class="stat-row"><span class="stat-icon">🏹</span><span class="stat-val">${accuracy}%</span><span>Accuracy</span></div></div>`;
     } else { masteryHolder.innerHTML = ''; }
   } else {
     masteryHolder.innerHTML = '';

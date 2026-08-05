@@ -179,7 +179,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
 .room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 0; line-height: 1.25; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
-.room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 4px -16px 6px -16px; padding: 6px 16px; }
+.room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 16px -16px 16px -16px; padding: 6px 16px; }
 .room-stat-grid { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
 .stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; }
@@ -1860,14 +1860,13 @@ async function renderRoomStatsHeader() {
     <div class="account-name-line" id="room-header-username" style="margin-bottom:0; cursor:pointer;">${displayName(me)}</div>
     <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
-    <div style="margin-top:14px;"></div>
     <div class="room-stat-grid primary">
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless Matches${rankSuffix(roomStats.flawlessRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${roomStats.myPlayed}</span><span>Matches Played${rankSuffix(roomStats.playedRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${roomStats.myActiveDays}</span><span>Active Days${rankSuffix(roomStats.activeDaysRank)}</span></div>
     </div>
-    <div id="room-stats-more" class="hidden room-stat-grid">
+    <div id="room-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${dethronedCount || 0}</span><span>Dethroned</span></div>
       <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${wordsPlayed}</span><span>Words Played</span></div>
       <div class="stat-row"><span class="stat-icon">📜</span><span class="stat-val">${activity.challenges}</span><span>Start Match</span></div>

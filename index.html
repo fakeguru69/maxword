@@ -178,6 +178,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-style: italic; color: var(--teal); margin-bottom: 12px; }
 .room-stat-row { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--cream-dim); margin-bottom: 4px; }
+.room-stat-row.primary { font-size: 14px; font-weight: 700; color: var(--cream); }
+.room-stat-row.primary .stat-val { color: var(--gold); font-size: 15px; }
 .room-stat-row .stat-val { color: var(--cream); font-weight: 700; }
 .room-stats-header-block { margin-bottom: 18px; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
@@ -1582,29 +1584,51 @@ async function computeStrongestDuel() {
 // no narration of their own, matching the existing Activity-section pattern.
 // Silent (renders nothing) before your first game in this room — nothing to
 // show yet, and an empty/zeroed header would just be noise on day one.
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// Room-scoped mirror of the exact same definitions already used on Home's
+// Activity section (computeActivityStats) — reused unchanged, just joined
+// through rounds.room_id, so a player never has to learn a second meaning
+// for "Challenges" depending on which screen they're looking at.
+async function computeRoomActivityStats(username, roomId) {
+  const { data: myFirstFights } = await sb.from('first_fighters').select('round_id, rounds!inner(room_id)').eq('username', username).eq('rounds.room_id', roomId);
+  const { count: challenges } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', false).eq('room_id', roomId);
+  const { count: challengeBacks } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', true).eq('room_id', roomId);
+  return { firstFights: (myFirstFights || []).length, challenges: challenges || 0, challengeBacks: challengeBacks || 0 };
+}
+
 async function renderRoomStatsHeader() {
   const holder = $('room-stats-header');
   holder.innerHTML = '';
   const roomId = currentRoom.id;
 
-  const { data: myScores } = await sb.from('round_scores').select('score_points, correct_count, total_count, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId);
+  const { data: myScores } = await sb.from('round_scores').select('score_points, correct_count, total_count, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId);
   const gamesPlayed = (myScores || []).length;
   if (gamesPlayed === 0) return;
 
-  const personalBest = Math.max(...myScores.map(s => s.score_points));
   const flawlessCount = myScores.filter(s => s.correct_count === s.total_count).length;
-  const wordsAnswered = myScores.reduce((sum, s) => sum + s.total_count, 0);
+  const activeDays = new Set(myScores.map(s => new Date(s.played_at).toISOString().slice(0, 10))).size;
 
-  const { count: trialsStarted } = await sb.from('rounds').select('*', { count: 'exact', head: true }).eq('room_id', roomId).eq('creator_username', me);
+  const { data: myWordAnswers } = await sb.from('word_answers').select('word_id, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId);
+  const wordsLearnt = new Set((myWordAnswers || []).map(w => w.word_id)).size;
 
-  const { data: allRoomRoundIds } = await sb.from('rounds').select('id').eq('room_id', roomId);
-  let crownsHeld = 0;
-  if (allRoomRoundIds && allRoomRoundIds.length) {
-    const { data: lb } = await sb.from('trial_leaderboard').select('round_id').eq('username', me).eq('rank', 1).in('round_id', allRoomRoundIds.map(r => r.id));
-    crownsHeld = (lb || []).length;
-  }
+  const activity = await computeRoomActivityStats(me, roomId);
 
-  const { data: roomRows } = await sb.from('room_leaderboard_alltime').select('username, avg_score').eq('room_id', roomId);
+  const { data: dethronedByMe } = await sb.from('dethronement_events').select('id, rounds!inner(room_id)').eq('dethroned_by_username', me).eq('rounds.room_id', roomId);
+  const crownsTaken = (dethronedByMe || []).length;
+  const crownTotal = activity.firstFights + crownsTaken; // every distinct way you can end up holding #1
+
+  // "Join Match" = claimed an existing ⚔️ let's fight! card — played a round you
+  // neither created nor were personally targeted on.
+  const { data: myPlayedRounds } = await sb.from('round_scores').select('round_id, rounds!inner(room_id, creator_username, target_username)').eq('username', me).eq('rounds.room_id', roomId);
+  const joinedMatches = (myPlayedRounds || []).filter(r => r.rounds.creator_username !== me && r.rounds.target_username !== me).length;
+
+  const strongest = await computeStrongestDuel();
+
+  const { data: roomRows } = await sb.from('room_leaderboard_alltime').select('username, avg_score, rounds_played').eq('room_id', roomId);
   const { data: allTimeRows } = await sb.from('global_leaderboard_alltime').select('username, rounds_played');
   const totalGamesMap = new Map((allTimeRows || []).map(r => [r.username, r.rounds_played]));
   const isRanked = u => (totalGamesMap.get(u) || 0) >= MIN_GAMES_TO_RANK;
@@ -1613,7 +1637,13 @@ async function renderRoomStatsHeader() {
   const myRank = myIndex >= 0 ? myIndex + 1 : null;
   const totalRanked = ranked.length;
 
-  const strongest = await computeStrongestDuel();
+  // Activity Rank — a second, independent leaderboard by raw participation
+  // (rounds_played), not skill. Deliberately includes EVERY room member, not
+  // just ranked ones — this axis is about showing up, not being good.
+  const activitySorted = [...(roomRows || [])].sort((a, b) => b.rounds_played - a.rounds_played);
+  const activityIndex = activitySorted.findIndex(r => r.username === me);
+  const activityRank = activityIndex >= 0 ? activityIndex + 1 : null;
+  const activityTotal = activitySorted.length;
 
   const { data: streakRow } = await sb.from('streaks').select('current_streak, last_played_date').eq('username', me).maybeSingle();
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -1642,9 +1672,14 @@ async function renderRoomStatsHeader() {
     headlineSub = podiumScore ? `${Math.max(1, Math.round(podiumScore - ranked[myIndex].avg_score))} pts from the podium` : `${totalRanked} ranked players`;
   }
   const gamesDelta = snap && snap.last_rounds_played != null ? gamesPlayed - snap.last_rounds_played : null;
-  const gamesLine = gamesDelta > 0 ? `${gamesPlayed} games played (${gamesDelta} since last visit)` : `${gamesPlayed} games played`;
+  const deltaPart = gamesDelta > 0 ? ` (${gamesDelta} since last visit)` : '';
+  const activityPart = activityRank ? ` — ${ordinal(activityRank)} most active (${activityRank} of ${activityTotal})` : '';
+  const gamesLine = `${gamesPlayed} Match${gamesPlayed === 1 ? '' : 'es'} played${deltaPart}${activityPart}`;
 
   // ---- Ticker: priority order, first match wins, only ONE shown ----
+  // Signature Duel deliberately removed from this pool — it's now a permanent
+  // top-4 chip below, so showing it here too would just repeat a fact that's
+  // already visible on screen instead of surfacing something new.
   let ticker = null;
   if (streakAtRisk) {
     ticker = `🔥 Play today or lose your ${streakRow.current_streak}-day streak`;
@@ -1659,9 +1694,6 @@ async function renderRoomStatsHeader() {
     const gap = Math.max(1, Math.round(ranked[myIndex].avg_score - behindMe.avg_score));
     if (gap <= 30) ticker = `⚡ ${displayName(behindMe.username)} is just ${gap} pts behind you`;
   }
-  if (!ticker && strongest) {
-    ticker = `⚔️ ${strongest.record.wins}–${strongest.record.losses} vs. ${displayName(strongest.opponent)} — your strongest duel`;
-  }
   if (!ticker) {
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
     const { count: newMembers } = await sb.from('room_members').select('*', { count: 'exact', head: true }).eq('room_id', roomId).gte('joined_at', weekAgo);
@@ -1670,14 +1702,25 @@ async function renderRoomStatsHeader() {
   if (!ticker) ticker = `📜 Start a Match to make your mark`;
 
   // ---- Render ----
+  // Top 4 = action-drivers (the only way each one grows is by starting a
+  // Challenge, a Counter Challenge, claiming an open Match, or building enough
+  // duel history to have a Signature Duel at all) — bold tier. Everything else
+  // is real but doesn't specifically pull toward a next action — quiet tier,
+  // same card, no tap required, just visually secondary.
+  const signatureDuelText = strongest
+    ? `${strongest.record.wins}–${strongest.record.losses} vs. ${displayName(strongest.opponent)}`
+    : '—';
+
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
     <div class="room-headline">${headlineMain}${headlineSub ? ` <span class="sub">— ${headlineSub}</span>` : ''}</div>
     <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
     <div class="room-ticker">${ticker}</div>
-    <div class="room-stat-row">⚔️ Matches started <span class="stat-val">${trialsStarted || 0}</span> · 📖 Words answered <span class="stat-val">${wordsAnswered}</span></div>
-    <div class="room-stat-row">👑 Crowns <span class="stat-val">${crownsHeld}</span> · 🏅 Best <span class="stat-val">${personalBest}</span> · ✨ Flawless <span class="stat-val">${flawlessCount}</span></div>
+    <div class="room-stat-row primary">⚔️ Challenges <span class="stat-val">${activity.challenges}</span> · 🎯 Counter <span class="stat-val">${activity.challengeBacks}</span></div>
+    <div class="room-stat-row primary">☝️ First Fights <span class="stat-val">${activity.firstFights}</span> · ⚔️ Signature Duel <span class="stat-val">${signatureDuelText}</span></div>
+    <div class="room-stat-row">🚩 Join Match <span class="stat-val">${joinedMatches}</span> · 👑 Crown <span class="stat-val">${crownTotal}</span> · 🔻 Crowns Taken <span class="stat-val">${crownsTaken}</span></div>
+    <div class="room-stat-row">✨ Flawless <span class="stat-val">${flawlessCount}</span> · ✍️ Words Learnt <span class="stat-val">${wordsLearnt}</span> · 📅 Active Days <span class="stat-val">${activeDays}</span></div>
   `;
   holder.appendChild(block);
 

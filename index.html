@@ -396,6 +396,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div class="account-name-line" id="player-profile-name"></div>
     <div id="player-profile-status-holder"></div>
     <div id="player-profile-activity-holder"></div>
+    <div id="player-profile-more-holder"></div>
     <div id="player-profile-mastery-holder"></div>
     <div id="player-profile-badges-holder"></div>
     <div id="player-profile-duel-holder"></div>
@@ -556,28 +557,36 @@ async function openPlayerProfile(username) {
     { data: streak },
     { count: crowns },
     { data: lifetimeWinRows },
-    { count: played },
     stats,
+    globalStats,
+    masteredStats,
   ] = await Promise.all([
     sb.from('global_leaderboard_alltime').select('*'),
     sb.from('streaks').select('*').eq('username', username).maybeSingle(),
     sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', username).eq('rank', 1),
     sb.from('lifetime_wins').select('round_id').eq('username', username),
-    sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', username),
     computeFullPlayerStats(username),
+    computeGlobalStatRankings(username),
+    computeWordsMasteredRanking(),
   ]);
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const theirIndex = sorted.findIndex(r => r.username === username);
   const lifetimeWins = new Set((lifetimeWinRows || []).map(r => r.round_id)).size;
+  const played = globalStats.myPlayed;
 
-  // Headline — Style A (terse, matches Room's exact format/weight), rendered
-  // in white/cream rather than gold per the mockup comparison. Streak/Crowns
-  // Held/Lifetime Wins moved into the stat grid below since this terse format
-  // only has room for 2 facts, same constraint Room's headline has.
+  // Activity Rank — same second leaderboard concept as Room's headline, just
+  // global instead of room-scoped. Reuses the already-fetched global rows
+  // rather than a second query.
+  const activitySorted = [...(rows || [])].sort((a, b) => b.rounds_played - a.rounds_played);
+  const activityIndex = activitySorted.findIndex(r => r.username === username);
+  const activityRank = activityIndex >= 0 ? activityIndex + 1 : null;
+
+  // Headline — two ranks, nothing else, matching Room's exact format/weight.
+  const activityPart = activityRank ? `#${activityRank}` : '–';
   if (played && theirIndex !== -1) {
-    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL RANK · 📜 ${played} MATCH PLAYED</div>`;
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL RANK · 🗡️ ${activityPart} MATCHES PLAYED</div>`;
   } else if (played) {
-    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">UNRANKED · 📜 ${played} MATCH PLAYED</div>`;
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} MATCHES PLAYED</div>`;
   } else {
     $('player-profile-status-holder').innerHTML = '<div class="empty-state">No games played yet.</div>';
   }
@@ -587,45 +596,56 @@ async function openPlayerProfile(username) {
   // there's nothing for a ticker to be highlighting. Also awkward in
   // other-view, where "pts from #2" reads as a fact with no one to act on it.
 
-  // Full stat grid — same icon set and 2-column layout as the Room Stats
-  // Header, just account-wide instead of room-scoped. Deliberately uses the
-  // QUIET tier styling (no .primary) — the headline above is the one bright
-  // thing on this screen. Streak/Crowns Held/Lifetime Wins added here (moved
-  // out of the old status line). Note: "Crown" (derived lifetime total) uses
-  // 🎖️ here instead of 👑 specifically to avoid colliding with "Crowns Held"
-  // (live count) now sitting in the same grid — two different concepts that
-  // would otherwise share one icon side by side.
+  // Top 4 — Flawless / Words Mastered / Matches Played / Active Days: the 4
+  // stats that survived the full psychology audit (Streak and Duel both
+  // deliberately excluded — Streak reads oddly without ticker-style urgency
+  // framing, Duel needs the Rivalry card's relational treatment, not a flat
+  // number). Format: volume + rank in parens, matching Room exactly.
+  const rankSuffix = r => r ? ` (#${r})` : '';
   if (played) {
-    const streakPart = streak && streak.current_streak > 0 ? `<span>🔥 <span class="stat-val">${streak.current_streak}</span> Streak</span>` : '';
-    const crownsHeldPart = crowns ? `<span>👑 <span class="stat-val">${crowns}</span> Crowns Held</span>` : '';
-    const lifetimeWinsPart = lifetimeWins ? `<span>🏆 <span class="stat-val">${lifetimeWins}</span> Lifetime Wins</span>` : '';
     $('player-profile-activity-holder').innerHTML = `
       <div class="room-stat-grid primary">
-        ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-        <span>📜 <span class="stat-val">${stats.startMatch}</span> Start Match</span>
-        <span>🎯 <span class="stat-val">${stats.counter}</span> Counter</span>
-        <span>☝️ <span class="stat-val">${stats.firstFights}</span> First Fights</span>
-        <span>⚔️ <span class="stat-val">${stats.joinMatch}</span> Join Match</span>
-        <span>🎖️ <span class="stat-val">${stats.crownTotal}</span> Crown</span>
-        <span>🔻 <span class="stat-val">${stats.crownsTaken}</span> Crowns Taken</span>
-        <span>✨ <span class="stat-val">${stats.flawlessCount}</span> Flawless</span>
-        <span>✍️ <span class="stat-val">${stats.wordsLearnt}</span> Words Learnt</span>
-        <span>📅 <span class="stat-val">${stats.activeDays}</span> Active Days</span>
+        <span>✨ <span class="stat-val">${globalStats.myFlawless}</span> Flawless${rankSuffix(globalStats.flawlessRank)}</span>
+        <span>📖 <span class="stat-val">${masteredStats.myCount}</span> Words Mastered${rankSuffix(masteredStats.myRank)}</span>
+        <span>🗡️ <span class="stat-val">${played}</span> Matches Played${rankSuffix(globalStats.playedRank)}</span>
+        <span>📅 <span class="stat-val">${globalStats.myActiveDays}</span> Active Days${rankSuffix(globalStats.activeDaysRank)}</span>
       </div>`;
   } else {
     $('player-profile-activity-holder').innerHTML = '';
   }
 
-  // Mastery is strictly self-only — never fetched or shown for anyone else.
+  // "See more" — everything real but not top-4-worthy: Streak (no ticker here
+  // to carry its urgency, so it's a plain fact instead), Crowns Held (live)
+  // and Lifetime Wins (bragging-rights flavored but weaker than the top 4),
+  // Dethroned, Words Played, and the Contribution stats.
+  const moreHolder = $('player-profile-more-holder');
+  const streakPart = streak && streak.current_streak > 0 ? `<span>🔥 <span class="stat-val">${streak.current_streak}</span> Streak</span>` : '';
+  const crownsHeldPart = crowns ? `<span>👑 <span class="stat-val">${crowns}</span> Crowns Held</span>` : '';
+  const lifetimeWinsPart = lifetimeWins ? `<span>🏆 <span class="stat-val">${lifetimeWins}</span> Lifetime Wins</span>` : '';
+  moreHolder.innerHTML = played ? `
+    <div class="room-stat-grid">
+      ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
+      <span>🔻 <span class="stat-val">${stats.dethroned}</span> Dethroned</span>
+      <span>✍️ <span class="stat-val">${stats.wordsPlayed}</span> Words Played</span>
+      <span>📜 <span class="stat-val">${stats.startMatch}</span> Start Match</span>
+      <span>🎯 <span class="stat-val">${stats.counter}</span> Counter</span>
+      <span>☝️ <span class="stat-val">${stats.firstFights}</span> First Fights</span>
+      <span>⚔️ <span class="stat-val">${stats.joinMatch}</span> Join Match</span>
+    </div>` : '';
+
+  // Accuracy is strictly self-only — never fetched or shown for anyone else
+  // (a percentage can discourage further play if it's ever shown publicly).
+  // Words Mastered moved OUT of this section into the public top-4 above —
+  // it's cumulative/climbing, unlike Accuracy's constant flux, so it earned
+  // public status; Accuracy did not.
   const masteryHolder = $('player-profile-mastery-holder');
   if (isSelf) {
     const { data: mRows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
     const list = mRows || [];
     const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
     if (totalAnswered > 0) {
-      const mastered = list.filter(r => r.correct_count > 0 && r.incorrect_count === 0).length;
       const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
-      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid primary"><span>📖 <span class="stat-val">${mastered}</span> Words Mastered</span><span>🏹 <span class="stat-val">${accuracy}%</span> Accuracy</span></div>`;
+      masteryHolder.innerHTML = `<div class="section-label">Mastery</div><div class="room-stat-grid"><span>🏹 <span class="stat-val">${accuracy}%</span> Accuracy</span></div>`;
     } else { masteryHolder.innerHTML = ''; }
   } else {
     masteryHolder.innerHTML = '';
@@ -1050,31 +1070,54 @@ async function renderBadgeShowcase() {
 // rendering in openPlayerProfile), everything here is public/braggable.
 async function computeFullPlayerStats(username) {
   const [
-    { data: myScores },
     { data: myFirstFights },
     { count: startMatch },
     { count: counter },
-    { data: dethronedByMe },
+    { count: dethronedCount },
     { data: myPlayedRounds },
     { data: myWordAnswers },
   ] = await Promise.all([
-    sb.from('round_scores').select('correct_count, total_count, played_at').eq('username', username),
     sb.from('first_fighters').select('round_id').eq('username', username),
     sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', false),
     sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', true),
-    sb.from('dethronement_events').select('id').eq('dethroned_by_username', username),
+    sb.from('dethronement_events').select('id', { count: 'exact', head: true }).eq('dethroned_by_username', username),
     sb.from('round_scores').select('round_id, rounds!inner(creator_username, target_username)').eq('username', username),
     sb.from('word_answers').select('word_id').eq('username', username),
   ]);
-  const firstFights = (myFirstFights || []).length;
-  const crownsTaken = (dethronedByMe || []).length;
-  const joinMatch = (myPlayedRounds || []).filter(r => r.rounds.creator_username !== username && r.rounds.target_username !== username).length;
   return {
-    startMatch: startMatch || 0, counter: counter || 0, firstFights, joinMatch,
-    crownTotal: firstFights + crownsTaken, crownsTaken,
-    flawlessCount: (myScores || []).filter(s => s.correct_count === s.total_count).length,
-    activeDays: new Set((myScores || []).map(s => new Date(s.played_at).toISOString().slice(0, 10))).size,
-    wordsLearnt: new Set((myWordAnswers || []).map(w => w.word_id)).size,
+    startMatch: startMatch || 0, counter: counter || 0, firstFights: (myFirstFights || []).length,
+    joinMatch: (myPlayedRounds || []).filter(r => r.rounds.creator_username !== username && r.rounds.target_username !== username).length,
+    dethroned: dethronedCount || 0,
+    wordsPlayed: new Set((myWordAnswers || []).map(w => w.word_id)).size,
+  };
+}
+
+// Flawless/Active Days/Matches Played, ranked among EVERY player account-wide
+// (the global equivalent of computeRoomStatRankings). Fetches every player's
+// round_scores in one query — a real cost at scale, acceptable for now given
+// how few real accounts exist; worth revisiting if the player base grows.
+async function computeGlobalStatRankings(username) {
+  const { data: scores } = await sb.from('round_scores').select('username, correct_count, total_count, played_at');
+  const byUser = {};
+  (scores || []).forEach(s => {
+    if (!byUser[s.username]) byUser[s.username] = { flawless: 0, days: new Set(), played: 0 };
+    byUser[s.username].played++;
+    if (s.correct_count === s.total_count) byUser[s.username].flawless++;
+    byUser[s.username].days.add(new Date(s.played_at).toISOString().slice(0, 10));
+  });
+  const allUsers = Object.keys(byUser);
+  const rankOf = metricFn => {
+    const sorted = allUsers.map(u => ({ u, v: metricFn(byUser[u]) })).sort((a, b) => b.v - a.v);
+    const idx = {};
+    sorted.forEach((row, i) => { idx[row.u] = i + 1; });
+    return idx;
+  };
+  const mine = byUser[username] || { flawless: 0, days: new Set(), played: 0 };
+  return {
+    myFlawless: mine.flawless, myActiveDays: mine.days.size, myPlayed: mine.played,
+    flawlessRank: rankOf(x => x.flawless)[username] || null,
+    activeDaysRank: rankOf(x => x.days.size)[username] || null,
+    playedRank: rankOf(x => x.played)[username] || null,
   };
 }
 
@@ -1661,61 +1704,84 @@ async function computeRoomActivityStats(username, roomId) {
   return { firstFights: (myFirstFights || []).length, challenges: challenges || 0, challengeBacks: challengeBacks || 0 };
 }
 
+// Flawless/Active Days/Matches Played, ranked among every member of THIS room.
+// Fetches every member's round_scores in one query rather than one query per
+// member — same batching principle used throughout this file.
+async function computeRoomStatRankings(roomId) {
+  const { data: members } = await sb.from('room_members').select('username').eq('room_id', roomId);
+  const usernames = (members || []).map(m => m.username);
+  const { data: scores } = await sb.from('round_scores').select('username, correct_count, total_count, played_at, rounds!inner(room_id)').eq('rounds.room_id', roomId);
+  const byUser = {};
+  usernames.forEach(u => { byUser[u] = { flawless: 0, days: new Set(), played: 0 }; });
+  (scores || []).forEach(s => {
+    if (!byUser[s.username]) byUser[s.username] = { flawless: 0, days: new Set(), played: 0 };
+    byUser[s.username].played++;
+    if (s.correct_count === s.total_count) byUser[s.username].flawless++;
+    byUser[s.username].days.add(new Date(s.played_at).toISOString().slice(0, 10));
+  });
+  const allUsers = Object.keys(byUser);
+  const rankOf = metricFn => {
+    const sorted = allUsers.map(u => ({ u, v: metricFn(byUser[u]) })).sort((a, b) => b.v - a.v);
+    const idx = {};
+    sorted.forEach((row, i) => { idx[row.u] = i + 1; });
+    return idx;
+  };
+  const flawlessRank = rankOf(x => x.flawless);
+  const activeDaysRank = rankOf(x => x.days.size);
+  const playedRank = rankOf(x => x.played);
+  const mine = byUser[me] || { flawless: 0, days: new Set(), played: 0 };
+  return {
+    myFlawless: mine.flawless, myActiveDays: mine.days.size, myPlayed: mine.played,
+    flawlessRank: flawlessRank[me] || null, activeDaysRank: activeDaysRank[me] || null, playedRank: playedRank[me] || null,
+  };
+}
+
+// Words Mastered is inherently a GLOBAL skill property (mastery of a word
+// depends on your last 2 attempts ever, wherever they happened — it can't be
+// meaningfully scoped to "answers given inside this one room"), so this is
+// shared as-is by both Room and Profile rather than room-scoped like the rest.
+async function computeWordsMasteredRanking() {
+  const { data: rows } = await sb.from('words_mastered_counts').select('*');
+  const sorted = (rows || []).sort((a, b) => b.mastered_count - a.mastered_count);
+  const rankIdx = {};
+  sorted.forEach((r, i) => { rankIdx[r.username] = i + 1; });
+  const myRow = sorted.find(r => r.username === me);
+  return { myCount: myRow ? myRow.mastered_count : 0, myRank: rankIdx[me] || null };
+}
+
 async function renderRoomStatsHeader() {
   const holder = $('room-stats-header');
   holder.innerHTML = '';
   const roomId = currentRoom.id;
 
-  // All 9 of these are independent of each other's results — firing them
+  // All of these are independent of each other's results — firing them
   // together instead of one-at-a-time is what actually made this screen feel
-  // slow (13 sequential round-trips before this fix).
+  // slow (13 sequential round-trips before this fix, way back).
   const [
     { data: myScores },
-    { data: myWordAnswers },
     activity,
-    { data: dethronedByMe },
     { data: myPlayedRounds },
     { data: roomRows },
     { data: allTimeRows },
     { data: streakRow },
     { data: snap },
+    roomStats,
+    masteredStats,
   ] = await Promise.all([
-    sb.from('round_scores').select('score_points, correct_count, total_count, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
-    sb.from('word_answers').select('word_id, is_correct, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
+    sb.from('round_scores').select('score_points, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
     computeRoomActivityStats(me, roomId),
-    sb.from('dethronement_events').select('id, rounds!inner(room_id)').eq('dethroned_by_username', me).eq('rounds.room_id', roomId),
     sb.from('round_scores').select('round_id, rounds!inner(room_id, creator_username, target_username)').eq('username', me).eq('rounds.room_id', roomId),
     sb.from('room_leaderboard_alltime').select('username, avg_score, rounds_played').eq('room_id', roomId),
     sb.from('global_leaderboard_alltime').select('username, rounds_played'),
     sb.from('streaks').select('current_streak, last_played_date').eq('username', me).maybeSingle(),
     sb.from('room_visit_snapshots').select('*').eq('username', me).eq('room_id', roomId).maybeSingle(),
+    computeRoomStatRankings(roomId),
+    computeWordsMasteredRanking(),
   ]);
 
   const gamesPlayed = (myScores || []).length;
   if (gamesPlayed === 0) return;
 
-  const flawlessCount = myScores.filter(s => s.correct_count === s.total_count).length;
-  const activeDays = new Set(myScores.map(s => new Date(s.played_at).toISOString().slice(0, 10))).size;
-
-  // Words Mastered/Accuracy — SAME threshold logic as Home's Mastery section
-  // (mastered = answered correctly at least once, never wrong; accuracy =
-  // overall correct/total), just room-scoped instead of account-wide.
-  const wordStats = new Map();
-  (myWordAnswers || []).forEach(w => {
-    const s = wordStats.get(w.word_id) || { correct: 0, incorrect: 0 };
-    if (w.is_correct) s.correct++; else s.incorrect++;
-    wordStats.set(w.word_id, s);
-  });
-  const wordsLearnt = wordStats.size;
-  const wordsMastered = [...wordStats.values()].filter(s => s.correct > 0 && s.incorrect === 0).length;
-  const totalAnswered = [...wordStats.values()].reduce((sum, s) => sum + s.correct + s.incorrect, 0);
-  const roomAccuracy = totalAnswered > 0 ? Math.round(([...wordStats.values()].reduce((sum, s) => sum + s.correct, 0) / totalAnswered) * 100) : 0;
-
-  const crownsTaken = (dethronedByMe || []).length;
-  const crownTotal = activity.firstFights + crownsTaken; // every distinct way you can end up holding #1
-
-  // "Join Match" = claimed an existing ⚔️ let's fight! card — played a round you
-  // neither created nor were personally targeted on.
   const joinedMatches = (myPlayedRounds || []).filter(r => r.rounds.creator_username !== me && r.rounds.target_username !== me).length;
 
   const totalGamesMap = new Map((allTimeRows || []).map(r => [r.username, r.rounds_played]));
@@ -1723,41 +1789,33 @@ async function renderRoomStatsHeader() {
   const ranked = (roomRows || []).filter(r => isRanked(r.username)).sort((a, b) => b.avg_score - a.avg_score);
   const myIndex = ranked.findIndex(r => r.username === me);
   const myRank = myIndex >= 0 ? myIndex + 1 : null;
-  const totalRanked = ranked.length;
 
   // Activity Rank — a second, independent leaderboard by raw participation
-  // (rounds_played), not skill. Deliberately includes EVERY room member, not
-  // just ranked ones — this axis is about showing up, not being good.
+  // (rounds_played), not skill. Includes EVERY room member, not just ranked
+  // ones — this axis is about showing up, not being good. This IS the number
+  // shown in the headline now (a rank, not a raw count) per the "headline =
+  // ranks, grid = raw evidence" principle.
   const activitySorted = [...(roomRows || [])].sort((a, b) => b.rounds_played - a.rounds_played);
   const activityIndex = activitySorted.findIndex(r => r.username === me);
   const activityRank = activityIndex >= 0 ? activityIndex + 1 : null;
-  const activityTotal = activitySorted.length;
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const streakAtRisk = !!(streakRow && streakRow.current_streak > 0 && streakRow.last_played_date !== todayStr);
 
-  // ---- Headline: kept short per explicit instruction — just rank + games
-  // played, no room name (redundant with the page title), no sub-text (the
-  // "down from last visit" signal is already covered by the ticker below,
-  // so nothing is actually lost by dropping it here).
+  // ---- Headline: two ranks, nothing else. Skill standing + effort standing.
   let headlineLine;
+  const activityPart = activityRank ? `#${activityRank}` : '–';
   if (myRank === null) {
-    headlineLine = `UNRANKED · 🗡️ ${gamesPlayed} MATCH PLAYED`;
+    headlineLine = `UNRANKED · 🗡️ ${activityPart} MATCHES PLAYED`;
   } else if (myRank === 1) {
-    headlineLine = `👑 #1 RANK · 🗡️ ${gamesPlayed} MATCH PLAYED`;
+    headlineLine = `👑 #1 RANK · 🗡️ ${activityPart} MATCHES PLAYED`;
   } else {
-    headlineLine = `🥇 #${myRank} RANK · 🗡️ ${gamesPlayed} MATCH PLAYED`;
+    headlineLine = `🥇 #${myRank} RANK · 🗡️ ${activityPart} MATCHES PLAYED`;
   }
 
-  // Leaderboard button shows your current rank inline — a reason to tap,
-  // not just a label. Static HTML normally, updated here since this is
-  // where myRank gets computed.
   $('btn-open-room-leaderboard').innerHTML = myRank ? `🏆 Leaderboard (#${myRank})` : '🏆 Leaderboard';
 
   // ---- Ticker: priority order, first match wins, only ONE shown ----
-  // Signature Duel deliberately NOT a candidate here — it now lives
-  // permanently in the Rivalry card slot instead, so showing it here too
-  // would repeat an already-visible fact rather than surface something new.
   let ticker = null;
   if (streakAtRisk) {
     ticker = `🔥 Play today or lose your ${streakRow.current_streak}-day streak`;
@@ -1779,16 +1837,18 @@ async function renderRoomStatsHeader() {
   }
   if (!ticker) ticker = `📜 Start a Match to make your mark`;
 
-  // ---- Render ----
-  // Top 4 = action-drivers (the only way each one grows is by starting a
-  // Match, a Counter Challenge, or claiming an open Match) — bold tier, always
-  // visible. Everything else is real but doesn't specifically pull toward a
-  // next action — quiet tier, collapsed behind a tap (same top-N+overflow
-  // pattern as Home's badge showcase) so the glance stays uncluttered.
-  // Signature Duel deliberately lives in the Rivalry card slot instead of here
-  // now — same duel-status question, one home, not shown twice.
-  const quietCount = 7; // Crown, Crowns Taken, Flawless, Words Learnt, Words Mastered, Accuracy, Active Days
+  // ---- Top 4: Flawless / Words Mastered / Matches Played / Active Days —
+  // the 4 stats that survived the full psychology audit (Streak and Duel both
+  // deliberately excluded, they live in the ticker and Rivalry card instead).
+  // Format: volume + rank in parens, per explicit request — "8 Flawless (#3)".
+  const rankSuffix = r => r ? ` (#${r})` : '';
+  const [{ count: dethronedCount }, { data: myWordAnswers }] = await Promise.all([
+    sb.from('dethronement_events').select('*, rounds!inner(room_id)', { count: 'exact', head: true }).eq('dethroned_by_username', me).eq('rounds.room_id', roomId),
+    sb.from('word_answers').select('word_id, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
+  ]);
+  const wordsPlayed = new Set((myWordAnswers || []).map(w => w.word_id)).size;
 
+  const quietCount = 7; // Dethroned, Words Played, Start Match, Counter, First Fights, Join Match, Accuracy
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
@@ -1796,19 +1856,18 @@ async function renderRoomStatsHeader() {
     <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
     <div class="room-stat-grid primary">
+      <span>✨ <span class="stat-val">${roomStats.myFlawless}</span> Flawless${rankSuffix(roomStats.flawlessRank)}</span>
+      <span>📖 <span class="stat-val">${masteredStats.myCount}</span> Words Mastered${rankSuffix(masteredStats.myRank)}</span>
+      <span>🗡️ <span class="stat-val">${roomStats.myPlayed}</span> Matches Played${rankSuffix(roomStats.playedRank)}</span>
+      <span>📅 <span class="stat-val">${roomStats.myActiveDays}</span> Active Days${rankSuffix(roomStats.activeDaysRank)}</span>
+    </div>
+    <div id="room-stats-more" class="hidden room-stat-grid">
+      <span>🔻 <span class="stat-val">${dethronedCount || 0}</span> Dethroned</span>
+      <span>✍️ <span class="stat-val">${wordsPlayed}</span> Words Played</span>
       <span>📜 <span class="stat-val">${activity.challenges}</span> Start Match</span>
       <span>🎯 <span class="stat-val">${activity.challengeBacks}</span> Counter</span>
       <span>☝️ <span class="stat-val">${activity.firstFights}</span> First Fights</span>
       <span>⚔️ <span class="stat-val">${joinedMatches}</span> Join Match</span>
-    </div>
-    <div id="room-stats-more" class="hidden room-stat-grid">
-      <span>👑 <span class="stat-val">${crownTotal}</span> Crown</span>
-      <span>🔻 <span class="stat-val">${crownsTaken}</span> Crowns Taken</span>
-      <span>✨ <span class="stat-val">${flawlessCount}</span> Flawless</span>
-      <span>✍️ <span class="stat-val">${wordsLearnt}</span> Words Learnt</span>
-      <span>📖 <span class="stat-val">${wordsMastered}</span> Words Mastered</span>
-      <span>🏹 <span class="stat-val">${roomAccuracy}%</span> Accuracy</span>
-      <span>📅 <span class="stat-val">${activeDays}</span> Active Days</span>
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;

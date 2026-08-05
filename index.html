@@ -207,13 +207,13 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div class="seal-mark">M</div>
     <div>
       <div class="brand-title display">MaxWord</div>
-      <div class="brand-sub">a Fake Guru app · GP vocabulary trials</div>
+      <div class="brand-sub">a Fake Guru app · GP Vocabulary Showdown</div>
     </div>
   </div>
 
   <!-- LOGIN (default landing) -->
   <section id="view-login" class="card">
-    <h2 class="display" style="margin-bottom:14px;">Enter the Trials</h2>
+    <h2 class="display" style="margin-bottom:14px;">Enter the Showdown</h2>
     <label for="login-username">Username</label>
     <input id="login-username" autocomplete="username" />
     <label for="login-pin">4-digit PIN</label>
@@ -327,7 +327,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div id="my-open-challenges"></div>
       <div id="dares-list"></div>
       <div class="dare-sub" id="dare-cap-note" style="margin-top:6px;"></div>
-      <button class="btn-primary" id="btn-start-round" style="margin-top:10px;">Start a Trial</button>
+      <button class="btn-primary" id="btn-start-round" style="margin-top:10px;">Start a Match</button>
     </div>
   </section>
 
@@ -335,7 +335,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
        already works, and keeps it a quieter secondary status check rather than
        competing for the same attention as the Trials list) -->
   <section id="view-room-leaderboard" class="card hidden">
-    <button class="link-btn breadcrumb" id="btn-room-lb-back">&larr; Back to Trials</button>
+    <button class="link-btn breadcrumb" id="btn-room-lb-back">&larr; Back to Matches</button>
     <h2 class="display" id="room-lb-title" style="margin-bottom:14px;">Leaderboard</h2>
     <div id="rank-banner" class="rank-banner hidden"></div>
     <div class="tabs-sub">
@@ -350,7 +350,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <section id="view-choose-target" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-choose-target-back">&larr; Back</button>
     <h2 class="display" style="margin-bottom:6px;">Call someone out</h2>
-    <div class="section-label" style="margin-top:0;">Aim this Trial at someone specific</div>
+    <div class="section-label" style="margin-top:0;">Aim this Match at someone specific</div>
     <div id="target-member-list"></div>
     <button class="link-btn" id="btn-target-anyone" style="margin-top:6px;">Or just open it to anyone</button>
   </section>
@@ -359,7 +359,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <section id="view-trial" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-trial-back">&larr; Back to room</button>
     <div class="trial-header">
-      <div class="trial-number">📜 Trial #<span id="trial-number-display"></span></div>
+      <div class="trial-number">📜 Match #<span id="trial-number-display"></span></div>
       <div class="trial-tags" id="trial-tags"></div>
     </div>
     <div id="trial-urgency-holder"></div>
@@ -368,7 +368,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="trial-duel-holder"></div>
     <div id="trial-leaderboard-list"></div>
     <div class="btn-row" style="margin-top:14px;">
-      <button class="btn-primary" id="btn-trial-play">Play this Trial</button>
+      <button class="btn-primary" id="btn-trial-play">Play this Match</button>
       <button class="share-icon-btn" id="btn-trial-send">🔗 Send</button>
     </div>
   </section>
@@ -567,7 +567,7 @@ async function openPlayerProfile(username) {
   // Lifetime Wins is deliberately separate from the live "Crowns Held" above —
   // this one only ever grows, a permanent record even after a crown is lost.
   const lifetimeLines = [];
-  if (played) lifetimeLines.push(`📜 ${played} Trial${played === 1 ? '' : 's'} played`);
+  if (played) lifetimeLines.push(`📜 ${played} Match${played === 1 ? '' : 'es'} played`);
   if (lifetimeWins) lifetimeLines.push(`🏆 ${lifetimeWins} lifetime win${lifetimeWins === 1 ? '' : 's'}`);
   const lifetimeHtml = lifetimeLines.length ? `<div class="mastery-section">${lifetimeLines.map(l => `<div class="mastery-line prominent">${l}</div>`).join('')}</div>` : '';
 
@@ -619,7 +619,7 @@ async function openPlayerProfile(username) {
         <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(username)}</span></div>
         <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
       </div>`
-    : `<div class="empty-state">You haven't had a direct Trial with ${displayName(username)} yet.</div>`;
+    : `<div class="empty-state">You haven't dueled ${displayName(username)} directly yet.</div>`;
 }
 $('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
 
@@ -695,7 +695,7 @@ async function shareRound(r) {
   const isMine = r.creator_username === me;
   const subject = isMine ? `I, ${displayName(me)},` : displayName(r.creator_username);
   const ask = isMine ? 'can you beat me?' : 'can you beat it?';
-  shareText(`🎯 ${subject} ${scorePart} on Trial #${r.trial_number} in MaxWord's "${currentRoom.name}" — ${ask}\n\n⚔️ ${url}`);
+  shareText(`🎯 ${subject} ${scorePart} on Match #${r.trial_number} in MaxWord's "${currentRoom.name}" — ${ask}\n\n⚔️ ${url}`);
 }
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
@@ -871,16 +871,16 @@ async function checkDethronements() {
   let text;
   if (events.length === 1) {
     const e = events[0];
-    text = `${displayName(e.dethroned_by_username)} just took Trial #${e.rounds.trial_number} from you${await duelSuffix(e.dethroned_by_username)}.`;
+    text = `${displayName(e.dethroned_by_username)} just took Match #${e.rounds.trial_number} from you${await duelSuffix(e.dethroned_by_username)}.`;
   } else {
-    text = `You've been dethroned on ${events.length} Trials — open your Game Rooms to see who got you.`;
+    text = `You've been dethroned on ${events.length} Matches — open your Game Rooms to see who got you.`;
   }
   // First dethronement ever gets a longer, one-time explainer tacked on — every
   // one after this stays short, since by then the person already knows the rule.
   const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
   if (!seenBefore) {
     await sb.from('reminders_shown').insert({ username: me, reminder_key: 'first_dethroned' });
-    text += ` Trials are one-shot, so you can't replay this one — but you can challenge them back with a fresh Trial.`;
+    text += ` Matches are one-shot, so you can't replay this one — but you can challenge them back with a fresh Match.`;
   }
   $('dethroned-modal-text').textContent = text;
   $('dethroned-modal').classList.remove('hidden');
@@ -907,7 +907,7 @@ async function checkNewChallenges() {
   if (fresh.length === 0) return;
   let text;
   if (fresh.length === 1) {
-    text = `${displayName(fresh[0].creator_username)} challenged you to Trial #${fresh[0].trial_number}${await duelSuffix(fresh[0].creator_username)}.`;
+    text = `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}${await duelSuffix(fresh[0].creator_username)}.`;
   } else {
     text = `${fresh.length} new challenges are waiting for you — open your Game Rooms to see them.`;
   }
@@ -1065,7 +1065,7 @@ async function loadRoomsList() {
   if (roomIds.length === 0) { list.innerHTML = '<div class="empty-state">No Game Rooms yet — create one or join with a code.</div>'; return; }
   const { data: rooms } = await sb.from('rooms').select('*').in('id', roomIds);
 
-  // Most active/recently-touched room first — "latest Trial created in this room"
+  // Most active/recently-touched room first — "latest Match created in this room"
   // as the activity signal, falling back to the room's own creation date for one
   // that's never had a Trial yet.
   const { data: latestRounds } = await sb.from('rounds').select('room_id, created_at').in('room_id', roomIds).order('created_at', { ascending: false });
@@ -1340,7 +1340,7 @@ async function loadDares() {
   const all = rounds || [];
   $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
 
-  if (all.length === 0) { $('trials-count-label').textContent = '📜 Trials'; list.innerHTML = '<div class="empty-state">No Trials yet. Start one!</div>'; return; }
+  if (all.length === 0) { $('trials-count-label').textContent = '📜 Matches'; list.innerHTML = '<div class="empty-state">No Matches yet. Start one!</div>'; return; }
 
   // Fetch + compute state for every Trial first, so we can sort by what actually
   // needs attention — a retaliation aimed at you first, then a fresh callout, then
@@ -1375,7 +1375,7 @@ async function loadDares() {
   // counts toward "open," since there's nothing left for you to do on THAT Trial.
   const openStates = new Set(['challenged_back', 'targeted', 'unplayed']);
   const openCount = withState.filter(w => openStates.has(w.state)).length;
-  $('trials-count-label').textContent = openCount > 0 ? `📜 Open Trials (${openCount})` : '📜 Trials';
+  $('trials-count-label').textContent = openCount > 0 ? `📜 Open Matches (${openCount})` : '📜 Matches';
 
   list.innerHTML = '';
   for (const { r, rows, myRow, champ, state } of withState) {
@@ -1417,7 +1417,7 @@ async function loadDares() {
 
     div.innerHTML = `
       <div class="trial-card-top">
-        <div class="trial-card-number">📜 Trial #${r.trial_number}</div>
+        <div class="trial-card-number">📜 Match #${r.trial_number}</div>
         <span class="trial-status-badge ${badgeClass}">${badge}</span>
       </div>
       <div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>
@@ -1430,7 +1430,7 @@ async function loadDares() {
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const { count } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('room_id', currentRoom.id).eq('creator_username', me).gte('created_at', startOfDay.toISOString());
   const used = count || 0;
-  $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} Trials in this Game Room today.`;
+  $('dare-cap-note').textContent = `You've started ${used}/${MAX_OPEN_DARES_PER_DAY} Matches in this Game Room today.`;
   $('btn-start-round').disabled = used >= MAX_OPEN_DARES_PER_DAY;
   $('btn-start-round').onclick = () => openTargetPicker();
 }
@@ -1472,7 +1472,7 @@ async function openTrialScreen(round) {
   // their score stays (leaving only removes the room_members row) but they no
   // longer count toward totalMembers — without this, that could read as a
   // nonsensical "3 of 2 have played."
-  $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Trial</div>`;
+  $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Match</div>`;
 
   // duel record — only when this Trial is a direct callout between two specific people, and I'm one of them
   const duelHolder = $('trial-duel-holder');
@@ -1492,7 +1492,7 @@ async function openTrialScreen(round) {
   // leaderboard — plain rank, no medals, matches Room/Global
   const lbList = $('trial-leaderboard-list');
   lbList.innerHTML = '';
-  if (rows.length === 0) { lbList.innerHTML = '<div class="empty-state">Nobody has played this Trial yet.</div>'; }
+  if (rows.length === 0) { lbList.innerHTML = '<div class="empty-state">Nobody has played this Match yet.</div>'; }
   rows.forEach(row => {
     const div = document.createElement('div');
     div.className = 'trial-lb-row' + (row.rank === 1 ? ' champion' : '');
@@ -1507,7 +1507,7 @@ async function openTrialScreen(round) {
   const playBtn = $('btn-trial-play');
   if (!iPlayed) {
     playBtn.classList.remove('hidden');
-    playBtn.textContent = 'Play this Trial';
+    playBtn.textContent = 'Play this Match';
     playBtn.onclick = () => startRound(round);
   } else if (myRow.rank !== 1) {
     playBtn.classList.remove('hidden');
@@ -1667,7 +1667,7 @@ async function renderRoomStatsHeader() {
     const { count: newMembers } = await sb.from('room_members').select('*', { count: 'exact', head: true }).eq('room_id', roomId).gte('joined_at', weekAgo);
     if (newMembers > 0) ticker = `🆕 ${newMembers} new member${newMembers > 1 ? 's' : ''} joined this week`;
   }
-  if (!ticker) ticker = `📜 Start a Trial to make your mark`;
+  if (!ticker) ticker = `📜 Start a Match to make your mark`;
 
   // ---- Render ----
   const block = document.createElement('div');
@@ -1676,7 +1676,7 @@ async function renderRoomStatsHeader() {
     <div class="room-headline">${headlineMain}${headlineSub ? ` <span class="sub">— ${headlineSub}</span>` : ''}</div>
     <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
     <div class="room-ticker">${ticker}</div>
-    <div class="room-stat-row">⚔️ Trials started <span class="stat-val">${trialsStarted || 0}</span> · 📖 Words answered <span class="stat-val">${wordsAnswered}</span></div>
+    <div class="room-stat-row">⚔️ Matches started <span class="stat-val">${trialsStarted || 0}</span> · 📖 Words answered <span class="stat-val">${wordsAnswered}</span></div>
     <div class="room-stat-row">👑 Crowns <span class="stat-val">${crownsHeld}</span> · 🏅 Best <span class="stat-val">${personalBest}</span> · ✨ Flawless <span class="stat-val">${flawlessCount}</span></div>
   `;
   holder.appendChild(block);
@@ -1740,7 +1740,7 @@ async function renderRivalryCard() {
     waiting.style.marginBottom = '0';
     waiting.style.color = 'var(--cream-dim)';
     waiting.style.fontSize = '13px';
-    waiting.textContent = `⏳ Waiting for ${displayName(opponent)} to respond to your last Trial.`;
+    waiting.textContent = `⏳ Waiting for ${displayName(opponent)} to respond to your last Match.`;
     card.appendChild(waiting);
   } else {
     const btn = document.createElement('button');
@@ -2019,7 +2019,7 @@ async function startRound(round) {
   const { count: everPlayed } = await sb.from('round_scores').select('id', { count: 'exact', head: true }).eq('username', me);
   if (!everPlayed) {
     await showOnboardingTipOnce('first_trial_ever', '📜 How Trials work',
-      `Each Trial is permanent and one-shot — you only get one attempt at it, ever, so make it count. Beat the current top score to become champion — but stay alert, since someone else can beat YOUR score later and take the throne back.`,
+      `Each Match is permanent and one-shot — you only get one attempt at it, ever, so make it count. Beat the current top score to become champion — but stay alert, since someone else can beat YOUR score later and take the throne back.`,
       () => { show('view-game'); renderQuestion(); });
     return;
   }
@@ -2230,7 +2230,7 @@ async function renderScorecard(correct, points, newBadges) {
     // already used for Duel Record on the Trial screen.
     const opponent = isOwnRound ? currentRound.target_username : currentRound.creator_username;
     if (opponent) {
-      shareText(`🎯 ${displayName(me)} challenges ${displayName(opponent)} — ${points} pts on Trial #${currentRound.trial_number} in MaxWord's "${currentRoom.name}". Can you beat it?\n\n⚔️ ${url}`);
+      shareText(`🎯 ${displayName(me)} challenges ${displayName(opponent)} — ${points} pts on Match #${currentRound.trial_number} in MaxWord's "${currentRoom.name}". Can you beat it?\n\n⚔️ ${url}`);
     } else {
       shareText(`🎯 I, ${displayName(me)}, scored ${points} pts on MaxWord's "${currentRoom.name}" — can you beat me?\n\n⚔️ ${url}`);
     }
@@ -2273,7 +2273,7 @@ async function renderScorecard(correct, points, newBadges) {
     const card = document.createElement('div');
     card.className = 'forced-flow-card';
     if (iWon === false) {
-      card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Trial, aimed straight at whoever just beat you.</div>`;
+      card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Match, aimed straight at whoever just beat you.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
       btn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
@@ -2305,7 +2305,7 @@ async function renderScorecard(correct, points, newBadges) {
       // The real "before she quits" moment for a solo player specifically — she's
       // just done the full onboarding arc alone. A Trial only gets exciting once
       // someone else is in it, so the ask here is to invite, not just "see room."
-      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! But a Trial's no fun alone — invite someone to make it a real contest.</div>`;
+      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! But a Match's no fun alone — invite someone to make it a real contest.</div>`;
       const shareBtn = document.createElement('button');
       shareBtn.className = 'btn-primary';
       shareBtn.textContent = '📤 Share challenge';
@@ -2323,7 +2323,7 @@ async function renderScorecard(correct, points, newBadges) {
       laterBtn.onclick = () => openRoom(currentRoom);
       card.appendChild(laterBtn);
     } else {
-      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! Every Trial you play feeds your overall average, and that average is what your Leaderboard position is based on.</div>`;
+      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! Every Match you play feeds your overall average, and that average is what your Leaderboard position is based on.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
       btn.textContent = 'See my Game Room';
@@ -2353,7 +2353,7 @@ async function renderOtherDares() {
     // of just leaving this slot on the scorecard empty.
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
-    btn.textContent = 'Start a new Trial';
+    btn.textContent = 'Start a new Match';
     btn.onclick = () => openTargetPicker();
     holder.appendChild(btn);
     return;
@@ -2361,7 +2361,7 @@ async function renderOtherDares() {
   holder.innerHTML = ''; // clear again — a newer call may have already started filling this since the awaits above
   const title = document.createElement('div');
   title.className = 'dare-sub';
-  title.textContent = `${open.length} more open Trial${open.length > 1 ? 's' : ''} in this Game Room:`;
+  title.textContent = `${open.length} more open Match${open.length > 1 ? 'es' : ''} in this Game Room:`;
   holder.appendChild(title);
   const shown = open.slice(0, 3);
   const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', shown.map(r => r.id)).eq('rank', 1);
@@ -2380,7 +2380,7 @@ async function renderOtherDares() {
     const div = document.createElement('div');
     div.className = 'trial-card state-targeted';
     div.onclick = () => openTrialScreen(r);
-    div.innerHTML = `<div class="trial-card-top"><div class="trial-card-number">📜 Trial #${r.trial_number}</div><span class="trial-status-badge ${badgeClass}">${badge}</span></div><div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>`;
+    div.innerHTML = `<div class="trial-card-top"><div class="trial-card-number">📜 Match #${r.trial_number}</div><span class="trial-status-badge ${badgeClass}">${badge}</span></div><div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>`;
     holder.appendChild(div);
   }
 }

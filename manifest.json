@@ -1,7 +1,7 @@
 {
   "name": "MaxWord",
   "short_name": "MaxWord",
-  "description": "A Fake Guru app for GP vocabulary trials",
+  "description": "A Fake Guru app for GP Vocabulary Showdown",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0B0E14",

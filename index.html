@@ -187,7 +187,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .stat-row:last-child { margin-bottom: 0; padding-bottom: 0; }
 .stat-row .stat-icon { font-size: 15px; }
 .room-stat-grid .stat-val { color: var(--cream); font-weight: 700; text-align: right; }
-.room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--gold); text-decoration: underline; cursor: pointer; margin-top: 6px; }
+.room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--cream-dim); text-decoration: underline; cursor: pointer; margin-top: 6px; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
@@ -610,8 +610,8 @@ async function openPlayerProfile(username) {
     $('player-profile-activity-holder').innerHTML = `
       <div style="margin-top:14px;"></div>
       <div class="room-stat-grid primary">
-        <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless${rankSuffix(globalStats.flawlessRank)}</span></div>
         <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
+        <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless Matches${rankSuffix(globalStats.flawlessRank)}</span></div>
         <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${played}</span><span>Matches Played${rankSuffix(globalStats.playedRank)}</span></div>
         <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${globalStats.myActiveDays}</span><span>Active Days${rankSuffix(globalStats.activeDaysRank)}</span></div>
       </div>`;
@@ -1862,8 +1862,8 @@ async function renderRoomStatsHeader() {
     <div class="room-ticker">${ticker}</div>
     <div style="margin-top:14px;"></div>
     <div class="room-stat-grid primary">
-      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless${rankSuffix(roomStats.flawlessRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless Matches${rankSuffix(roomStats.flawlessRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${roomStats.myPlayed}</span><span>Matches Played${rankSuffix(roomStats.playedRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${roomStats.myActiveDays}</span><span>Active Days${rankSuffix(roomStats.activeDaysRank)}</span></div>
     </div>

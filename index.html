@@ -578,7 +578,7 @@ async function openPlayerProfile(username) {
   // weight here than the quieter version on your own Home page.
   const stats = await computeActivityStats(username);
   const activityLines = [];
-  if (stats.challenges) activityLines.push(`⚔️ ${stats.challenges} Match${stats.challenges === 1 ? '' : 'es'} started`);
+  if (stats.challenges) activityLines.push(`⚔️ ${stats.challenges} Start Match`);
   if (stats.challengeBacks) activityLines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
   if (stats.firstFights) activityLines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
   $('player-profile-activity-holder').innerHTML = (lifetimeHtml || activityLines.length)
@@ -1043,7 +1043,7 @@ async function renderActivitySection() {
   const stats = await computeActivityStats(me);
   if (stats.firstFights + stats.challenges + stats.challengeBacks === 0) { holder.innerHTML = ''; return; }
   const lines = [];
-  if (stats.challenges) lines.push(`⚔️ ${stats.challenges} Match${stats.challenges === 1 ? '' : 'es'} started`);
+  if (stats.challenges) lines.push(`⚔️ ${stats.challenges} Start Match`);
   if (stats.challengeBacks) lines.push(`🎯 ${stats.challengeBacks} counter challenge${stats.challengeBacks === 1 ? '' : 's'}`);
   if (stats.firstFights) lines.push(`☝️ ${stats.firstFights} first fight${stats.firstFights === 1 ? '' : 's'}`);
   holder.innerHTML = `<div class="section-label">Activity</div><div class="mastery-section">${lines.map(l => `<div class="mastery-line">${l}</div>`).join('')}</div>`;
@@ -1763,7 +1763,7 @@ async function renderRoomStatsHeader() {
     <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
     <div class="room-ticker">${ticker}</div>
     <div class="room-stat-grid primary">
-      <span>⚔️ <span class="stat-val">${activity.challenges}</span> Matches Started</span>
+      <span>⚔️ <span class="stat-val">${activity.challenges}</span> Start Match</span>
       <span>🎯 <span class="stat-val">${activity.challengeBacks}</span> Counter</span>
       <span>☝️ <span class="stat-val">${activity.firstFights}</span> First Fights</span>
       <span>🚩 <span class="stat-val">${joinedMatches}</span> Join Match</span>

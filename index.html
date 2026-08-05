@@ -318,7 +318,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <section id="view-room" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-room-back">&larr; Game Rooms</button>
     <h2 class="display" id="room-title">Room</h2>
-    <div class="room-meta" id="room-code-display"></div>
     <div class="member-line" id="member-count-line"></div>
     <div id="room-stats-header"></div>
     <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
@@ -1240,7 +1239,6 @@ async function renderHomeScreenBanner() {
 async function openRoom(room) {
   currentRoom = room;
   $('room-title').textContent = room.name;
-  $('room-code-display').textContent = `${room.code} · ${room.is_open ? 'Open room' : 'Closed room'}`;
   show('view-room');
   await loadDares();
   await renderMemberLine();
@@ -1304,7 +1302,7 @@ function refreshActiveRoomPanel() {
 async function renderMemberLine() {
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
   const n = (members || []).length;
-  $('member-count-line').innerHTML = `${n} member${n === 1 ? '' : 's'} · <span class="manage-link" id="link-manage-members">Manage</span> · <span class="manage-link" id="link-invite-room">🔗 Invite</span>`;
+  $('member-count-line').innerHTML = `${currentRoom.code} · ${currentRoom.is_open ? 'Open' : 'Closed'} · ${n} member${n === 1 ? '' : 's'} · <span class="manage-link" id="link-manage-members">Manage</span> · <span class="manage-link" id="link-invite-room">🔗 Invite</span>`;
   $('link-manage-members').onclick = () => { show('view-members'); loadMembers(); };
   $('link-invite-room').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
@@ -1667,13 +1665,12 @@ async function renderRoomStatsHeader() {
     headlineMain = `#${myRank} in ${currentRoom.name}`;
     headlineSub = `on the podium`;
   } else {
-    const podiumScore = ranked[2] ? ranked[2].avg_score : null;
     headlineMain = `#${myRank} in ${currentRoom.name}`;
-    headlineSub = podiumScore ? `${Math.max(1, Math.round(podiumScore - ranked[myIndex].avg_score))} pts from the podium` : `${totalRanked} ranked players`;
+    headlineSub = null;
   }
   const gamesDelta = snap && snap.last_rounds_played != null ? gamesPlayed - snap.last_rounds_played : null;
   const deltaPart = gamesDelta > 0 ? ` (${gamesDelta} since last visit)` : '';
-  const activityPart = activityRank ? ` — ${ordinal(activityRank)} most active (${activityRank} of ${activityTotal})` : '';
+  const activityPart = activityRank ? ` — (${activityRank} of ${activityTotal})` : '';
   const gamesLine = `${gamesPlayed} Match${gamesPlayed === 1 ? '' : 'es'} played${deltaPart}${activityPart}`;
 
   // ---- Ticker: priority order, first match wins, only ONE shown ----
@@ -1718,11 +1715,16 @@ async function renderRoomStatsHeader() {
     <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
     <div class="room-ticker">${ticker}</div>
     <div class="room-stat-row primary">⚔️ Challenges <span class="stat-val">${activity.challenges}</span> · 🎯 Counter <span class="stat-val">${activity.challengeBacks}</span></div>
-    <div class="room-stat-row primary">☝️ First Fights <span class="stat-val">${activity.firstFights}</span> · ⚔️ Signature Duel <span class="stat-val">${signatureDuelText}</span></div>
-    <div class="room-stat-row">🚩 Join Match <span class="stat-val">${joinedMatches}</span> · 👑 Crown <span class="stat-val">${crownTotal}</span> · 🔻 Crowns Taken <span class="stat-val">${crownsTaken}</span></div>
+    <div class="room-stat-row primary">☝️ First Fights <span class="stat-val">${activity.firstFights}</span> · 🚩 Join Match <span class="stat-val">${joinedMatches}</span></div>
+    <div class="room-stat-row">⚔️ Signature Duel <span class="stat-val">${signatureDuelText}</span></div>
+    <div class="room-stat-row">👑 Crown <span class="stat-val">${crownTotal}</span> · 🔻 Crowns Taken <span class="stat-val">${crownsTaken}</span></div>
     <div class="room-stat-row">✨ Flawless <span class="stat-val">${flawlessCount}</span> · ✍️ Words Learnt <span class="stat-val">${wordsLearnt}</span> · 📅 Active Days <span class="stat-val">${activeDays}</span></div>
+    <button class="room-leaderboard-btn" id="btn-quick-start-match" style="margin-top:8px;">📜 Start a Match</button>
   `;
   holder.appendChild(block);
+  // Quick-access "Start a Match" up here too — the Trials list can get long,
+  // so this saves a scroll to the bottom button for the same action.
+  $('btn-quick-start-match').onclick = () => openTargetPicker();
 
   await sb.from('room_visit_snapshots').upsert({ username: me, room_id: roomId, last_rank: myRank, last_rounds_played: gamesPlayed });
 }

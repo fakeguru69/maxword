@@ -608,6 +608,7 @@ async function openPlayerProfile(username) {
   const rankSuffix = r => r ? ` (#${r})` : '';
   if (played) {
     $('player-profile-activity-holder').innerHTML = `
+      <div class="section-label" style="margin-top:8px;">Stats</div>
       <div class="room-stat-grid primary">
         <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless${rankSuffix(globalStats.flawlessRank)}</span></div>
         <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
@@ -1822,24 +1823,24 @@ async function renderRoomStatsHeader() {
   // ---- Ticker: priority order, first match wins, only ONE shown ----
   let ticker = null;
   if (streakAtRisk) {
-    ticker = `🔥 Play today or lose your ${streakRow.current_streak}-day streak`;
+    ticker = `Play today or lose your ${streakRow.current_streak}-day streak`;
   } else if (snap && snap.last_rank && myRank && snap.last_rank < myRank) {
-    ticker = `🔻 Slipped from #${snap.last_rank} to #${myRank} in this room`;
+    ticker = `Slipped from #${snap.last_rank} to #${myRank} in this room`;
   } else if (myRank && myRank > 1) {
     const aheadOfMe = ranked[myIndex - 1];
-    if (aheadOfMe) ticker = `⚡ ${Math.max(1, Math.round(aheadOfMe.avg_score - ranked[myIndex].avg_score))} pts from #${myRank - 1}`;
+    if (aheadOfMe) ticker = `${Math.max(1, Math.round(aheadOfMe.avg_score - ranked[myIndex].avg_score))} pts from #${myRank - 1}`;
   }
   if (!ticker && myRank && myIndex + 1 < ranked.length) {
     const behindMe = ranked[myIndex + 1];
     const gap = Math.max(1, Math.round(ranked[myIndex].avg_score - behindMe.avg_score));
-    if (gap <= 30) ticker = `⚡ ${displayName(behindMe.username)} is just ${gap} pts behind you`;
+    if (gap <= 30) ticker = `${displayName(behindMe.username)} is just ${gap} pts behind you`;
   }
   if (!ticker) {
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
     const { count: newMembers } = await sb.from('room_members').select('*', { count: 'exact', head: true }).eq('room_id', roomId).gte('joined_at', weekAgo);
-    if (newMembers > 0) ticker = `🆕 ${newMembers} new member${newMembers > 1 ? 's' : ''} joined this week`;
+    if (newMembers > 0) ticker = `${newMembers} new member${newMembers > 1 ? 's' : ''} joined this week`;
   }
-  if (!ticker) ticker = `📜 Start a Match to make your mark`;
+  if (!ticker) ticker = `Start a Match to make your mark`;
 
   // ---- Top 4: Flawless / Words Mastered / Matches Played / Active Days —
   // the 4 stats that survived the full psychology audit (Streak and Duel both
@@ -1859,6 +1860,7 @@ async function renderRoomStatsHeader() {
     <div class="account-name-line" id="room-header-username" style="margin-bottom:0; cursor:pointer;">${displayName(me)}</div>
     <div class="room-headline">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
+    <div class="section-label" style="margin-top:8px;">Stats</div>
     <div class="room-stat-grid primary">
       <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless${rankSuffix(roomStats.flawlessRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>

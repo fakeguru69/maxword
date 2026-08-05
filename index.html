@@ -323,9 +323,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="room-stats-header"></div>
     <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
     <div id="rivalry-holder"></div>
-    <button class="room-leaderboard-btn" id="btn-quick-start-match" style="margin-top:8px;">📜 Start a Match</button>
 
     <div id="trials-count-label" class="section-label" style="margin-top:16px;"></div>
+    <button class="room-leaderboard-btn" id="btn-quick-start-match" style="margin-bottom:14px;">📜 Start a Match</button>
     <div id="panel-dares">
       <div id="my-open-challenges"></div>
       <div id="dares-list"></div>
@@ -1242,12 +1242,20 @@ async function openRoom(room) {
   currentRoom = room;
   $('room-title').textContent = room.name;
   show('view-room');
-  await loadDares();
-  await renderMemberLine();
-  await renderRoomStatsHeader();
-  await renderRivalryCard();
-  await checkDethronements();
-  await checkNewChallenges();
+  // These 6 each populate their own separate part of the screen and don't
+  // depend on each other's results — running them together instead of one
+  // at a time is what actually made opening a room feel slow.
+  await Promise.all([
+    loadDares(),
+    renderMemberLine(),
+    renderRoomStatsHeader(),
+    renderRivalryCard(),
+    checkDethronements(),
+    checkNewChallenges(),
+  ]);
+  // Kept last, deliberately sequential: this tip explains the card badges
+  // loadDares() just rendered, so it should appear once that list has
+  // actually settled, not race it.
   await maybeShowRoomVocabTip();
   subscribeRoomRealtime(room.id);
 }
@@ -1548,16 +1556,12 @@ async function computeDuelRecord(userA, userB) {
   return { wins, losses, ties, total: wins + losses + ties };
 }
 
-// Nemesis card — surfaces the one person in this room you're most behind
-// against (or, failing that, dead-even with), with a one-tap way to act on it.
-// Requires at least 2 played duels against them so a single fluke loss can't
-// masquerade as a rivalry. Always paired with the visible record (never a
-// bare "Nemesis" label with no number behind it) — the number IS the
-// explanation, no need to expose the picking logic itself.
-// Mirror of computeMyRivalries — but picks who you dominate MOST, for pride/flex
-// framing (the ticker/stats header) rather than a call-to-action. Same exclusive
-// floor (2+ duels) so a single lucky win can't masquerade as domination.
-async function computeStrongestDuel() {
+// Shared by both halves of the Rivalry card (who I'm behind/tied with, and —
+// when that's empty — who I'm most ahead of) — computes every opponent with
+// real Duel history ONCE, with per-opponent records fetched in parallel,
+// instead of each half separately re-deriving the same opponent list and
+// re-querying every record from scratch.
+async function computeMyDuelCandidates() {
   const { data: rounds } = await sb.from('rounds').select('creator_username, target_username')
     .eq('room_id', currentRoom.id)
     .not('target_username', 'is', null);
@@ -1566,13 +1570,27 @@ async function computeStrongestDuel() {
     if (r.creator_username === me && r.target_username !== me) opponents.add(r.target_username);
     else if (r.target_username === me && r.creator_username !== me) opponents.add(r.creator_username);
   });
+  const opponentList = [...opponents];
+  const records = await Promise.all(opponentList.map(opp => computeDuelRecord(me, opp)));
+  return opponentList
+    .map((opponent, i) => ({ opponent, record: records[i] }))
+    .filter(c => c.record.total >= 2); // floor: at least 2 duels before this counts as a real pattern
+}
+function pickWorstRival(candidates) {
+  let best = null; // "worst" for me = most worth acting on
+  for (const { opponent, record } of candidates) {
+    const net = record.losses - record.wins; // positive = I'm behind
+    if (net < 0) continue; // ahead of them — not a rivalry to feature here
+    if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = { opponent, record, net };
+  }
+  return best;
+}
+function pickStrongestDuel(candidates) {
   let best = null;
-  for (const opp of opponents) {
-    const record = await computeDuelRecord(me, opp);
-    if (record.total < 2) continue;
+  for (const { opponent, record } of candidates) {
     const net = record.wins - record.losses; // positive = I'm ahead
     if (net <= 0) continue;
-    if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = { opponent: opp, record, net };
+    if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = { opponent, record, net };
   }
   return best;
 }
@@ -1595,9 +1613,11 @@ function ordinal(n) {
 // through rounds.room_id, so a player never has to learn a second meaning
 // for "Challenges" depending on which screen they're looking at.
 async function computeRoomActivityStats(username, roomId) {
-  const { data: myFirstFights } = await sb.from('first_fighters').select('round_id, rounds!inner(room_id)').eq('username', username).eq('rounds.room_id', roomId);
-  const { count: challenges } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', false).eq('room_id', roomId);
-  const { count: challengeBacks } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', true).eq('room_id', roomId);
+  const [{ data: myFirstFights }, { count: challenges }, { count: challengeBacks }] = await Promise.all([
+    sb.from('first_fighters').select('round_id, rounds!inner(room_id)').eq('username', username).eq('rounds.room_id', roomId),
+    sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', false).eq('room_id', roomId),
+    sb.from('rounds').select('id', { count: 'exact', head: true }).eq('creator_username', username).eq('via_challenge_back', true).eq('room_id', roomId),
+  ]);
   return { firstFights: (myFirstFights || []).length, challenges: challenges || 0, challengeBacks: challengeBacks || 0 };
 }
 
@@ -1606,29 +1626,58 @@ async function renderRoomStatsHeader() {
   holder.innerHTML = '';
   const roomId = currentRoom.id;
 
-  const { data: myScores } = await sb.from('round_scores').select('score_points, correct_count, total_count, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId);
+  // All 9 of these are independent of each other's results — firing them
+  // together instead of one-at-a-time is what actually made this screen feel
+  // slow (13 sequential round-trips before this fix).
+  const [
+    { data: myScores },
+    { data: myWordAnswers },
+    activity,
+    { data: dethronedByMe },
+    { data: myPlayedRounds },
+    { data: roomRows },
+    { data: allTimeRows },
+    { data: streakRow },
+    { data: snap },
+  ] = await Promise.all([
+    sb.from('round_scores').select('score_points, correct_count, total_count, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
+    sb.from('word_answers').select('word_id, is_correct, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
+    computeRoomActivityStats(me, roomId),
+    sb.from('dethronement_events').select('id, rounds!inner(room_id)').eq('dethroned_by_username', me).eq('rounds.room_id', roomId),
+    sb.from('round_scores').select('round_id, rounds!inner(room_id, creator_username, target_username)').eq('username', me).eq('rounds.room_id', roomId),
+    sb.from('room_leaderboard_alltime').select('username, avg_score, rounds_played').eq('room_id', roomId),
+    sb.from('global_leaderboard_alltime').select('username, rounds_played'),
+    sb.from('streaks').select('current_streak, last_played_date').eq('username', me).maybeSingle(),
+    sb.from('room_visit_snapshots').select('*').eq('username', me).eq('room_id', roomId).maybeSingle(),
+  ]);
+
   const gamesPlayed = (myScores || []).length;
   if (gamesPlayed === 0) return;
 
   const flawlessCount = myScores.filter(s => s.correct_count === s.total_count).length;
   const activeDays = new Set(myScores.map(s => new Date(s.played_at).toISOString().slice(0, 10))).size;
 
-  const { data: myWordAnswers } = await sb.from('word_answers').select('word_id, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId);
-  const wordsLearnt = new Set((myWordAnswers || []).map(w => w.word_id)).size;
+  // Words Mastered/Accuracy — SAME threshold logic as Home's Mastery section
+  // (mastered = answered correctly at least once, never wrong; accuracy =
+  // overall correct/total), just room-scoped instead of account-wide.
+  const wordStats = new Map();
+  (myWordAnswers || []).forEach(w => {
+    const s = wordStats.get(w.word_id) || { correct: 0, incorrect: 0 };
+    if (w.is_correct) s.correct++; else s.incorrect++;
+    wordStats.set(w.word_id, s);
+  });
+  const wordsLearnt = wordStats.size;
+  const wordsMastered = [...wordStats.values()].filter(s => s.correct > 0 && s.incorrect === 0).length;
+  const totalAnswered = [...wordStats.values()].reduce((sum, s) => sum + s.correct + s.incorrect, 0);
+  const roomAccuracy = totalAnswered > 0 ? Math.round(([...wordStats.values()].reduce((sum, s) => sum + s.correct, 0) / totalAnswered) * 100) : 0;
 
-  const activity = await computeRoomActivityStats(me, roomId);
-
-  const { data: dethronedByMe } = await sb.from('dethronement_events').select('id, rounds!inner(room_id)').eq('dethroned_by_username', me).eq('rounds.room_id', roomId);
   const crownsTaken = (dethronedByMe || []).length;
   const crownTotal = activity.firstFights + crownsTaken; // every distinct way you can end up holding #1
 
   // "Join Match" = claimed an existing ⚔️ let's fight! card — played a round you
   // neither created nor were personally targeted on.
-  const { data: myPlayedRounds } = await sb.from('round_scores').select('round_id, rounds!inner(room_id, creator_username, target_username)').eq('username', me).eq('rounds.room_id', roomId);
   const joinedMatches = (myPlayedRounds || []).filter(r => r.rounds.creator_username !== me && r.rounds.target_username !== me).length;
 
-  const { data: roomRows } = await sb.from('room_leaderboard_alltime').select('username, avg_score, rounds_played').eq('room_id', roomId);
-  const { data: allTimeRows } = await sb.from('global_leaderboard_alltime').select('username, rounds_played');
   const totalGamesMap = new Map((allTimeRows || []).map(r => [r.username, r.rounds_played]));
   const isRanked = u => (totalGamesMap.get(u) || 0) >= MIN_GAMES_TO_RANK;
   const ranked = (roomRows || []).filter(r => isRanked(r.username)).sort((a, b) => b.avg_score - a.avg_score);
@@ -1644,11 +1693,8 @@ async function renderRoomStatsHeader() {
   const activityRank = activityIndex >= 0 ? activityIndex + 1 : null;
   const activityTotal = activitySorted.length;
 
-  const { data: streakRow } = await sb.from('streaks').select('current_streak, last_played_date').eq('username', me).maybeSingle();
   const todayStr = new Date().toISOString().slice(0, 10);
   const streakAtRisk = !!(streakRow && streakRow.current_streak > 0 && streakRow.last_played_date !== todayStr);
-
-  const { data: snap } = await sb.from('room_visit_snapshots').select('*').eq('username', me).eq('room_id', roomId).maybeSingle();
 
   // ---- Headline ----
   let headlineMain, headlineSub;
@@ -1707,20 +1753,22 @@ async function renderRoomStatsHeader() {
   // pattern as Home's badge showcase) so the glance stays uncluttered.
   // Signature Duel deliberately lives in the Rivalry card slot instead of here
   // now — same duel-status question, one home, not shown twice.
-  const quietCount = 5; // Crown, Crowns Taken, Flawless, Words Learnt, Active Days
+  const quietCount = 7; // Crown, Crowns Taken, Flawless, Words Learnt, Words Mastered, Accuracy, Active Days
 
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
+    <div class="account-name-line" style="font-size:18px; margin-bottom:4px;">${displayName(me)}</div>
     <div class="room-headline">${headlineMain}${headlineSub ? ` <span class="sub">— ${headlineSub}</span>` : ''}</div>
     <div class="room-headline sub" style="margin-bottom:8px;">${gamesLine}</div>
     <div class="room-ticker">${ticker}</div>
-    <div class="room-stat-row primary">⚔️ Matches Started <span class="stat-val">${activity.challenges}</span> · 🎯 Counter <span class="stat-val">${activity.challengeBacks}</span></div>
-    <div class="room-stat-row primary">☝️ First Fights <span class="stat-val">${activity.firstFights}</span> · 🚩 Join Match <span class="stat-val">${joinedMatches}</span></div>
+    <div class="room-stat-row primary">⚔️ <span class="stat-val">${activity.challenges}</span> Matches Started · 🎯 <span class="stat-val">${activity.challengeBacks}</span> Counter</div>
+    <div class="room-stat-row primary">☝️ <span class="stat-val">${activity.firstFights}</span> First Fights · 🚩 <span class="stat-val">${joinedMatches}</span> Join Match</div>
     <div id="room-stats-more" class="hidden">
-      <div class="room-stat-row">👑 Crown <span class="stat-val">${crownTotal}</span> · 🔻 Crowns Taken <span class="stat-val">${crownsTaken}</span></div>
-      <div class="room-stat-row">✨ Flawless <span class="stat-val">${flawlessCount}</span> · ✍️ Words Learnt <span class="stat-val">${wordsLearnt}</span></div>
-      <div class="room-stat-row">📅 Active Days <span class="stat-val">${activeDays}</span></div>
+      <div class="room-stat-row">👑 <span class="stat-val">${crownTotal}</span> Crown · 🔻 <span class="stat-val">${crownsTaken}</span> Crowns Taken</div>
+      <div class="room-stat-row">✨ <span class="stat-val">${flawlessCount}</span> Flawless · ✍️ <span class="stat-val">${wordsLearnt}</span> Words Learnt</div>
+      <div class="room-stat-row">📖 <span class="stat-val">${wordsMastered}</span> Words Mastered · 🎯 <span class="stat-val">${roomAccuracy}%</span> Accuracy</div>
+      <div class="room-stat-row">📅 <span class="stat-val">${activeDays}</span> Active Days</div>
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;
@@ -1734,36 +1782,17 @@ async function renderRoomStatsHeader() {
   await sb.from('room_visit_snapshots').upsert({ username: me, room_id: roomId, last_rank: myRank, last_rounds_played: gamesPlayed });
 }
 
-async function computeMyRivalries() {
-  const { data: rounds } = await sb.from('rounds').select('creator_username, target_username')
-    .eq('room_id', currentRoom.id)
-    .not('target_username', 'is', null);
-  const opponents = new Set();
-  (rounds || []).forEach(r => {
-    if (r.creator_username === me && r.target_username !== me) opponents.add(r.target_username);
-    else if (r.target_username === me && r.creator_username !== me) opponents.add(r.creator_username);
-  });
-  let best = null; // "best" candidate to feature, i.e. most worth acting on
-  for (const opp of opponents) {
-    const record = await computeDuelRecord(me, opp);
-    if (record.total < 2) continue; // floor: at least 2 duels before this counts as a real pattern
-    const net = record.losses - record.wins; // positive = I'm behind
-    if (net < 0) continue; // ahead of them — not a rivalry to feature here
-    const candidate = { opponent: opp, record, net };
-    if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = candidate;
-  }
-  return best;
-}
 async function renderRivalryCard() {
   const holder = $('rivalry-holder');
   holder.innerHTML = '';
-  const rival = await computeMyRivalries();
+  const candidates = await computeMyDuelCandidates();
+  const rival = pickWorstRival(candidates);
   if (!rival) {
     // Nobody to chase down right now — this is the mirror-image moment: show
     // the duel you're WINNING instead of one you need to fix. Same slot, same
     // "what's my duel status" question, just the other possible answer —
     // never shown alongside the top-4 stats too, to avoid saying it twice.
-    const strongest = await computeStrongestDuel();
+    const strongest = pickStrongestDuel(candidates);
     if (!strongest) return;
     const card = document.createElement('div');
     card.className = 'rivalry-card tied';

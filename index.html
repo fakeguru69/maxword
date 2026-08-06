@@ -179,7 +179,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
 .room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 0; line-height: 1.25; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
-.room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 16px -16px 16px -16px; padding: 6px 16px; }
+.room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 8px -16px 8px -16px; padding: 6px 16px; }
 .room-stat-grid { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
 .stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; }
@@ -276,11 +276,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 
   <!-- HOME -->
   <section id="view-home" class="card hidden">
-    <div class="account-header" style="display:flex; justify-content:space-between; align-items:center;">
-      <div class="account-name-line" id="account-username-display" style="cursor:pointer;">Signed in</div>
+    <div style="display:flex; justify-content:flex-end;">
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
-    <div id="status-row-holder"></div>
+    <div class="room-stats-header-block">
+      <div class="account-name-line" id="account-username-display" style="margin-bottom:0; cursor:pointer;">Signed in</div>
+      <div id="status-row-holder"></div>
+      <div id="home-activity-holder"></div>
+      <div id="home-more-holder"></div>
+    </div>
     <div id="badge-showcase-holder"></div>
     <div id="a2hs-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
@@ -1027,18 +1031,77 @@ function commentForScore(points) {
 // compact row. "Crowns Held" deliberately echoes the same "crown holder" badge
 // language already used on Trial cards, so it doesn't need its own explainer.
 async function renderStatusRow() {
-  const holder = $('status-row-holder');
-  const { data: rows } = await sb.from('global_leaderboard_alltime').select('*');
+  const statusHolder = $('status-row-holder');
+  const activityHolder = $('home-activity-holder');
+  const moreHolder = $('home-more-holder');
+
+  // Full content-copy of Profile's self-view — deliberately reuses the exact
+  // same global-scoped functions Profile uses (never room-scoped; Home has
+  // no room context, same as Profile). Home/Profile always show GLOBAL rank;
+  // only Room shows ROOM rank — keep that split whenever this is touched.
+  const [
+    { data: rows },
+    { data: streak },
+    { count: crowns },
+    { data: lifetimeWinRows },
+    stats,
+    globalStats,
+    masteredStats,
+  ] = await Promise.all([
+    sb.from('global_leaderboard_alltime').select('*'),
+    sb.from('streaks').select('*').eq('username', me).maybeSingle(),
+    sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', me).eq('rank', 1),
+    sb.from('lifetime_wins').select('round_id').eq('username', me),
+    computeFullPlayerStats(me),
+    computeGlobalStatRankings(me),
+    computeWordsMasteredRanking(),
+  ]);
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const myIndex = sorted.findIndex(r => r.username === me);
-  const { data: streak } = await sb.from('streaks').select('*').eq('username', me).maybeSingle();
-  const { count: crowns } = await sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', me).eq('rank', 1);
+  const lifetimeWins = new Set((lifetimeWinRows || []).map(r => r.round_id)).size;
+  const played = globalStats.myPlayed;
 
-  const parts = [];
-  if (myIndex !== -1) parts.push(`🌍 Global #${myIndex + 1}`);
-  if (streak && streak.current_streak > 0) parts.push(`🔥 ${streak.current_streak}-day streak`);
-  if (crowns) parts.push(`👑 ${crowns} Crown${crowns === 1 ? '' : 's'} Held`);
-  holder.innerHTML = parts.length ? `<div class="status-row">${parts.join(' · ')}</div>` : '';
+  if (!played) { statusHolder.innerHTML = ''; activityHolder.innerHTML = ''; moreHolder.innerHTML = ''; return; }
+
+  const activitySorted = [...(rows || [])].sort((a, b) => b.rounds_played - a.rounds_played);
+  const activityIndex = activitySorted.findIndex(r => r.username === me);
+  const activityRank = activityIndex >= 0 ? activityIndex + 1 : null;
+  const activityPart = activityRank ? `#${activityRank}` : '–';
+
+  statusHolder.innerHTML = myIndex !== -1
+    ? `<div class="room-headline" style="color:var(--cream);">🌍 #${myIndex + 1} GLOBAL RANK · 🗡️ ${activityPart} PLAYED</div>`
+    : `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
+
+  const rankSuffix = r => r ? ` (#${r})` : '';
+  activityHolder.innerHTML = `
+    <div class="room-stat-grid primary">
+      <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless Matches${rankSuffix(globalStats.flawlessRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${played}</span><span>Matches Played${rankSuffix(globalStats.playedRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${globalStats.myActiveDays}</span><span>Active Days${rankSuffix(globalStats.activeDaysRank)}</span></div>
+    </div>`;
+
+  const streakPart = streak && streak.current_streak > 0 ? `<div class="stat-row"><span class="stat-icon">🔥</span><span class="stat-val">${streak.current_streak}</span><span>Streak</span></div>` : '';
+  const crownsHeldPart = crowns ? `<div class="stat-row"><span class="stat-icon">👑</span><span class="stat-val">${crowns}</span><span>Crowns Held</span></div>` : '';
+  const lifetimeWinsPart = lifetimeWins ? `<div class="stat-row"><span class="stat-icon">🏆</span><span class="stat-val">${lifetimeWins}</span><span>Lifetime Wins</span></div>` : '';
+  const moreCount = [streakPart, crownsHeldPart, lifetimeWinsPart].filter(Boolean).length + 6;
+  moreHolder.innerHTML = `
+    <div id="home-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
+      ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
+      <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${stats.dethroned}</span><span>Dethroned</span></div>
+      <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${stats.wordsPlayed}</span><span>Words Played</span></div>
+      <div class="stat-row"><span class="stat-icon">📜</span><span class="stat-val">${stats.startMatch}</span><span>Start Match</span></div>
+      <div class="stat-row"><span class="stat-icon">🎯</span><span class="stat-val">${stats.counter}</span><span>Counter</span></div>
+      <div class="stat-row"><span class="stat-icon">☝️</span><span class="stat-val">${stats.firstFights}</span><span>First Fights</span></div>
+      <div class="stat-row"><span class="stat-icon">⚔️</span><span class="stat-val">${stats.joinMatch}</span><span>Join Match</span></div>
+    </div>
+    <span class="room-stats-toggle" id="home-stats-toggle">▸ ${moreCount} more stats</span>
+  `;
+  $('home-stats-toggle').onclick = () => {
+    const more = $('home-stats-more');
+    const collapsed = more.classList.toggle('hidden');
+    $('home-stats-toggle').textContent = collapsed ? `▸ ${moreCount} more stats` : '▾ Show less';
+  };
 }
 
 const HOME_BADGE_CAP = 4;

@@ -180,6 +180,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 0; line-height: 1.25; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 8px -16px 8px -16px; padding: 6px 16px; }
+.room-ticker.danger { color: #E08478; background: rgba(192,85,74,0.18); }
+.room-ticker.clickable { cursor: pointer; }
 .room-stat-grid { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
 .stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; }
@@ -329,7 +331,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div class="member-line" id="member-count-line"></div>
     <div id="room-stats-header"></div>
     <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
-    <div id="rivalry-holder"></div>
 
     <div id="trials-count-label" class="section-label" style="margin-top:16px;"></div>
     <button class="room-leaderboard-btn" id="btn-quick-start-match" style="margin-bottom:14px;">📜 Start a Match</button>
@@ -594,9 +595,11 @@ async function openPlayerProfile(username) {
   // Headline — two ranks, nothing else, matching Room's exact format/weight.
   const activityPart = activityRank ? `#${activityRank}` : '–';
   if (played && theirIndex !== -1) {
-    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL · 🗡️ ${activityPart} PLAYED</div>`;
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" id="profile-headline-link" style="color:var(--cream); cursor:pointer;">🌍 #${theirIndex + 1} GLOBAL · 🗡️ ${activityPart} PLAYED</div>`;
+    $('profile-headline-link').onclick = () => $('btn-global-leaderboard').click();
   } else if (played) {
-    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" id="profile-headline-link" style="color:var(--cream); cursor:pointer;">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
+    $('profile-headline-link').onclick = () => $('btn-global-leaderboard').click();
   } else {
     $('player-profile-status-holder').innerHTML = '<div class="empty-state">No games played yet.</div>';
   }
@@ -1070,8 +1073,9 @@ async function renderStatusRow() {
   const activityPart = activityRank ? `#${activityRank}` : '–';
 
   statusHolder.innerHTML = myIndex !== -1
-    ? `<div class="room-headline" style="color:var(--cream);">🌍 #${myIndex + 1} GLOBAL · 🗡️ ${activityPart} PLAYED</div>`
-    : `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
+    ? `<div class="room-headline" id="home-headline-link" style="color:var(--cream); cursor:pointer;">🌍 #${myIndex + 1} GLOBAL · 🗡️ ${activityPart} PLAYED</div>`
+    : `<div class="room-headline" id="home-headline-link" style="color:var(--cream); cursor:pointer;">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
+  $('home-headline-link').onclick = () => $('btn-global-leaderboard').click();
 
   // Ticker — same priority-pick pattern as Room's (streak-risk > near-miss),
   // reusing data already fetched above (no new queries). Home is the "what's
@@ -1399,14 +1403,15 @@ async function openRoom(room) {
   currentRoom = room;
   $('room-title').textContent = room.name;
   show('view-room');
-  // These 6 each populate their own separate part of the screen and don't
+  // These 5 each populate their own separate part of the screen and don't
   // depend on each other's results — running them together instead of one
-  // at a time is what actually made opening a room feel slow.
+  // at a time is what actually made opening a room feel slow. (Duel ticker
+  // used to be a 6th here as its own card — now computed inside
+  // renderRoomStatsHeader() alongside everything else in that card.)
   await Promise.all([
     loadDares(),
     renderMemberLine(),
     renderRoomStatsHeader(),
-    renderRivalryCard(),
     checkDethronements(),
     checkNewChallenges(),
   ]);
@@ -1852,6 +1857,7 @@ async function renderRoomStatsHeader() {
     { data: snap },
     roomStats,
     masteredStats,
+    duelTicker,
   ] = await Promise.all([
     sb.from('round_scores').select('score_points, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
     computeRoomActivityStats(me, roomId),
@@ -1862,6 +1868,7 @@ async function renderRoomStatsHeader() {
     sb.from('room_visit_snapshots').select('*').eq('username', me).eq('room_id', roomId).maybeSingle(),
     computeRoomStatRankings(roomId),
     computeWordsMasteredRanking(),
+    computeDuelTicker(),
   ]);
 
   const gamesPlayed = (myScores || []).length;
@@ -1899,6 +1906,7 @@ async function renderRoomStatsHeader() {
   }
 
   $('btn-open-room-leaderboard').innerHTML = myRank ? `🏆 Leaderboard (#${myRank})` : '🏆 Leaderboard';
+  $('room-headline-link').onclick = () => $('btn-open-room-leaderboard').click();
 
   // ---- Ticker: priority order, first match wins, only ONE shown ----
   let ticker = null;
@@ -1938,8 +1946,9 @@ async function renderRoomStatsHeader() {
   block.className = 'room-stats-header-block';
   block.innerHTML = `
     <div class="account-name-line" id="room-header-username" style="margin-bottom:0; cursor:pointer;">${displayName(me)}</div>
-    <div class="room-headline">${headlineLine}</div>
+    <div class="room-headline" id="room-headline-link" style="cursor:pointer;">${headlineLine}</div>
     <div class="room-ticker">${ticker}</div>
+    <div id="room-duel-ticker-holder"></div>
     <div class="room-stat-grid primary">
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless Matches${rankSuffix(roomStats.flawlessRank)}</span></div>
@@ -1958,6 +1967,14 @@ async function renderRoomStatsHeader() {
   `;
   holder.appendChild(block);
   $('room-header-username').onclick = () => openPlayerProfile(me);
+  if (duelTicker) {
+    const clickable = duelTicker.opponent ? 'clickable' : '';
+    $('room-duel-ticker-holder').innerHTML = `<div class="room-ticker danger ${clickable}">${duelTicker.text}</div>`;
+    if (duelTicker.opponent) {
+      const opp = duelTicker.opponent;
+      $('room-duel-ticker-holder').querySelector('.room-ticker').onclick = function () { this.style.pointerEvents = 'none'; startNewRound(opp); };
+    }
+  }
   $('room-stats-toggle').onclick = () => {
     const more = $('room-stats-more');
     const collapsed = more.classList.toggle('hidden');
@@ -1967,31 +1984,23 @@ async function renderRoomStatsHeader() {
   await sb.from('room_visit_snapshots').upsert({ username: me, room_id: roomId, last_rank: myRank, last_rounds_played: gamesPlayed });
 }
 
-async function renderRivalryCard() {
-  const holder = $('rivalry-holder');
-  holder.innerHTML = '';
+// Second "breaking news" ticker — currently Duel-only, but written generally
+// enough that other news types (dethronement, etc.) could feed in here later
+// once we decide priority/color rules for those. Returns null when there's
+// nothing worth saying (never fabricates filler for this one).
+async function computeDuelTicker() {
   const candidates = await computeMyDuelCandidates();
   const rival = pickWorstRival(candidates);
   if (!rival) {
-    // Nobody to chase down right now — this is the mirror-image moment: show
-    // the duel you're WINNING instead of one you need to fix. Same slot, same
-    // "what's my duel status" question, just the other possible answer —
-    // never shown alongside the top-4 stats too, to avoid saying it twice.
     const strongest = pickStrongestDuel(candidates);
-    if (!strongest) return;
-    const card = document.createElement('div');
-    card.className = 'rivalry-card tied';
-    card.innerHTML = `<div class="rivalry-text">⚔️ Signature Duel — <span class="rivalry-score">${strongest.record.wins}–${strongest.record.losses}</span> vs. <span class="opponent-name">${displayName(strongest.opponent)}</span>.</div>`;
-    holder.appendChild(card);
-    return;
+    if (!strongest) return null;
+    return { text: `⚔️ Signature Duel — ${strongest.record.wins}–${strongest.record.losses} vs. ${displayName(strongest.opponent)}`, opponent: null };
   }
   const { opponent, record, net } = rival;
 
-  // Don't offer "Settle the score" again if a Trial between us is already
-  // sitting out there unanswered — without this check, the card looks
-  // identical on every visit (the tie/deficit doesn't change until the
-  // opponent actually plays back), so it's easy to tap it repeatedly and
-  // leave a pile of duplicate unanswered Trials aimed at the same person.
+  // Don't offer to settle again if a Match between us is already unanswered
+  // — without this, the ticker looks identical every visit and repeated taps
+  // would leave duplicate open Matches against the same person.
   const now = new Date().toISOString();
   const { data: pendingRounds } = await sb.from('rounds').select('id')
     .eq('room_id', currentRoom.id)
@@ -2003,29 +2012,10 @@ async function renderRivalryCard() {
     const answeredIds = new Set((theirScores || []).map(s => s.round_id));
     pending = pendingRounds.some(r => !answeredIds.has(r.id));
   }
-
-  const card = document.createElement('div');
-  card.className = net === 0 ? 'rivalry-card tied' : 'rivalry-card';
-  const label = net === 0
-    ? `Dead even with <span class="opponent-name">${displayName(opponent)}</span> — <span class="rivalry-score">${record.wins}–${record.losses}</span>.${pending ? '' : ' Break the tie.'}`
-    : `⚔️ Down <span class="rivalry-score">${record.wins}–${record.losses}</span> against <span class="opponent-name">${displayName(opponent)}</span>.`;
-  card.innerHTML = `<div class="rivalry-text">${label}</div>`;
-  if (pending) {
-    const waiting = document.createElement('div');
-    waiting.className = 'rivalry-text';
-    waiting.style.marginBottom = '0';
-    waiting.style.color = 'var(--cream-dim)';
-    waiting.style.fontSize = '13px';
-    waiting.textContent = `⏳ Waiting for ${displayName(opponent)} to respond to your last Match.`;
-    card.appendChild(waiting);
-  } else {
-    const btn = document.createElement('button');
-    btn.className = 'btn-primary';
-    btn.textContent = 'Settle the score';
-    btn.onclick = () => { btn.disabled = true; startNewRound(opponent); };
-    card.appendChild(btn);
-  }
-  holder.appendChild(card);
+  const text = net === 0
+    ? `Dead even with ${displayName(opponent)} — ${record.wins}–${record.losses}${pending ? ` · ⏳ waiting on their reply` : ' · tap to settle the tie'}`
+    : `⚔️ Down ${record.wins}–${record.losses} against ${displayName(opponent)}${pending ? ` · ⏳ waiting on their reply` : ' · tap to settle the score'}`;
+  return { text, opponent: pending ? null : opponent };
 }
 
 $('btn-trial-back').onclick = () => { currentTrialRound = null; show('view-room'); loadDares(); };

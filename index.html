@@ -199,6 +199,17 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 #view-player-profile .info-btn.active { border-color: var(--gold-soft); color: var(--gold); }
 #view-player-profile .info-tip { display: none; grid-column: 1 / -1; font-size: 12px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 8px 10px; margin-top: 4px; line-height: 1.4; }
 #view-player-profile .info-tip.show { display: block; }
+/* Profile-only: badges as a 2-col tap-to-expand grid, feels like a badge
+   case rather than a settings list. Scoped under .badge-grid so the
+   scorecard's post-round "new badge" popup (plain .badge-earned-card,
+   not inside .badge-grid) keeps its original full-width look untouched. */
+.badge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.badge-grid .badge-earned-card { text-align: center; margin-bottom: 0; cursor: pointer; }
+.badge-grid .badge-earned-title { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 0; }
+.badge-grid .badge-icon { font-size: 26px; }
+.badge-grid .badge-name { font-size: 13px; }
+.badge-grid .badge-earned-req { display: none; margin-top: 8px; }
+.badge-grid .badge-earned-card.open .badge-earned-req { display: block; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
@@ -414,6 +425,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div class="room-stats-header-block">
       <div class="account-name-line" id="player-profile-name" style="margin-bottom:0;"></div>
       <div id="player-profile-status-holder"></div>
+    </div>
+    <div class="section-label strong" id="player-profile-stats-label">Your Stats</div>
+    <div class="room-stats-header-block" id="player-profile-stats-card">
       <div id="player-profile-activity-holder"></div>
       <div id="player-profile-more-holder"></div>
     </div>
@@ -632,9 +646,10 @@ async function openPlayerProfile(username) {
   // framing, Duel needs the Rivalry card's relational treatment, not a flat
   // number). Format: volume + rank in parens, matching Room exactly.
   const rankSuffix = r => r ? ` (#${r})` : '';
+  $('player-profile-stats-label').style.display = played ? '' : 'none';
+  $('player-profile-stats-card').style.display = played ? '' : 'none';
   if (played) {
     $('player-profile-activity-holder').innerHTML = `
-      <div style="margin-top:14px;"></div>
       <div class="room-stat-grid primary">
         ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
         ${statRow('✨', globalStats.myFlawless, `Flawless Matches${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
@@ -691,9 +706,9 @@ async function openPlayerProfile(username) {
   const uniqueBadgeKeys = [...new Set((badgeRows || []).map(r => r.badge_key))];
   uniqueBadgeKeys.sort((a, b) => (BADGE_META[b]?.rarity || 0) - (BADGE_META[a]?.rarity || 0));
   const badgesHolder = $('player-profile-badges-holder');
-  badgesHolder.innerHTML = uniqueBadgeKeys.length ? `<div class="section-label">Badges</div>` +
+  badgesHolder.innerHTML = uniqueBadgeKeys.length ? `<div class="section-label strong">Badges</div><div class="badge-grid">` +
     uniqueBadgeKeys.map(key => { const meta = BADGE_META[key] || { emoji: '🏅', label: key, req: '' };
-      return `<div class="badge-earned-card"><div class="badge-earned-title">${meta.emoji} ${meta.label}</div><div class="badge-earned-req">${meta.req}</div></div>`; }).join('') : '';
+      return `<div class="badge-earned-card"><div class="badge-earned-title"><span class="badge-icon">${meta.emoji}</span><span class="badge-name">${meta.label}</span></div><div class="badge-earned-req">${meta.req}</div></div>`; }).join('') + `</div>` : '';
 
   // Duel Record doesn't apply to your own profile — nothing to compare against yourself.
   if (isSelf) {
@@ -715,11 +730,16 @@ $('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
 // re-attached anyway; delegation avoids that churn entirely.
 $('view-player-profile').addEventListener('click', (e) => {
   const btn = e.target.closest('.info-btn');
-  if (!btn) return;
-  const tip = btn.nextElementSibling;
-  if (!tip || !tip.classList.contains('info-tip')) return;
-  const showing = tip.classList.toggle('show');
-  btn.classList.toggle('active', showing);
+  if (btn) {
+    const tip = btn.nextElementSibling;
+    if (tip && tip.classList.contains('info-tip')) {
+      const showing = tip.classList.toggle('show');
+      btn.classList.toggle('active', showing);
+    }
+    return;
+  }
+  const tile = e.target.closest('.badge-grid .badge-earned-card');
+  if (tile) tile.classList.toggle('open');
 });
 
 // Same idea as computeDuelRecord, but across every room you've ever shared a

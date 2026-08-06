@@ -284,7 +284,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <section id="view-signup" class="card hidden">
     <h2 class="display" style="margin-bottom:14px;">Sign up</h2>
     <label for="signup-username">Choose a username</label>
-    <input id="signup-username" autocomplete="username" />
+    <input id="signup-username" autocomplete="username" maxlength="12" />
     <label for="signup-pin">Choose a 4-digit PIN</label>
     <input id="signup-pin" type="password" inputmode="numeric" maxlength="4" />
     <label for="signup-question">Security question</label>
@@ -404,8 +404,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <!-- CHOOSE TARGET (direct callout is the default/prominent path — "anyone" is the fallback) -->
   <section id="view-choose-target" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-choose-target-back">&larr; Back</button>
-    <h2 class="display" style="margin-bottom:6px;">Call someone out</h2>
-    <div class="section-label" style="margin-top:0;">Aim this Match at someone specific</div>
+    <h2 class="display" style="margin-bottom:6px;">Send a Challenge</h2>
+    <div class="section-label" style="margin-top:0;">Pick who to challenge</div>
     <div id="target-member-list"></div>
     <button class="link-btn" id="btn-target-anyone" style="margin-top:6px;">Or just open it to anyone</button>
   </section>
@@ -696,8 +696,10 @@ async function openPlayerProfile(username) {
   $('player-profile-stats-label').style.display = played ? '' : 'none';
   $('player-profile-stats-card').style.display = played ? '' : 'none';
   if (played) {
+    const theirAvgScore = theirIndex !== -1 ? Math.round(sorted[theirIndex].avg_score) : null;
     $('player-profile-activity-holder').innerHTML = `
       <div class="room-stat-grid primary">
+        ${theirAvgScore !== null ? statRow('⚖️', theirAvgScore, `Avg Score${rankSuffix(theirIndex + 1)}`, 'Average score across every match — the single number every rank on every leaderboard is built from.', 'avgScore') : ''}
         ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
         ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
         ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
@@ -708,13 +710,13 @@ async function openPlayerProfile(username) {
   }
 
   // "See more" — everything real but not top-4-worthy: Streak (no ticker here
-  // to carry its urgency, so it's a plain fact instead), Crowns Held (live)
-  // and Lifetime Wins (bragging-rights flavored but weaker than the top 4),
-  // Dethroned, Words Played, and the Contribution stats.
+  // to carry its urgency, so it's a plain fact instead), Crowns Held (live —
+  // the only crown stat now; Lifetime Wins/Dethroned cut, both were
+  // redundant with Held and confusingly bidirectional), Words Played, and
+  // the Contribution stats.
   const moreHolder = $('player-profile-more-holder');
-  const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
+  const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Day Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
   const crownsHeldPart = quietStats.crowns.value ? statRow('👑', quietStats.crowns.value, `Crowns Held${rankSuffix(quietStats.crowns.rank)}`, 'Matches where you currently hold the top score.', 'crowns') : '';
-  const lifetimeWinsPart = quietStats.lifetimeWins.value ? statRow('🏆', quietStats.lifetimeWins.value, `Lifetime Wins${rankSuffix(quietStats.lifetimeWins.rank)}`, 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.', 'lifetimeWins') : '';
 
   // Accuracy is strictly self-only — never fetched or shown for anyone else
   // (a percentage can discourage further play if it's ever shown publicly).
@@ -736,12 +738,12 @@ async function openPlayerProfile(username) {
 
   moreHolder.innerHTML = played ? `
     <div class="room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
-      ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-      ${statRow('🔻', quietStats.dethroned.value, `Dethroned${rankSuffix(quietStats.dethroned.rank)}`, 'Times someone has beaten your top score after you set it.', 'dethroned')}
+      ${streakPart}${crownsHeldPart}
       ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
-      ${statRow('📜', quietStats.startMatch.value, `Start Match${rankSuffix(quietStats.startMatch.rank)}`, 'Matches you started yourself.', 'startMatch')}
+      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
+      ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
-      ${statRow('☝️', quietStats.firstFights.value, `First Fights${rankSuffix(quietStats.firstFights.rank)}`, 'Matches you were the very first to play.', 'firstFights')}
+      ${statRow('☝️', quietStats.firstFights.value, `Been First${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
       ${accuracyPart}
     </div>` : '';
@@ -862,13 +864,14 @@ function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i-
 // Usernames are stored lowercase (case-insensitive login) but shown in caps
 // everywhere in the UI to match the Cinzel/seal aesthetic — visual only,
 // never affects storage, matching, or login.
-// Capped at 14 chars everywhere names render — this is the single source
-// every screen's "name + something else" pairing (leaderboard row + score,
-// "started by X", "YOU vs. X") reads from, so fixing wrap here fixes it
-// everywhere at once rather than patching each context's CSS separately.
+// Capped at 12 chars everywhere names render — matches the hard signup limit
+// (see btn-signup), so this is now mostly a defensive backstop rather than
+// the primary fix; still the single source every screen's "name + something
+// else" pairing (leaderboard row + score, "started by X", "YOU vs. X")
+// reads from, so any future change to the cap only needs to happen here.
 function displayName(u) {
   const name = (u || '').toUpperCase();
-  return name.length > 14 ? name.slice(0, 13) + '…' : name;
+  return name.length > 12 ? name.slice(0, 11) + '…' : name;
 }
 // Same idea, but for the one spot (a button sitting in an otherwise normal
 // sentence) where all-caps clashes with the rest of the label instead of
@@ -964,6 +967,7 @@ $('btn-signup').onclick = async () => {
   const err = $('signup-error');
   err.classList.add('hidden');
   if (!username || !/^\d{4}$/.test(pin) || !question || !answer) { err.textContent = 'Fill in a username, 4-digit PIN, security question, and answer.'; err.classList.remove('hidden'); return; }
+  if (username.length > 12) { err.textContent = 'Username must be 12 characters or fewer.'; err.classList.remove('hidden'); return; }
   const pin_hash = await sha256(pin + username);
   const security_answer_hash = await sha256(answer);
   const { error } = await sb.from('profiles').insert({ username, pin_hash, security_question: question, security_answer_hash });
@@ -1178,12 +1182,14 @@ async function renderStatusRow() {
     globalStats,
     masteredStats,
     quietStats,
+    pendingChallenge,
   ] = await Promise.all([
     sb.from('global_leaderboard_alltime').select('*'),
     sb.from('streaks').select('*').eq('username', me).maybeSingle(),
     computeGlobalStatRankings(me),
     computeWordsMasteredRanking(),
     computeQuietStatRankings('global', null),
+    computeHomePendingChallengeTicker().catch(err => { console.error('Home pending challenge ticker failed:', err); return null; }),
   ]);
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const myIndex = sorted.findIndex(r => r.username === me);
@@ -1201,43 +1207,55 @@ async function renderStatusRow() {
     : `<div class="room-headline" id="home-headline-link" style="color:var(--cream); cursor:pointer;">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
   $('home-headline-link').onclick = () => $('btn-global-leaderboard').click();
 
-  // Ticker — same priority-pick pattern as Room's (streak-risk > near-miss),
-  // reusing data already fetched above (no new queries). Home is the "what's
-  // urgent right now" landing spot, which is exactly the job this does — a
-  // better fit here than it was on Profile, where everything is deliberately
-  // shown open/at-rest and there's nothing for a ticker to be surfacing.
+  // Ticker — same priority-pick pattern as Room's, reusing data already
+  // fetched above where possible. Home is the "what's urgent right now"
+  // landing spot. Unlike Room, Home has only ONE slot (no room-scoped duel
+  // data to fill a 2nd) — so this pools both "about you" and "about someone
+  // else" candidates into that single slot, picked by priority. Now has a
+  // guaranteed fallback, matching Room — previously this could render
+  // completely blank.
   let ticker = null;
+  let tickerOnClick = null;
   const todayStr = new Date().toISOString().slice(0, 10);
   if (streak && streak.current_streak > 0 && streak.last_played_date !== todayStr) {
-    ticker = `Play today or lose your ${streak.current_streak}-day streak`;
+    ticker = `Play today or lose your ${streak.current_streak}-day streak!`;
+  } else if (pendingChallenge) {
+    ticker = pendingChallenge.text;
+    tickerOnClick = async () => { await openRoom(pendingChallenge.room); openTrialScreen(pendingChallenge.round); };
   } else if (myIndex > 0) {
     const aheadOfMe = sorted[myIndex - 1];
     const gap = Math.max(1, Math.round(aheadOfMe.avg_score - sorted[myIndex].avg_score));
-    ticker = `${gap} pts from #${myIndex}`;
+    ticker = `${displayName(aheadOfMe.username)} is only ${gap} pts ahead of you — Challenge them!`;
   }
-  $('home-ticker-holder').innerHTML = ticker ? `<div class="room-ticker">${ticker}</div>` : '';
+  if (!ticker) ticker = `Start a Match to make your mark`;
+  $('home-ticker-holder').innerHTML = `<div class="room-ticker${tickerOnClick ? ' clickable' : ''}">${ticker}</div>`;
+  if (tickerOnClick) {
+    const action = tickerOnClick;
+    $('home-ticker-holder').querySelector('.room-ticker').onclick = function () { this.style.pointerEvents = 'none'; action(); };
+  }
 
   const rankSuffix = r => r ? ` (#${r})` : '';
+  const myAvgScore = myIndex !== -1 ? Math.round(sorted[myIndex].avg_score) : null;
   activityHolder.innerHTML = `
     <div class="room-stat-grid primary">
+      ${myAvgScore !== null ? statRow('⚖️', myAvgScore, `Avg Score${rankSuffix(myIndex + 1)}`, 'Your average score across every match — the single number every rank on every leaderboard is built from.', 'avgScore') : ''}
       ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
       ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
       ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
       ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
     </div>`;
 
-  const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
+  const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Day Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
   const crownsHeldPart = quietStats.crowns.value ? statRow('👑', quietStats.crowns.value, `Crowns Held${rankSuffix(quietStats.crowns.rank)}`, 'Matches where you currently hold the top score.', 'crowns') : '';
-  const lifetimeWinsPart = quietStats.lifetimeWins.value ? statRow('🏆', quietStats.lifetimeWins.value, `Lifetime Wins${rankSuffix(quietStats.lifetimeWins.rank)}`, 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.', 'lifetimeWins') : '';
-  const moreCount = [streakPart, crownsHeldPart, lifetimeWinsPart].filter(Boolean).length + 6;
+  const moreCount = [streakPart, crownsHeldPart].filter(Boolean).length + 5;
   moreHolder.innerHTML = `
     <div id="home-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
-      ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-      ${statRow('🔻', quietStats.dethroned.value, `Dethroned${rankSuffix(quietStats.dethroned.rank)}`, 'Times someone has beaten your top score after you set it.', 'dethroned')}
+      ${streakPart}${crownsHeldPart}
       ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
-      ${statRow('📜', quietStats.startMatch.value, `Start Match${rankSuffix(quietStats.startMatch.rank)}`, 'Matches you started yourself.', 'startMatch')}
+      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
+      ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
-      ${statRow('☝️', quietStats.firstFights.value, `First Fights${rankSuffix(quietStats.firstFights.rank)}`, 'Matches you were the very first to play.', 'firstFights')}
+      ${statRow('☝️', quietStats.firstFights.value, `Been First${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
     </div>
     <span class="room-stats-toggle" id="home-stats-toggle">▸ ${moreCount} more stats</span>
@@ -1975,11 +1993,11 @@ async function computeWordsMasteredRanking() {
   return { myCount: myRow ? myRow.mastered_count : 0, myRank: rankIdx[me] || null };
 }
 
-// Ranks the 9 "overflow" stats that previously showed a raw number with no
-// rank at all. Descending sort (more = better rank) for all of them EXCEPT
-// Dethroned, which sorts ascending — getting dethroned less is the good
-// outcome, so a lower count earns the better rank, the opposite convention
-// from every other stat here.
+// Ranks the overflow stats that show a raw number with a rank alongside it.
+// All of them sort descending (more = better rank) — the one stat that used
+// to need an ascending exception (Dethroned) was cut entirely (see stats
+// brainstorm notes: redundant with Crowns Held, and inherently ambiguous —
+// no wording fixed "did I dethrone someone, or did someone dethrone me").
 // scope: 'global' ranks against everyone who's played at least once (same
 // pool policy as computeGlobalStatRankings); 'room' ranks against every
 // member of roomId (same pool policy as computeRoomStatRankings, zero-count
@@ -1993,16 +2011,13 @@ async function computeWordsMasteredRanking() {
 // stats — shared by computeQuietStatsByUser (ranking) and the stat
 // leaderboard feature, so both read off one definition instead of two.
 const QUIET_STAT_METRICS = {
-  streak: { fn: x => x.streak, dir: 'desc' }, crowns: { fn: x => x.crowns, dir: 'desc' }, lifetimeWins: { fn: x => x.lifetimeWins, dir: 'desc' },
-  // 'asc' means a LOWER raw value earns the better (#1) rank — Dethroned is
-  // the one exception: getting dethroned less is the good outcome, so it
-  // ranks the opposite direction from every other stat's descending
-  // "more is higher-ranked" convention.
-  dethroned: { fn: x => x.dethroned, dir: 'asc' }, wordsPlayed: { fn: x => x.wordsPlayed.size, dir: 'desc' }, startMatch: { fn: x => x.startMatch, dir: 'desc' },
+  streak: { fn: x => x.streak, dir: 'desc' }, crowns: { fn: x => x.crowns, dir: 'desc' },
+  wordsPlayed: { fn: x => x.wordsPlayed.size, dir: 'desc' }, matchStarted: { fn: x => x.matchStarted, dir: 'desc' },
+  challengesSent: { fn: x => x.challengesSent, dir: 'desc' },
   counter: { fn: x => x.counter, dir: 'desc' }, firstFights: { fn: x => x.firstFights, dir: 'desc' }, joinMatch: { fn: x => x.joinMatch, dir: 'desc' },
 };
 
-// Fetches and tallies the 9 overflow stats for EVERY user in scope (global =
+// Fetches and tallies the overflow stats for EVERY user in scope (global =
 // everyone who's played, room = every member) — the shared data both
 // computeQuietStatRankings (reduces to "my rank") and the stat-leaderboard
 // feature (shows everyone, sorted) are built on.
@@ -2017,8 +2032,6 @@ async function computeQuietStatsByUser(scope, roomId) {
     { data: members },
     { data: streakRows },
     { data: crownRows },
-    { data: winRows },
-    { data: dethroneRows },
     { data: wordAnswerRows },
     { data: roundRows },
     { data: firstFightRows },
@@ -2029,12 +2042,6 @@ async function computeQuietStatsByUser(scope, roomId) {
     isRoom
       ? sb.from('trial_leaderboard').select('username, round_id').eq('rank', 1).in('round_id', roomRoundIds)
       : sb.from('trial_leaderboard').select('username').eq('rank', 1),
-    isRoom
-      ? sb.from('lifetime_wins').select('username, round_id').in('round_id', roomRoundIds)
-      : sb.from('lifetime_wins').select('username'),
-    isRoom
-      ? sb.from('dethronement_events').select('dethroned_by_username, round_id').in('round_id', roomRoundIds)
-      : sb.from('dethronement_events').select('dethroned_by_username'),
     isRoom
       ? sb.from('word_answers').select('username, word_id, rounds!inner(room_id)').eq('rounds.room_id', roomId)
       : sb.from('word_answers').select('username, word_id'),
@@ -2051,7 +2058,7 @@ async function computeQuietStatsByUser(scope, roomId) {
 
   const byUser = {};
   const pool = isRoom ? (members || []).map(m => m.username) : null;
-  const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, lifetimeWins: 0, dethroned: 0, wordsPlayed: new Set(), startMatch: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
+  const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, wordsPlayed: new Set(), matchStarted: 0, challengesSent: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
   if (pool) pool.forEach(ensure);
 
   // Every row is guarded against a missing username field before touching
@@ -2063,10 +2070,18 @@ async function computeQuietStatsByUser(scope, roomId) {
   // insurance regardless of which exact row it ever was.
   (streakRows || []).forEach(r => { if (r.username && (!isRoom || byUser[r.username])) ensure(r.username).streak = r.current_streak || 0; });
   (crownRows || []).forEach(r => { if (r.username) ensure(r.username).crowns++; });
-  (winRows || []).forEach(r => { if (r.username) ensure(r.username).lifetimeWins++; });
-  (dethroneRows || []).forEach(r => { if (r.dethroned_by_username) ensure(r.dethroned_by_username).dethroned++; });
   (wordAnswerRows || []).forEach(r => { if (r.username) ensure(r.username).wordsPlayed.add(r.word_id); });
-  (roundRows || []).forEach(r => { if (!r.creator_username) return; const u = ensure(r.creator_username); if (r.via_challenge_back) u.counter++; else u.startMatch++; });
+  // Split what used to be one "Start Match" bucket into two honest actions:
+  // opening a plain, un-aimed Match (matchStarted) vs. directly naming
+  // someone (challengesSent) — those are different intents and deserve
+  // different numbers, same principle as splitting Crowns from Duel.
+  (roundRows || []).forEach(r => {
+    if (!r.creator_username) return;
+    const u = ensure(r.creator_username);
+    if (r.via_challenge_back) u.counter++;
+    else if (r.target_username) u.challengesSent++;
+    else u.matchStarted++;
+  });
   (firstFightRows || []).forEach(r => { if (r.username) ensure(r.username).firstFights++; });
   (joinScoreRows || []).forEach(r => { if (!r.username || !r.rounds) return; if (r.rounds.creator_username !== r.username && r.rounds.target_username !== r.username) ensure(r.username).joinMatch++; });
 
@@ -2075,7 +2090,7 @@ async function computeQuietStatsByUser(scope, roomId) {
 
 async function computeQuietStatRankings(scope, roomId, forUsername = me) {
   const byUser = await computeQuietStatsByUser(scope, roomId);
-  const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, lifetimeWins: 0, dethroned: 0, wordsPlayed: new Set(), startMatch: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
+  const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, wordsPlayed: new Set(), matchStarted: 0, challengesSent: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
   const allUsers = Object.keys(byUser);
   const rankOf = (metricFn, direction = 'desc') => {
     const sorted = allUsers.map(u => ({ u, v: metricFn(byUser[u]) }))
@@ -2101,12 +2116,14 @@ async function computeQuietStatRankings(scope, roomId, forUsername = me) {
 const STAT_META = {
   wordsMastered: { icon: '📖', label: 'Words Mastered' }, flawless: { icon: '✨', label: 'Flawless' },
   played: { icon: '🗡️', label: 'Matches Played' }, activeDays: { icon: '📅', label: 'Active Days' },
-  streak: { icon: '🔥', label: 'Streak' }, crowns: { icon: '👑', label: 'Crowns Held' },
-  lifetimeWins: { icon: '🏆', label: 'Lifetime Wins' }, dethroned: { icon: '🔻', label: 'Dethroned' },
-  wordsPlayed: { icon: '✍️', label: 'Words Played' }, startMatch: { icon: '📜', label: 'Start Match' },
-  counter: { icon: '🎯', label: 'Counter' }, firstFights: { icon: '☝️', label: 'First Fights' },
+  avgScore: { icon: '⚖️', label: 'Avg Score' },
+  streak: { icon: '🔥', label: 'Day Streak' }, crowns: { icon: '👑', label: 'Crowns Held' },
+  wordsPlayed: { icon: '✍️', label: 'Words Played' }, matchStarted: { icon: '📜', label: 'Match Started' },
+  challengesSent: { icon: '📯', label: 'Challenges Sent' },
+  counter: { icon: '🎯', label: 'Counter' }, firstFights: { icon: '☝️', label: 'Been First' },
   joinMatch: { icon: '⚔️', label: 'Join Match' },
 };
+
 
 // Full sorted leaderboard for ANY single rankable stat — reuses the exact
 // same query shapes as the ranking functions above (computeGlobalStatRankings/
@@ -2116,6 +2133,13 @@ const STAT_META = {
 // stat-row render.
 async function computeStatLeaderboard(statKey, scope, roomId) {
   const isRoom = scope === 'room';
+  if (statKey === 'avgScore') {
+    const { data: rows } = isRoom
+      ? await sb.from('room_leaderboard_alltime').select('username, avg_score').eq('room_id', roomId)
+      : await sb.from('global_leaderboard_alltime').select('username, avg_score');
+    const list = (rows || []).map(r => ({ username: r.username, value: Math.round(r.avg_score) }));
+    return { rows: list.sort((a, b) => b.value - a.value) };
+  }
   if (statKey === 'wordsMastered') {
     const { data: rows } = await sb.from('words_mastered_counts').select('*');
     let list = (rows || []).map(r => ({ username: r.username, value: r.mastered_count }));
@@ -2197,6 +2221,10 @@ async function renderRoomStatsHeader() {
     roomStats,
     masteredStats,
     quietStats,
+    crownSnatchByMe,
+    crownSnatchFromMe,
+    pendingChallenge,
+    socialProof,
     duelTicker,
   ] = await Promise.all([
     sb.from('round_scores').select('score_points, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
@@ -2207,6 +2235,10 @@ async function renderRoomStatsHeader() {
     computeRoomStatRankings(roomId),
     computeWordsMasteredRanking(),
     computeQuietStatRankings('room', roomId),
+    computeCrownSnatchByMe(roomId).catch(err => { console.error('Crown snatch (by me) ticker failed:', err); return null; }),
+    computeCrownSnatchFromMe(roomId).catch(err => { console.error('Crown snatch (from me) ticker failed:', err); return null; }),
+    computePendingChallengeTicker(roomId).catch(err => { console.error('Pending challenge ticker failed:', err); return null; }),
+    computeSocialProofTicker(roomId).catch(err => { console.error('Social proof ticker failed:', err); return null; }),
     computeDuelTicker().catch(err => { console.error('Duel ticker failed:', err); return null; }),
   ]);
 
@@ -2244,53 +2276,70 @@ async function renderRoomStatsHeader() {
 
   $('btn-open-room-leaderboard').innerHTML = myRank ? `🏆 Leaderboard (#${myRank})` : '🏆 Leaderboard';
 
-  // ---- Ticker: priority order, first match wins, only ONE shown ----
+  // ---- Slot 1 (gold, "about you"): your own standing, self-contained,
+  // never depends on what a specific rival just did. Always has a fallback.
   let ticker = null;
   if (streakAtRisk) {
-    ticker = `Play today or lose your ${streakRow.current_streak}-day streak`;
+    ticker = `Play today or lose your ${streakRow.current_streak}-day streak!`;
+  } else if (crownSnatchByMe) {
+    ticker = crownSnatchByMe;
   } else if (snap && snap.last_rank && myRank && snap.last_rank < myRank) {
     ticker = `Slipped from #${snap.last_rank} to #${myRank} in this room`;
   } else if (myRank && myRank > 1) {
     const aheadOfMe = ranked[myIndex - 1];
-    if (aheadOfMe) ticker = `${Math.max(1, Math.round(aheadOfMe.avg_score - ranked[myIndex].avg_score))} pts from #${myRank - 1}`;
-  }
-  if (!ticker && myRank && myIndex + 1 < ranked.length) {
-    const behindMe = ranked[myIndex + 1];
-    const gap = Math.max(1, Math.round(ranked[myIndex].avg_score - behindMe.avg_score));
-    if (gap <= 30) ticker = `${displayName(behindMe.username)} is just ${gap} pts behind you`;
-  }
-  if (!ticker) {
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-    const { count: newMembers } = await sb.from('room_members').select('*', { count: 'exact', head: true }).eq('room_id', roomId).gte('joined_at', weekAgo);
-    if (newMembers > 0) ticker = `${newMembers} new member${newMembers > 1 ? 's' : ''} joined this week`;
+    if (aheadOfMe) {
+      const gap = Math.max(1, Math.round(aheadOfMe.avg_score - ranked[myIndex].avg_score));
+      ticker = `${displayName(aheadOfMe.username)} is only ${gap} pts ahead of you — Challenge them!`;
+    }
   }
   if (!ticker) ticker = `Start a Match to make your mark`;
+
+  // ---- Slot 2 (red, "about someone else"): only fires when another named
+  // person is the reason this matters right now — allowed to stay empty on
+  // a quiet day rather than manufacture false urgency.
+  let slot2 = null;
+  if (duelTicker) {
+    slot2 = { text: duelTicker.text, onClick: duelTicker.opponent ? () => startNewRound(duelTicker.opponent) : null };
+  } else if (pendingChallenge) {
+    slot2 = { text: pendingChallenge.text, onClick: () => openTrialScreen(pendingChallenge.round) };
+  } else if (crownSnatchFromMe) {
+    slot2 = { text: crownSnatchFromMe, onClick: null };
+  } else if (myRank && myIndex + 1 < ranked.length) {
+    const behindMe = ranked[myIndex + 1];
+    const gap = Math.max(1, Math.round(ranked[myIndex].avg_score - behindMe.avg_score));
+    if (gap <= 30) slot2 = { text: `${displayName(behindMe.username)} is right behind you — only ${gap} pts back!`, onClick: null };
+  }
+  if (!slot2 && socialProof) {
+    slot2 = { text: socialProof, onClick: null };
+  }
 
   // ---- Top 4: Flawless / Words Mastered / Matches Played / Active Days —
   // the 4 stats that survived the full psychology audit (Streak and Duel both
   // deliberately excluded, they live in the ticker and Rivalry card instead).
   // Format: volume + rank in parens, per explicit request — "8 Flawless (#3)".
   const rankSuffix = r => r ? ` (#${r})` : '';
-  const quietCount = 6; // Dethroned, Words Played, Start Match, Counter, First Fights, Join Match
+  const quietCount = 6; // Words Played, Match Started, Challenges Sent, Counter, Been First, Join Match
+  const myAvgScore = myRank !== null ? Math.round(ranked[myIndex].avg_score) : null;
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
     <div class="account-name-line" id="room-header-username" style="margin-bottom:0; cursor:pointer;">${displayName(me)}</div>
     <div class="room-headline" id="room-headline-link" style="cursor:pointer;">${headlineLine}</div>
-    <div class="room-ticker${duelTicker ? ' stacked-top' : ''}">${ticker}</div>
+    <div class="room-ticker${slot2 ? ' stacked-top' : ''}">${ticker}</div>
     <div id="room-duel-ticker-holder"></div>
     <div class="room-stat-grid primary">
+      ${myAvgScore !== null ? statRow('⚖️', myAvgScore, `Avg Score${rankSuffix(myRank)}`, 'Your average score in this room — the single number this room\'s rank is built from.', 'avgScore') : ''}
       ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
       ${statRow('✨', roomStats.myFlawless, `Flawless${rankSuffix(roomStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
       ${statRow('🗡️', roomStats.myPlayed, `Matches Played${rankSuffix(roomStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
       ${statRow('📅', roomStats.myActiveDays, `Active Days${rankSuffix(roomStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
     </div>
     <div id="room-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
-      ${statRow('🔻', quietStats.dethroned.value, `Dethroned${rankSuffix(quietStats.dethroned.rank)}`, 'Times someone has beaten your top score after you set it.', 'dethroned')}
       ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
-      ${statRow('📜', quietStats.startMatch.value, `Start Match${rankSuffix(quietStats.startMatch.rank)}`, 'Matches you started yourself.', 'startMatch')}
+      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
+      ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
-      ${statRow('☝️', quietStats.firstFights.value, `First Fights${rankSuffix(quietStats.firstFights.rank)}`, 'Matches you were the very first to play.', 'firstFights')}
+      ${statRow('☝️', quietStats.firstFights.value, `Been First${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
@@ -2298,12 +2347,12 @@ async function renderRoomStatsHeader() {
   holder.appendChild(block);
   $('room-header-username').onclick = () => openPlayerProfile(me);
   $('room-headline-link').onclick = () => $('btn-open-room-leaderboard').click();
-  if (duelTicker) {
-    const clickable = duelTicker.opponent ? 'clickable' : '';
-    $('room-duel-ticker-holder').innerHTML = `<div class="room-ticker danger ${clickable}">${duelTicker.text}</div>`;
-    if (duelTicker.opponent) {
-      const opp = duelTicker.opponent;
-      $('room-duel-ticker-holder').querySelector('.room-ticker').onclick = function () { this.style.pointerEvents = 'none'; startNewRound(opp); };
+  if (slot2) {
+    const clickable = slot2.onClick ? 'clickable' : '';
+    $('room-duel-ticker-holder').innerHTML = `<div class="room-ticker danger ${clickable}">${slot2.text}</div>`;
+    if (slot2.onClick) {
+      const action = slot2.onClick;
+      $('room-duel-ticker-holder').querySelector('.room-ticker').onclick = function () { this.style.pointerEvents = 'none'; action(); };
     }
   }
   $('room-stats-toggle').onclick = () => {
@@ -2319,6 +2368,86 @@ async function renderRoomStatsHeader() {
 // enough that other news types (dethronement, etc.) could feed in here later
 // once we decide priority/color rules for those. Returns null when there's
 // nothing worth saying (never fabricates filler for this one).
+// Crown-snatch tickers reuse dethronement_events — the exact same data the
+// dethronement popup already runs on — windowed to the last 24h so "just"
+// stays honest instead of being permanently true forever after one event.
+async function computeCrownSnatchByMe(roomId) {
+  const since = new Date(Date.now() - 24 * 3600000).toISOString();
+  const { data } = await sb.from('dethronement_events')
+    .select('dethroned_username, created_at, rounds!inner(room_id, trial_number)')
+    .eq('dethroned_by_username', me).eq('rounds.room_id', roomId).gte('created_at', since)
+    .order('created_at', { ascending: false }).limit(1);
+  if (!data || data.length === 0) return null;
+  const row = data[0];
+  return `You just snatched Match #${row.rounds.trial_number} from ${displayName(row.dethroned_username)} — nice!`;
+}
+async function computeCrownSnatchFromMe(roomId) {
+  const since = new Date(Date.now() - 24 * 3600000).toISOString();
+  const { data } = await sb.from('dethronement_events')
+    .select('dethroned_by_username, created_at, rounds!inner(room_id, trial_number)')
+    .eq('dethroned_username', me).eq('rounds.room_id', roomId).gte('created_at', since)
+    .order('created_at', { ascending: false }).limit(1);
+  if (!data || data.length === 0) return null;
+  const row = data[0];
+  return `${displayName(row.dethroned_by_username)} just snatched Match #${row.rounds.trial_number} from you!`;
+}
+
+// A pending direct Challenge needs zero history to be worth surfacing —
+// unlike every other ticker candidate, it works even for a brand-new player
+// with no rank or rivalry yet, which makes it valuable in exactly the
+// cold-start window where nothing else in the pool has anything to say.
+async function computePendingChallengeTicker(roomId) {
+  const now = new Date().toISOString();
+  const { data: rounds } = await sb.from('rounds').select('*')
+    .eq('room_id', roomId).eq('target_username', me).gt('expires_at', now);
+  if (!rounds || rounds.length === 0) return null;
+  const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', rounds.map(r => r.id));
+  const answered = new Set((myScores || []).map(s => s.round_id));
+  const unanswered = rounds.find(r => !answered.has(r.id));
+  if (!unanswered) return null;
+  return { text: `${displayName(unanswered.creator_username)} is waiting for your move!`, round: unanswered };
+}
+
+// Social proof — doesn't require ME to be behind anyone; the crowd's
+// failure is the hook on its own. Picks any open Match in the room I
+// haven't played yet with at least 2 failed attempts against the champion.
+async function computeSocialProofTicker(roomId) {
+  const now = new Date().toISOString();
+  const { data: rounds } = await sb.from('rounds').select('id, trial_number').eq('room_id', roomId).gt('expires_at', now);
+  if (!rounds || rounds.length === 0) return null;
+  const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me);
+  const played = new Set((myScores || []).map(s => s.round_id));
+  const candidates = rounds.filter(r => !played.has(r.id));
+  if (candidates.length === 0) return null;
+  const { data: lbRows } = await sb.from('trial_leaderboard').select('round_id, username, score_points, rank').in('round_id', candidates.map(r => r.id));
+  const byRound = {};
+  (lbRows || []).forEach(r => { (byRound[r.round_id] = byRound[r.round_id] || []).push(r); });
+  for (const r of candidates) {
+    const rows = byRound[r.id] || [];
+    if (rows.length < 2) continue;
+    const champ = rows.find(x => x.rank === 1);
+    if (!champ) continue;
+    return `${rows.length} have FAILED to beat ${displayName(champ.username)}'s ${champ.score_points} on Match #${r.trial_number} — think you can?`;
+  }
+  return null;
+}
+
+// Home's cross-room version of the same idea — checks every room at once
+// rather than one, since Home has no single room context. Embeds the full
+// room row (not just its name) so a click can jump straight there via the
+// same openRoom() used everywhere else, then open the Match itself.
+async function computeHomePendingChallengeTicker() {
+  const now = new Date().toISOString();
+  const { data: rounds } = await sb.from('rounds').select('*, rooms!inner(*)')
+    .eq('target_username', me).gt('expires_at', now);
+  if (!rounds || rounds.length === 0) return null;
+  const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', rounds.map(r => r.id));
+  const answered = new Set((myScores || []).map(s => s.round_id));
+  const unanswered = rounds.find(r => !answered.has(r.id));
+  if (!unanswered) return null;
+  return { text: `${displayName(unanswered.creator_username)} is waiting for your move in ${unanswered.rooms.name}!`, room: unanswered.rooms, round: unanswered };
+}
+
 async function computeDuelTicker() {
   const candidates = await computeMyDuelCandidates();
   const rival = pickWorstRival(candidates);
@@ -2581,7 +2710,7 @@ async function openTargetPicker() {
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
     btn.style.marginBottom = '8px';
-    btn.textContent = displayName(m.username);
+    btn.textContent = `⚔️ Challenge ${displayName(m.username)}`;
     btn.onclick = () => { disableAllPickerButtons(); startNewRound(m.username); };
     list.appendChild(btn);
   });
@@ -2778,50 +2907,57 @@ async function renderScorecard(correct, points, newBadges) {
     badgeDiv.appendChild(card);
   });
 
-  // Win/lose verdict — only meaningful when you just accepted SOMEONE ELSE's challenge
-  // (there's a score to compare against). Your own fresh round has nothing to beat yet.
+  // Win/lose verdict compares against the CURRENT CHAMPION (rank 1 on this
+  // Match), not the round's creator — a round can pick up new players after
+  // creation, so "did I beat the creator" stopped being the right question
+  // once a third player could be the one actually leading. Same logic the
+  // Trial screen's own "Challenge back" button already used; this brings
+  // the Scorecard in line with it instead of the two disagreeing.
   const verdictEl = $('score-verdict');
-  const isOwnRound = currentRound.creator_username === me;
-  let iWon = null; // true = I won, false = I lost/tied, null = no comparison (own round)
-  if (!isOwnRound) {
-    const { data: creatorScore } = await sb.from('round_scores').select('score_points').eq('round_id', currentRound.id).eq('username', currentRound.creator_username).maybeSingle();
-    if (creatorScore) {
-      const theirs = creatorScore.score_points;
-      if (points > theirs) { verdictEl.textContent = `🎉 You beat ${displayName(currentRound.creator_username)}'s ${theirs} by ${points - theirs}!`; iWon = true; }
-      else if (points < theirs) { verdictEl.textContent = `${displayName(currentRound.creator_username)}'s ${theirs} pts still stands.`; iWon = false; }
-      else { verdictEl.textContent = `🤝 Tied with ${displayName(currentRound.creator_username)} at ${theirs}!`; iWon = false; }
-      verdictEl.classList.remove('hidden');
+  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', currentRound.id);
+  const champRow = (lbRows || []).find(r => r.rank === 1);
+  let iWon = null; // true = I'm the Game Champion now, false = someone else is
+  if (champRow) {
+    if (champRow.username === me) {
+      verdictEl.textContent = `🎉 You're the Game Champion! ${points} pts.`;
+      iWon = true;
     } else {
-      verdictEl.classList.add('hidden');
+      const gap = champRow.score_points - points;
+      verdictEl.textContent = gap === 0
+        ? `🤝 Tied with ${displayName(champRow.username)} at ${champRow.score_points}!`
+        : `You missed ${displayName(champRow.username)}'s ${champRow.score_points} by ${gap} — they're the Game Champion.`;
+      iWon = false;
     }
+    verdictEl.classList.remove('hidden');
   } else {
     verdictEl.classList.add('hidden');
   }
 
-  // Duel Record on the scorecard — same exclusive gate as everywhere else: only
-  // when THIS round was itself a direct callout (a Challenge or Challenge Back)
-  // and I'm one of the two named in it, never for an own-round or an open Trial
-  // someone just happened to join.
+  // Duel Record on the scorecard — same exclusive gate as everywhere else
+  // (a direct Challenge/Challenge-back, I'm one of the two named), PLUS one
+  // more condition: only when that same person is ALSO the current
+  // champion. Otherwise this card and the verdict above tell two different,
+  // contradictory-feeling stories at once (e.g. "3-1 lifetime vs A" sitting
+  // right next to "you lost to B this Match") — A's record doesn't
+  // disappear, it just waits until A and you are actually facing off.
   const duelHolder = $('score-duel-holder');
   duelHolder.innerHTML = '';
   if (currentRound.target_username && (me === currentRound.creator_username || me === currentRound.target_username)) {
     const opponent = me === currentRound.creator_username ? currentRound.target_username : currentRound.creator_username;
-    const record = await computeDuelRecordLifetime(me, opponent);
-    if (record.total > 0) {
-      duelHolder.innerHTML = duelRecordCard(opponent, record);
+    if (champRow && champRow.username === opponent) {
+      const record = await computeDuelRecordLifetime(me, opponent);
+      if (record.total > 0) {
+        duelHolder.innerHTML = duelRecordCard(opponent, record);
+      }
     }
   }
 
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
-    // The person I actually just competed against is NOT always target_username —
-    // that field just records who the round was aimed at when CREATED, which can
-    // be a totally different third person if I played someone else's targeted
-    // Trial. The real opponent: if this is my own round, whoever I called out
-    // when creating it (target_username); otherwise the creator, whose score I
-    // actually just compared against for the verdict above. Same resolution
-    // already used for Duel Record on the Trial screen.
-    const opponent = isOwnRound ? currentRound.target_username : currentRound.creator_username;
+    // Call out whoever's actually the champion right now — not always the
+    // round's creator, same reasoning as the verdict above. Nothing to call
+    // out if I'm the one holding the crown.
+    const opponent = champRow && champRow.username !== me ? champRow.username : null;
     if (opponent) {
       shareText(`🎯 ${displayName(me)} challenges ${displayName(opponent)} — ${points} pts on Match #${currentRound.trial_number} in MaxWord's "${currentRoom.name}". Can you beat it?\n\n⚔️ ${url}`);
     } else {
@@ -2829,22 +2965,22 @@ async function renderScorecard(correct, points, newBadges) {
     }
   };
 
-  // Challenge-back only exists when there's someone to challenge: hidden entirely on
-  // your own round (nothing to beat yet) AND on a win (nothing to avenge) — only
-  // shown, bold, when you've lost or tied. One consistent phrase everywhere this
-  // action appears: "Challenge [name] back."
+  // Challenge-back always targets the current champion — hidden entirely
+  // when I'm already the champion (nothing to avenge) or when there's no
+  // leaderboard yet at all. One consistent phrase everywhere this action
+  // appears: "Challenge [name] back."
   const dareBackBtn = $('btn-dare-back');
-  if (isOwnRound || iWon === true) {
+  if (iWon === true || iWon === null) {
     dareBackBtn.classList.add('hidden');
     $('btn-challenge-others').className = 'btn-primary';
   } else {
     dareBackBtn.classList.remove('hidden');
     dareBackBtn.className = 'btn-primary';
-    dareBackBtn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
+    dareBackBtn.textContent = `Challenge ${displayName(champRow.username)} back`;
     $('btn-challenge-others').className = 'btn-secondary';
   }
 
-  dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(currentRound.creator_username, true); };
+  dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(champRow.username, true); };
 
   // First two games ever: replace the normal button row entirely with a single
   // tailored next step, rather than a menu of choices — this is the one place a
@@ -2866,11 +3002,11 @@ async function renderScorecard(correct, points, newBadges) {
     const card = document.createElement('div');
     card.className = 'forced-flow-card';
     if (iWon === false) {
-      card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Match, aimed straight at whoever just beat you.</div>`;
+      card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Match, aimed straight at whoever's currently the Game Champion.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
-      btn.textContent = `Challenge ${displayName(currentRound.creator_username)} back`;
-      btn.onclick = () => { btn.disabled = true; startNewRound(currentRound.creator_username, true); };
+      btn.textContent = `Challenge ${displayName(champRow.username)} back`;
+      btn.onclick = () => { btn.disabled = true; startNewRound(champRow.username, true); };
       card.appendChild(btn);
     } else if (soloRoom) {
       // Nobody to pick from — skip the picker dead-end entirely and go straight

@@ -153,6 +153,13 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-card-byline-name { color: var(--cream); font-weight: 600; }
 .trial-status-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1.5px solid var(--gold); color: var(--gold); white-space: nowrap; flex-shrink: 0; background: transparent; font-weight: 600; }
 .trial-status-badge.losing { border-color: var(--danger); color: #F0A898; }
+/* Match card badge "i" — wraps badge+button so trial-card-top's
+   space-between still only sees 2 flex children (number, wrap). */
+.trial-badge-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.match-info-btn { background: none; border: 1px solid var(--gold-soft); color: var(--cream-dim); width: 16px; height: 16px; border-radius: 50%; font-size: 10px; line-height: 1; cursor: pointer; padding: 0; flex-shrink: 0; }
+.match-info-btn.active { border-color: var(--gold); color: var(--gold); }
+.match-info-tip { display: none; font-size: 11.5px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 6px 8px; margin-bottom: 6px; line-height: 1.4; }
+.match-info-tip.show { display: block; }
 .trial-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .trial-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--cream-dim); }
 .trial-tag.mine { border-color: var(--gold); color: var(--gold); }
@@ -186,19 +193,19 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-ticker.clickable { cursor: pointer; }
 .room-stat-grid { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
-.stat-row { display: grid; grid-template-columns: 24px 32px 1fr; align-items: baseline; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; }
+.stat-row { display: grid; grid-template-columns: 24px 32px 1fr 20px; align-items: baseline; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; }
 .stat-row:not(:last-child) { border-bottom: 1px solid var(--line); }
 .stat-row:last-child { margin-bottom: 0; padding-bottom: 0; }
 .stat-row .stat-icon { font-size: 15px; }
 .room-stat-grid .stat-val { color: var(--cream); font-weight: 700; text-align: right; }
 .room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--cream-dim); text-decoration: underline; cursor: pointer; margin-top: 6px; }
-/* Profile-only: every stat row gets a tap-to-explain "i". Scoped to this
-   view so Home/Room's .stat-row grid (no reserved 4th column) is untouched. */
-#view-player-profile .stat-row { grid-template-columns: 24px 32px 1fr 20px; }
-#view-player-profile .info-btn { background: none; border: 1px solid var(--line); color: var(--cream-dim); width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer; padding: 0; font-family: inherit; align-self: center; }
-#view-player-profile .info-btn.active { border-color: var(--gold-soft); color: var(--gold); }
-#view-player-profile .info-tip { display: none; grid-column: 1 / -1; font-size: 12px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 8px 10px; margin-top: 4px; line-height: 1.4; }
-#view-player-profile .info-tip.show { display: block; }
+/* Every stat row (Home, Room, Profile) gets a tap-to-explain "i" — was
+   Profile-only at first, now shared everywhere since every stat row uses
+   the same statRow() helper regardless of which screen renders it. */
+.info-btn { background: none; border: 1px solid var(--line); color: var(--cream-dim); width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer; padding: 0; font-family: inherit; align-self: center; }
+.info-btn.active { border-color: var(--gold-soft); color: var(--gold); }
+.info-tip { display: none; grid-column: 1 / -1; font-size: 12px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 8px 10px; margin-top: 4px; line-height: 1.4; }
+.info-tip.show { display: block; }
 /* Profile-only: gold border on every card, not just badges — nothing on
    this page is "actionable" vs "just informational" (unlike Room), so
    there's no hierarchy for grey to demote; whole page reads as one
@@ -745,22 +752,29 @@ async function openPlayerProfile(username) {
     : `<div class="empty-state">You haven't dueled ${displayName(username)} directly yet.</div>`;
 }
 $('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
-// Single delegated listener for every stat row's "i" — rows are rebuilt via
-// innerHTML each time the page opens, so per-button onclick would be
-// re-attached anyway; delegation avoids that churn entirely.
-$('view-player-profile').addEventListener('click', (e) => {
-  const btn = e.target.closest('.info-btn');
-  if (btn) {
-    const tip = btn.nextElementSibling;
-    if (tip && tip.classList.contains('info-tip')) {
-      const showing = tip.classList.toggle('show');
-      btn.classList.toggle('active', showing);
+// Shared "i" delegation — stat rows are rebuilt via innerHTML every render,
+// so per-button onclick would be re-attached anyway; delegation on the
+// stable outer view avoids that churn. Same handler used on Home and Room
+// now too (was Profile-only at first); badge-tile toggling stays
+// Profile-specific since Home/Room have no .badge-grid.
+function attachInfoBtnDelegation(viewId) {
+  $(viewId).addEventListener('click', (e) => {
+    const btn = e.target.closest('.info-btn');
+    if (btn) {
+      const tip = btn.nextElementSibling;
+      if (tip && tip.classList.contains('info-tip')) {
+        const showing = tip.classList.toggle('show');
+        btn.classList.toggle('active', showing);
+      }
+      return;
     }
-    return;
-  }
-  const tile = e.target.closest('.badge-grid .badge-earned-card');
-  if (tile) tile.classList.toggle('open');
-});
+    const tile = e.target.closest('.badge-grid .badge-earned-card');
+    if (tile) tile.classList.toggle('open');
+  });
+}
+attachInfoBtnDelegation('view-player-profile');
+attachInfoBtnDelegation('view-home');
+attachInfoBtnDelegation('view-room');
 
 // Same idea as computeDuelRecord, but across every room you've ever shared a
 // direct Trial in — a profile page has no "current room" to scope to, and
@@ -1166,25 +1180,25 @@ async function renderStatusRow() {
   const rankSuffix = r => r ? ` (#${r})` : '';
   activityHolder.innerHTML = `
     <div class="room-stat-grid primary">
-      <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless${rankSuffix(globalStats.flawlessRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${played}</span><span>Matches Played${rankSuffix(globalStats.playedRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${globalStats.myActiveDays}</span><span>Active Days${rankSuffix(globalStats.activeDaysRank)}</span></div>
+      ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
+      ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
+      ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.')}
+      ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.')}
     </div>`;
 
-  const streakPart = streak && streak.current_streak > 0 ? `<div class="stat-row"><span class="stat-icon">🔥</span><span class="stat-val">${streak.current_streak}</span><span>Streak</span></div>` : '';
-  const crownsHeldPart = crowns ? `<div class="stat-row"><span class="stat-icon">👑</span><span class="stat-val">${crowns}</span><span>Crowns Held</span></div>` : '';
-  const lifetimeWinsPart = lifetimeWins ? `<div class="stat-row"><span class="stat-icon">🏆</span><span class="stat-val">${lifetimeWins}</span><span>Lifetime Wins</span></div>` : '';
+  const streakPart = streak && streak.current_streak > 0 ? statRow('🔥', streak.current_streak, 'Streak', 'Consecutive days you\'ve played without a gap.') : '';
+  const crownsHeldPart = crowns ? statRow('👑', crowns, 'Crowns Held', 'Matches where you currently hold the top score.') : '';
+  const lifetimeWinsPart = lifetimeWins ? statRow('🏆', lifetimeWins, 'Lifetime Wins', 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.') : '';
   const moreCount = [streakPart, crownsHeldPart, lifetimeWinsPart].filter(Boolean).length + 6;
   moreHolder.innerHTML = `
     <div id="home-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-      <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${stats.dethroned}</span><span>Dethroned</span></div>
-      <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${stats.wordsPlayed}</span><span>Words Played</span></div>
-      <div class="stat-row"><span class="stat-icon">📜</span><span class="stat-val">${stats.startMatch}</span><span>Start Match</span></div>
-      <div class="stat-row"><span class="stat-icon">🎯</span><span class="stat-val">${stats.counter}</span><span>Counter</span></div>
-      <div class="stat-row"><span class="stat-icon">☝️</span><span class="stat-val">${stats.firstFights}</span><span>First Fights</span></div>
-      <div class="stat-row"><span class="stat-icon">⚔️</span><span class="stat-val">${stats.joinMatch}</span><span>Join Match</span></div>
+      ${statRow('🔻', stats.dethroned, 'Dethroned', 'Times someone has beaten your top score after you set it.')}
+      ${statRow('✍️', stats.wordsPlayed, 'Words Played', 'Total words answered across every match, right or wrong.')}
+      ${statRow('📜', stats.startMatch, 'Start Match', 'Matches you started yourself.')}
+      ${statRow('🎯', stats.counter, 'Counter', 'Times you fired back after being challenged.')}
+      ${statRow('☝️', stats.firstFights, 'First Fights', 'Matches you were the very first to play.')}
+      ${statRow('⚔️', stats.joinMatch, 'Join Match', 'Matches someone else started that you joined.')}
     </div>
     <span class="room-stats-toggle" id="home-stats-toggle">▸ ${moreCount} more stats</span>
   `;
@@ -1647,36 +1661,52 @@ async function loadDares() {
     // rankLine is kept as its own separate line (never concatenated into statusLine)
     // so "#R of T" doesn't wrap unpredictably depending on username length — it only
     // appears once you've actually played and have a rank to show.
-    let badge, badgeClass, statusLine, rankLine = '';
+    let badge, badgeClass, badgeInfo, statusLine, rankLine = '';
     if (state === 'champion') {
       badge = '👑 crown holder'; badgeClass = 'champion';
+      badgeInfo = 'You\'re currently in the lead on this Match.';
       statusLine = `${myRow.score_points} pts`;
       rankLine = `#1 of ${rows.length}`;
     } else if (state === 'losing') {
       badge = '👎 lost your crown'; badgeClass = 'losing';
+      badgeInfo = 'Someone beat your score — replay to try to reclaim the lead.';
       statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts`;
       rankLine = `#${myRow.rank} of ${rows.length}`;
     } else if (state === 'challenged_back') {
       badge = '🎯 counter challenge'; badgeClass = 'challenged-back';
+      badgeInfo = 'You challenged them back after they challenged you first.';
       statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     } else if (state === 'targeted') {
       badge = '🎯 challenge you'; badgeClass = 'targeted';
+      badgeInfo = 'Someone called you out directly on this Match.';
       statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     } else {
       // Generic open Trial — still worth a nudge, just a lighter-touch one than a
       // personal callout: an invitation, not a demand.
       badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
+      badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
       statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     }
 
     div.innerHTML = `
       <div class="trial-card-top">
         <div class="trial-card-number">📜 Match #${r.trial_number}</div>
-        <span class="trial-status-badge ${badgeClass}">${badge}</span>
+        <div class="trial-badge-wrap">
+          <span class="trial-status-badge ${badgeClass}">${badge}</span>
+          <button class="match-info-btn" type="button" aria-label="What does this mean?">i</button>
+        </div>
       </div>
+      <div class="match-info-tip">${badgeInfo}</div>
       <div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>
       <div class="dare-sub">${statusLine}</div>
       <div class="dare-sub">${rankLine ? rankLine + ' · ' : ''}played by ${rows.length}</div>`;
+    const matchInfoBtn = div.querySelector('.match-info-btn');
+    matchInfoBtn.onclick = (e) => {
+      e.stopPropagation();
+      const tip = div.querySelector('.match-info-tip');
+      const showing = tip.classList.toggle('show');
+      matchInfoBtn.classList.toggle('active', showing);
+    };
     list.appendChild(div);
   }
 
@@ -2019,18 +2049,18 @@ async function renderRoomStatsHeader() {
     <div class="room-ticker${duelTicker ? ' stacked-top' : ''}">${ticker}</div>
     <div id="room-duel-ticker-holder"></div>
     <div class="room-stat-grid primary">
-      <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless${rankSuffix(roomStats.flawlessRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${roomStats.myPlayed}</span><span>Matches Played${rankSuffix(roomStats.playedRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${roomStats.myActiveDays}</span><span>Active Days${rankSuffix(roomStats.activeDaysRank)}</span></div>
+      ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
+      ${statRow('✨', roomStats.myFlawless, `Flawless${rankSuffix(roomStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
+      ${statRow('🗡️', roomStats.myPlayed, `Matches Played${rankSuffix(roomStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.')}
+      ${statRow('📅', roomStats.myActiveDays, `Active Days${rankSuffix(roomStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.')}
     </div>
     <div id="room-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
-      <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${dethronedCount || 0}</span><span>Dethroned</span></div>
-      <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${wordsPlayed}</span><span>Words Played</span></div>
-      <div class="stat-row"><span class="stat-icon">📜</span><span class="stat-val">${activity.challenges}</span><span>Start Match</span></div>
-      <div class="stat-row"><span class="stat-icon">🎯</span><span class="stat-val">${activity.challengeBacks}</span><span>Counter</span></div>
-      <div class="stat-row"><span class="stat-icon">☝️</span><span class="stat-val">${activity.firstFights}</span><span>First Fights</span></div>
-      <div class="stat-row"><span class="stat-icon">⚔️</span><span class="stat-val">${joinedMatches}</span><span>Join Match</span></div>
+      ${statRow('🔻', dethronedCount || 0, 'Dethroned', 'Times someone has beaten your top score after you set it.')}
+      ${statRow('✍️', wordsPlayed, 'Words Played', 'Total words answered across every match, right or wrong.')}
+      ${statRow('📜', activity.challenges, 'Start Match', 'Matches you started yourself.')}
+      ${statRow('🎯', activity.challengeBacks, 'Counter', 'Times you fired back after being challenged.')}
+      ${statRow('☝️', activity.firstFights, 'First Fights', 'Matches you were the very first to play.')}
+      ${statRow('⚔️', joinedMatches, 'Join Match', 'Matches someone else started that you joined.')}
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;

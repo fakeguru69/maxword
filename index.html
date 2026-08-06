@@ -1868,7 +1868,7 @@ async function renderRoomStatsHeader() {
     sb.from('room_visit_snapshots').select('*').eq('username', me).eq('room_id', roomId).maybeSingle(),
     computeRoomStatRankings(roomId),
     computeWordsMasteredRanking(),
-    computeDuelTicker(),
+    computeDuelTicker().catch(err => { console.error('Duel ticker failed:', err); return null; }),
   ]);
 
   const gamesPlayed = (myScores || []).length;

@@ -1906,7 +1906,6 @@ async function renderRoomStatsHeader() {
   }
 
   $('btn-open-room-leaderboard').innerHTML = myRank ? `🏆 Leaderboard (#${myRank})` : '🏆 Leaderboard';
-  $('room-headline-link').onclick = () => $('btn-open-room-leaderboard').click();
 
   // ---- Ticker: priority order, first match wins, only ONE shown ----
   let ticker = null;
@@ -1967,6 +1966,7 @@ async function renderRoomStatsHeader() {
   `;
   holder.appendChild(block);
   $('room-header-username').onclick = () => openPlayerProfile(me);
+  $('room-headline-link').onclick = () => $('btn-open-room-leaderboard').click();
   if (duelTicker) {
     const clickable = duelTicker.opponent ? 'clickable' : '';
     $('room-duel-ticker-holder').innerHTML = `<div class="room-ticker danger ${clickable}">${duelTicker.text}</div>`;

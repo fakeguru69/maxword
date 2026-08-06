@@ -173,9 +173,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .completionist-line { font-size: 12px; color: var(--cream-dim); text-align: center; margin-bottom: 10px; }
 .urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
 .duel-record { text-align: center; font-size: 14px; color: var(--cream); margin-bottom: 14px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
-.duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.08); margin-top: 16px; margin-bottom: 14px; }
-.duel-record-title-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 10px; }
-.duel-record-title { font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.08); margin-top: 16px; margin-bottom: 14px; cursor: pointer; }
+.duel-record-title { font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
 .duel-info-tip { text-align: left; margin-bottom: 10px; }
 .duel-record-vs { font-size: 13px; color: var(--cream); margin-bottom: 8px; }
 .duel-record-vs .opponent-name { color: var(--cream); }
@@ -632,11 +631,8 @@ function statRow(icon, val, label, info, statKey = null) {
 // triplicated inline before; now one source of truth for both the markup
 // and the explainer text.
 function duelRecordCard(opponentUsername, record) {
-  return `<div class="duel-record-card">
-    <div class="duel-record-title-row">
-      <span class="duel-record-title">⚔️ Duel Record ⚔️</span>
-      <button class="info-btn" type="button" aria-label="What is this?">i</button>
-    </div>
+  return `<div class="duel-record-card" data-expandable="duel">
+    <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
     <div class="info-tip duel-info-tip">Head-to-head record between you two — counts only direct Challenges and Counter-challenges between you, not other Matches you both happened to join.</div>
     <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponentUsername)}</span></div>
     <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
@@ -799,6 +795,12 @@ function attachInfoBtnDelegation(viewId) {
     }
     const tile = e.target.closest('.badge-grid .badge-earned-card');
     if (tile) { tile.classList.toggle('open'); return; }
+    const duelCard = e.target.closest('.duel-record-card[data-expandable]');
+    if (duelCard) {
+      const tip = duelCard.querySelector('.duel-info-tip');
+      if (tip) tip.classList.toggle('show');
+      return;
+    }
     const statRowEl = e.target.closest('.stat-row[data-stat-key]');
     if (statRowEl) {
       const { scope, roomId } = statLeaderboardScopeFor(viewId);
@@ -2961,17 +2963,34 @@ async function renderOtherDares() {
   (allLb || []).forEach(row => { champByRound[row.round_id] = row; });
   for (const r of shown) {
     const champ = champByRound[r.id] || null;
-    let badge, badgeClass;
+    let badge, badgeClass, badgeInfo;
     if (r.target_username === me) {
-      if (r.via_challenge_back) { badge = '🎯 counter challenge'; badgeClass = 'challenged-back'; }
-      else { badge = '🎯 challenge you'; badgeClass = 'targeted'; }
+      if (r.via_challenge_back) { badge = '🎯 counter challenge'; badgeClass = 'challenged-back'; badgeInfo = 'You challenged them back after they challenged you first.'; }
+      else { badge = '🎯 challenge you'; badgeClass = 'targeted'; badgeInfo = 'Someone called you out directly on this Match.'; }
     } else {
       badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
+      badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
     }
     const div = document.createElement('div');
     div.className = 'trial-card state-targeted';
     div.onclick = () => openTrialScreen(r);
-    div.innerHTML = `<div class="trial-card-top"><div class="trial-card-number">📜 Match #${r.trial_number}</div><span class="trial-status-badge ${badgeClass}">${badge}</span></div><div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>`;
+    div.innerHTML = `
+      <div class="trial-card-top">
+        <div class="trial-card-number">📜 Match #${r.trial_number}</div>
+        <div class="trial-badge-wrap">
+          <span class="trial-status-badge ${badgeClass}">${badge}</span>
+          <button class="match-info-btn" type="button" aria-label="What does this mean?">i</button>
+        </div>
+      </div>
+      <div class="match-info-tip">${badgeInfo}</div>
+      <div class="trial-card-byline">started by <span class="trial-card-byline-name">${displayName(r.creator_username)}</span></div>`;
+    const matchInfoBtn = div.querySelector('.match-info-btn');
+    matchInfoBtn.onclick = (e) => {
+      e.stopPropagation();
+      const tip = div.querySelector('.match-info-tip');
+      const showing = tip.classList.toggle('show');
+      matchInfoBtn.classList.toggle('active', showing);
+    };
     holder.appendChild(div);
   }
 }

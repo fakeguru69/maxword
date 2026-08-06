@@ -396,8 +396,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="rank-banner" class="rank-banner hidden"></div>
     <div class="tabs-sub">
       <div class="tab" data-room-period="weekly">Week</div>
-      <div class="tab active" data-room-period="monthly">Month</div>
-      <div class="tab" data-room-period="alltime">All-time</div>
+      <div class="tab" data-room-period="monthly">Month</div>
+      <div class="tab active" data-room-period="alltime">All-time</div>
     </div>
     <div id="leaderboard-list"></div>
   </section>
@@ -436,8 +436,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="rank-banner-global" class="rank-banner hidden"></div>
     <div class="tabs-sub">
       <div class="tab" data-global-period="weekly">Week</div>
-      <div class="tab active" data-global-period="monthly">Month</div>
-      <div class="tab" data-global-period="alltime">All-time</div>
+      <div class="tab" data-global-period="monthly">Month</div>
+      <div class="tab active" data-global-period="alltime">All-time</div>
     </div>
     <div id="leaderboard-list-global"></div>
   </section>
@@ -469,7 +469,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
        Room, or Profile. Same scope the stat itself used (global or room). -->
   <section id="view-stat-leaderboard" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-stat-leaderboard-back">&larr; Back</button>
-    <div class="section-label strong" id="stat-leaderboard-title"></div>
+    <h2 class="display" id="stat-leaderboard-title" style="margin-bottom:4px;"></h2>
+    <div class="section-label" id="stat-leaderboard-subtitle" style="margin-top:0; margin-bottom:14px;"></div>
     <div id="stat-leaderboard-list"></div>
   </section>
 
@@ -859,7 +860,14 @@ function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i-
 // Usernames are stored lowercase (case-insensitive login) but shown in caps
 // everywhere in the UI to match the Cinzel/seal aesthetic — visual only,
 // never affects storage, matching, or login.
-function displayName(u) { return (u || '').toUpperCase(); }
+// Capped at 14 chars everywhere names render — this is the single source
+// every screen's "name + something else" pairing (leaderboard row + score,
+// "started by X", "YOU vs. X") reads from, so fixing wrap here fixes it
+// everywhere at once rather than patching each context's CSS separately.
+function displayName(u) {
+  const name = (u || '').toUpperCase();
+  return name.length > 14 ? name.slice(0, 13) + '…' : name;
+}
 // Same idea, but for the one spot (a button sitting in an otherwise normal
 // sentence) where all-caps clashes with the rest of the label instead of
 // reading as a stylistic seal — e.g. "Challenge Apple back," not the jarring
@@ -930,8 +938,8 @@ let currentRound = null;    // { id, room_id, creator_username, target_username,
 let roundWords = [];        // resolved word objects
 let roundAnswers = [];      // booleans per question
 let qIndex = 0;
-let lbPeriod = 'monthly';         // in-room leaderboard: 'weekly' | 'monthly' | 'alltime'
-let globalLbPeriod = 'monthly';   // standalone Global Leaderboard screen: same options
+let lbPeriod = 'alltime';         // in-room leaderboard: 'weekly' | 'monthly' | 'alltime'
+let globalLbPeriod = 'alltime';   // standalone Global Leaderboard screen: same options
 let deepLinkParams = null;
 
 // ---------------------------------------------------------------
@@ -2044,14 +2052,21 @@ async function computeQuietStatsByUser(scope, roomId) {
   const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, lifetimeWins: 0, dethroned: 0, wordsPlayed: new Set(), startMatch: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
   if (pool) pool.forEach(ensure);
 
-  (streakRows || []).forEach(r => { if (!isRoom || byUser[r.username]) ensure(r.username).streak = r.current_streak || 0; });
-  (crownRows || []).forEach(r => ensure(r.username).crowns++);
-  (winRows || []).forEach(r => ensure(r.username).lifetimeWins++);
-  (dethroneRows || []).forEach(r => ensure(r.username).dethroned++);
-  (wordAnswerRows || []).forEach(r => ensure(r.username).wordsPlayed.add(r.word_id));
-  (roundRows || []).forEach(r => { const u = ensure(r.creator_username); if (r.via_challenge_back) u.counter++; else u.startMatch++; });
-  (firstFightRows || []).forEach(r => ensure(r.username).firstFights++);
-  (joinScoreRows || []).forEach(r => { if (r.rounds.creator_username !== r.username && r.rounds.target_username !== r.username) ensure(r.username).joinMatch++; });
+  // Every row is guarded against a missing username field before touching
+  // `ensure()` — confirmed via direct DB query that none of these columns
+  // are ever NULL, but a missing/misshapen embed on any one row (e.g. an
+  // unexpected array instead of object from a !inner join) silently reading
+  // as JS `undefined` would otherwise create a phantom "undefined" entry
+  // that then shows up as a fake player in every leaderboard. Cheap
+  // insurance regardless of which exact row it ever was.
+  (streakRows || []).forEach(r => { if (r.username && (!isRoom || byUser[r.username])) ensure(r.username).streak = r.current_streak || 0; });
+  (crownRows || []).forEach(r => { if (r.username) ensure(r.username).crowns++; });
+  (winRows || []).forEach(r => { if (r.username) ensure(r.username).lifetimeWins++; });
+  (dethroneRows || []).forEach(r => { if (r.dethroned_by_username) ensure(r.dethroned_by_username).dethroned++; });
+  (wordAnswerRows || []).forEach(r => { if (r.username) ensure(r.username).wordsPlayed.add(r.word_id); });
+  (roundRows || []).forEach(r => { if (!r.creator_username) return; const u = ensure(r.creator_username); if (r.via_challenge_back) u.counter++; else u.startMatch++; });
+  (firstFightRows || []).forEach(r => { if (r.username) ensure(r.username).firstFights++; });
+  (joinScoreRows || []).forEach(r => { if (!r.username || !r.rounds) return; if (r.rounds.creator_username !== r.username && r.rounds.target_username !== r.username) ensure(r.username).joinMatch++; });
 
   return byUser;
 }
@@ -2121,6 +2136,7 @@ async function computeStatLeaderboard(statKey, scope, roomId) {
       (members || []).forEach(m => { byUser[m.username] = { flawless: 0, days: new Set(), played: 0 }; });
     }
     (scores || []).forEach(s => {
+      if (!s.username) return;
       if (!byUser[s.username]) byUser[s.username] = { flawless: 0, days: new Set(), played: 0 };
       byUser[s.username].played++;
       if (s.correct_count === s.total_count) byUser[s.username].flawless++;
@@ -2144,7 +2160,8 @@ async function openStatLeaderboard(statKey, scope, roomId) {
   if (!meta) return; // unranked stat (Accuracy) — tapping it does nothing, no leaderboard exists
   statLeaderboardReturnView = currentVisibleViewId();
   show('view-stat-leaderboard');
-  $('stat-leaderboard-title').textContent = `${meta.icon} ${meta.label} — ${scope === 'room' ? 'This Room' : 'Global'}`;
+  $('stat-leaderboard-title').textContent = `${meta.icon} ${meta.label}`;
+  $('stat-leaderboard-subtitle').textContent = scope === 'room' && currentRoom ? `${currentRoom.name} — This Room` : 'Global';
   $('stat-leaderboard-list').innerHTML = '<div class="empty-state">Loading…</div>';
   const { rows } = await computeStatLeaderboard(statKey, scope, roomId);
   if (rows.length === 0) { $('stat-leaderboard-list').innerHTML = '<div class="empty-state">Nobody has a score here yet.</div>'; return; }

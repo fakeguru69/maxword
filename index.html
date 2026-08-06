@@ -279,9 +279,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div style="display:flex; justify-content:flex-end;">
       <button class="link-btn" id="btn-logout">Log out</button>
     </div>
-    <div class="room-stats-header-block">
+    <div class="room-stats-header-block" style="margin:0 -18px;">
       <div class="account-name-line" id="account-username-display" style="margin-bottom:0; cursor:pointer;">Signed in</div>
       <div id="status-row-holder"></div>
+      <div id="home-ticker-holder"></div>
       <div id="home-activity-holder"></div>
       <div id="home-more-holder"></div>
     </div>
@@ -1071,6 +1072,22 @@ async function renderStatusRow() {
   statusHolder.innerHTML = myIndex !== -1
     ? `<div class="room-headline" style="color:var(--cream);">🌍 #${myIndex + 1} GLOBAL RANK · 🗡️ ${activityPart} PLAYED</div>`
     : `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
+
+  // Ticker — same priority-pick pattern as Room's (streak-risk > near-miss),
+  // reusing data already fetched above (no new queries). Home is the "what's
+  // urgent right now" landing spot, which is exactly the job this does — a
+  // better fit here than it was on Profile, where everything is deliberately
+  // shown open/at-rest and there's nothing for a ticker to be surfacing.
+  let ticker = null;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (streak && streak.current_streak > 0 && streak.last_played_date !== todayStr) {
+    ticker = `Play today or lose your ${streak.current_streak}-day streak`;
+  } else if (myIndex > 0) {
+    const aheadOfMe = sorted[myIndex - 1];
+    const gap = Math.max(1, Math.round(aheadOfMe.avg_score - sorted[myIndex].avg_score));
+    ticker = `${gap} pts from #${myIndex}`;
+  }
+  $('home-ticker-holder').innerHTML = ticker ? `<div class="room-ticker">${ticker}</div>` : '';
 
   const rankSuffix = r => r ? ` (#${r})` : '';
   activityHolder.innerHTML = `

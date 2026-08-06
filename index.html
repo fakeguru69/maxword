@@ -204,6 +204,16 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    there's no hierarchy for grey to demote; whole page reads as one
    celebratory case instead. */
 #view-player-profile .room-stats-header-block { border-color: var(--gold); }
+/* Profile-only: nameplate treated like a trading-card top third — double
+   border (frame + inner), circular initials avatar (no real photo/icon
+   system exists, so this is a placeholder monogram, not a final art
+   decision), small tagline under the headline. */
+.profile-frame { border: 2px solid var(--gold); border-radius: 16px; padding: 4px; margin-bottom: 12px; background: linear-gradient(180deg, rgba(212,175,55,0.10), rgba(212,175,55,0.02)); }
+.profile-frame-inner { border: 1px solid var(--gold-soft); border-radius: 12px; padding: 20px 16px; text-align: center; }
+.profile-avatar { width: 56px; height: 56px; margin: 0 auto 10px auto; border: 2px solid var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; font-family: 'Cinzel', serif; color: var(--gold); background: rgba(212,175,55,0.08); }
+.profile-frame .account-name-line { text-align: center; }
+.profile-frame .room-headline { text-align: center; }
+.profile-tagline { margin-top: 8px; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold-soft); }
 /* Profile-only: badges as a 2-col tap-to-expand grid, feels like a badge
    case rather than a settings list. Scoped under .badge-grid so the
    scorecard's post-round "new badge" popup (plain .badge-earned-card,
@@ -427,9 +437,13 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
        and never appears here, except when viewing your own profile. -->
   <section id="view-player-profile" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-player-profile-back">&larr; Back</button>
-    <div class="room-stats-header-block">
-      <div class="account-name-line" id="player-profile-name" style="margin-bottom:0;"></div>
-      <div id="player-profile-status-holder"></div>
+    <div class="profile-frame">
+      <div class="profile-frame-inner">
+        <div class="profile-avatar" id="player-profile-avatar"></div>
+        <div class="account-name-line" id="player-profile-name" style="margin-bottom:0;"></div>
+        <div id="player-profile-status-holder"></div>
+        <div class="profile-tagline">GP Vocabulary Showdown</div>
+      </div>
     </div>
     <div class="section-label strong" id="player-profile-stats-label">Stats</div>
     <div class="room-stats-header-block" id="player-profile-stats-card">
@@ -598,6 +612,7 @@ async function openPlayerProfile(username) {
   show('view-player-profile');
   const isSelf = username === me;
   $('player-profile-name').textContent = displayName(username);
+  $('player-profile-avatar').textContent = displayName(username).charAt(0);
 
   const [
     { data: rows },

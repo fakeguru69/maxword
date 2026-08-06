@@ -173,8 +173,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .completionist-line { font-size: 12px; color: var(--cream-dim); text-align: center; margin-bottom: 10px; }
 .urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
 .duel-record { text-align: center; font-size: 14px; color: var(--cream); margin-bottom: 14px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
-.duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.08); margin-bottom: 14px; }
-.duel-record-title { font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+.duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.08); margin-top: 16px; margin-bottom: 14px; }
+.duel-record-title-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 10px; }
+.duel-record-title { font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.duel-info-tip { text-align: left; margin-bottom: 10px; }
 .duel-record-vs { font-size: 13px; color: var(--cream); margin-bottom: 8px; }
 .duel-record-vs .opponent-name { color: var(--cream); }
 .duel-record-score { font-family: 'Cinzel', serif; font-size: 34px; font-weight: 900; color: var(--gold); letter-spacing: 0.06em; line-height: 1; }
@@ -206,6 +208,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .info-btn.active { border-color: var(--gold-soft); color: var(--gold); }
 .info-tip { display: none; grid-column: 1 / -1; font-size: 12px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 8px 10px; margin-top: 4px; line-height: 1.4; }
 .info-tip.show { display: block; }
+.stat-row[data-stat-key] { cursor: pointer; }
 /* Profile-only: gold border on every card, not just badges — nothing on
    this page is "actionable" vs "just informational" (unlike Room), so
    there's no hierarchy for grey to demote; whole page reads as one
@@ -462,6 +465,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="player-profile-duel-holder"></div>
   </section>
 
+  <!-- PER-STAT LEADERBOARD — reached by tapping any ranked stat row on Home,
+       Room, or Profile. Same scope the stat itself used (global or room). -->
+  <section id="view-stat-leaderboard" class="card hidden">
+    <button class="link-btn breadcrumb" id="btn-stat-leaderboard-back">&larr; Back</button>
+    <div class="section-label strong" id="stat-leaderboard-title"></div>
+    <div id="stat-leaderboard-list"></div>
+  </section>
+
   <!-- MEMBERS (separate screen, not a tab — kept out of the main loop) -->
   <section id="view-members" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-members-back">&larr; Back to room</button>
@@ -610,8 +621,25 @@ let playerProfileReturnView = 'view-home';
 // on the Profile page (see scoped CSS above) — Home/Room keep the plain
 // 3-column stat-row, no info button, since their stats already got the
 // psychology audit and don't need re-explaining every time.
-function statRow(icon, val, label, info) {
-  return `<div class="stat-row"><span class="stat-icon">${icon}</span><span class="stat-val">${val}</span><span>${label}</span><button class="info-btn" type="button" aria-label="What is this?">i</button><div class="info-tip">${info}</div></div>`;
+function statRow(icon, val, label, info, statKey = null) {
+  const keyAttr = statKey ? ` data-stat-key="${statKey}"` : '';
+  return `<div class="stat-row"${keyAttr}><span class="stat-icon">${icon}</span><span class="stat-val">${val}</span><span>${label}</span><button class="info-btn" type="button" aria-label="What is this?">i</button><div class="info-tip">${info}</div></div>`;
+}
+
+// Shared markup for the Duel Record card — used on Profile (viewing someone
+// else), the Match/Trial screen, and the post-round Scorecard. Was
+// triplicated inline before; now one source of truth for both the markup
+// and the explainer text.
+function duelRecordCard(opponentUsername, record) {
+  return `<div class="duel-record-card">
+    <div class="duel-record-title-row">
+      <span class="duel-record-title">⚔️ Duel Record ⚔️</span>
+      <button class="info-btn" type="button" aria-label="What is this?">i</button>
+    </div>
+    <div class="info-tip duel-info-tip">Head-to-head record between you two — counts only direct Challenges and Counter-challenges between you, not other Matches you both happened to join.</div>
+    <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponentUsername)}</span></div>
+    <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
+  </div>`;
 }
 
 async function openPlayerProfile(username) {
@@ -624,23 +652,18 @@ async function openPlayerProfile(username) {
   const [
     { data: rows },
     { data: streak },
-    { count: crowns },
-    { data: lifetimeWinRows },
-    stats,
     globalStats,
     masteredStats,
+    quietStats,
   ] = await Promise.all([
     sb.from('global_leaderboard_alltime').select('*'),
     sb.from('streaks').select('*').eq('username', username).maybeSingle(),
-    sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', username).eq('rank', 1),
-    sb.from('lifetime_wins').select('round_id').eq('username', username),
-    computeFullPlayerStats(username),
     computeGlobalStatRankings(username),
     computeWordsMasteredRanking(),
+    computeQuietStatRankings('global', null, username),
   ]);
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const theirIndex = sorted.findIndex(r => r.username === username);
-  const lifetimeWins = new Set((lifetimeWinRows || []).map(r => r.round_id)).size;
   const played = globalStats.myPlayed;
 
   // Activity Rank — same second leaderboard concept as Room's headline, just
@@ -678,10 +701,10 @@ async function openPlayerProfile(username) {
   if (played) {
     $('player-profile-activity-holder').innerHTML = `
       <div class="room-stat-grid primary">
-        ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
-        ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
-        ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.')}
-        ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.')}
+        ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
+        ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
+        ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
+        ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
       </div>`;
   } else {
     $('player-profile-activity-holder').innerHTML = '';
@@ -692,9 +715,9 @@ async function openPlayerProfile(username) {
   // and Lifetime Wins (bragging-rights flavored but weaker than the top 4),
   // Dethroned, Words Played, and the Contribution stats.
   const moreHolder = $('player-profile-more-holder');
-  const streakPart = streak && streak.current_streak > 0 ? statRow('🔥', streak.current_streak, 'Streak', 'Consecutive days you\'ve played without a gap.') : '';
-  const crownsHeldPart = crowns ? statRow('👑', crowns, 'Crowns Held', 'Matches where you currently hold the top score.') : '';
-  const lifetimeWinsPart = lifetimeWins ? statRow('🏆', lifetimeWins, 'Lifetime Wins', 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.') : '';
+  const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
+  const crownsHeldPart = quietStats.crowns.value ? statRow('👑', quietStats.crowns.value, `Crowns Held${rankSuffix(quietStats.crowns.rank)}`, 'Matches where you currently hold the top score.', 'crowns') : '';
+  const lifetimeWinsPart = quietStats.lifetimeWins.value ? statRow('🏆', quietStats.lifetimeWins.value, `Lifetime Wins${rankSuffix(quietStats.lifetimeWins.rank)}`, 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.', 'lifetimeWins') : '';
 
   // Accuracy is strictly self-only — never fetched or shown for anyone else
   // (a percentage can discourage further play if it's ever shown publicly).
@@ -717,12 +740,12 @@ async function openPlayerProfile(username) {
   moreHolder.innerHTML = played ? `
     <div class="room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-      ${statRow('🔻', stats.dethroned, 'Dethroned', 'Times someone has beaten your top score after you set it.')}
-      ${statRow('✍️', stats.wordsPlayed, 'Words Played', 'Total words answered across every match, right or wrong.')}
-      ${statRow('📜', stats.startMatch, 'Start Match', 'Matches you started yourself.')}
-      ${statRow('🎯', stats.counter, 'Counter', 'Times you fired back after being challenged.')}
-      ${statRow('☝️', stats.firstFights, 'First Fights', 'Matches you were the very first to play.')}
-      ${statRow('⚔️', stats.joinMatch, 'Join Match', 'Matches someone else started that you joined.')}
+      ${statRow('🔻', quietStats.dethroned.value, `Dethroned${rankSuffix(quietStats.dethroned.rank)}`, 'Times someone has beaten your top score after you set it.', 'dethroned')}
+      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
+      ${statRow('📜', quietStats.startMatch.value, `Start Match${rankSuffix(quietStats.startMatch.rank)}`, 'Matches you started yourself.', 'startMatch')}
+      ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
+      ${statRow('☝️', quietStats.firstFights.value, `First Fights${rankSuffix(quietStats.firstFights.rank)}`, 'Matches you were the very first to play.', 'firstFights')}
+      ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
       ${accuracyPart}
     </div>` : '';
 
@@ -744,19 +767,24 @@ async function openPlayerProfile(username) {
   }
   const record = await computeDuelRecordLifetime(me, username);
   $('player-profile-duel-holder').innerHTML = record.total > 0
-    ? `<div class="duel-record-card">
-        <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
-        <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(username)}</span></div>
-        <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
-      </div>`
+    ? duelRecordCard(username, record)
     : `<div class="empty-state">You haven't dueled ${displayName(username)} directly yet.</div>`;
 }
 $('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
-// Shared "i" delegation — stat rows are rebuilt via innerHTML every render,
-// so per-button onclick would be re-attached anyway; delegation on the
-// stable outer view avoids that churn. Same handler used on Home and Room
-// now too (was Profile-only at first); badge-tile toggling stays
-// Profile-specific since Home/Room have no .badge-grid.
+// Shared "i" + stat-row-tap delegation — stat rows are rebuilt via innerHTML
+// every render, so per-button onclick would be re-attached anyway;
+// delegation on the stable outer view avoids that churn. Same handler used
+// on Home/Room/Profile (was Profile-only "i" at first); badge-tile toggling
+// and stat-row-tap-for-leaderboard stay scoped to where they're relevant
+// (Home/Room have no .badge-grid; view-trial/view-scorecard have no
+// data-stat-key rows, so those two just no-op past the info-btn/badge checks).
+// Scope for the leaderboard is inferred from which view the tap happened in
+// — Home/Profile are always global, Room always uses whatever room is
+// currently open, matching the existing scoping rule everywhere else.
+function statLeaderboardScopeFor(viewId) {
+  if (viewId === 'view-room') return { scope: 'room', roomId: currentRoom ? currentRoom.id : null };
+  return { scope: 'global', roomId: null };
+}
 function attachInfoBtnDelegation(viewId) {
   $(viewId).addEventListener('click', (e) => {
     const btn = e.target.closest('.info-btn');
@@ -769,12 +797,19 @@ function attachInfoBtnDelegation(viewId) {
       return;
     }
     const tile = e.target.closest('.badge-grid .badge-earned-card');
-    if (tile) tile.classList.toggle('open');
+    if (tile) { tile.classList.toggle('open'); return; }
+    const statRowEl = e.target.closest('.stat-row[data-stat-key]');
+    if (statRowEl) {
+      const { scope, roomId } = statLeaderboardScopeFor(viewId);
+      openStatLeaderboard(statRowEl.dataset.statKey, scope, roomId);
+    }
   });
 }
 attachInfoBtnDelegation('view-player-profile');
 attachInfoBtnDelegation('view-home');
 attachInfoBtnDelegation('view-room');
+attachInfoBtnDelegation('view-trial');
+attachInfoBtnDelegation('view-scorecard');
 
 // Same idea as computeDuelRecord, but across every room you've ever shared a
 // direct Trial in — a profile page has no "current room" to scope to, and
@@ -1130,23 +1165,18 @@ async function renderStatusRow() {
   const [
     { data: rows },
     { data: streak },
-    { count: crowns },
-    { data: lifetimeWinRows },
-    stats,
     globalStats,
     masteredStats,
+    quietStats,
   ] = await Promise.all([
     sb.from('global_leaderboard_alltime').select('*'),
     sb.from('streaks').select('*').eq('username', me).maybeSingle(),
-    sb.from('trial_leaderboard').select('*', { count: 'exact', head: true }).eq('username', me).eq('rank', 1),
-    sb.from('lifetime_wins').select('round_id').eq('username', me),
-    computeFullPlayerStats(me),
     computeGlobalStatRankings(me),
     computeWordsMasteredRanking(),
+    computeQuietStatRankings('global', null),
   ]);
   const sorted = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
   const myIndex = sorted.findIndex(r => r.username === me);
-  const lifetimeWins = new Set((lifetimeWinRows || []).map(r => r.round_id)).size;
   const played = globalStats.myPlayed;
 
   if (!played) { statusHolder.innerHTML = ''; activityHolder.innerHTML = ''; moreHolder.innerHTML = ''; return; }
@@ -1180,25 +1210,25 @@ async function renderStatusRow() {
   const rankSuffix = r => r ? ` (#${r})` : '';
   activityHolder.innerHTML = `
     <div class="room-stat-grid primary">
-      ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
-      ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
-      ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.')}
-      ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.')}
+      ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
+      ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
+      ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
+      ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
     </div>`;
 
-  const streakPart = streak && streak.current_streak > 0 ? statRow('🔥', streak.current_streak, 'Streak', 'Consecutive days you\'ve played without a gap.') : '';
-  const crownsHeldPart = crowns ? statRow('👑', crowns, 'Crowns Held', 'Matches where you currently hold the top score.') : '';
-  const lifetimeWinsPart = lifetimeWins ? statRow('🏆', lifetimeWins, 'Lifetime Wins', 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.') : '';
+  const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
+  const crownsHeldPart = quietStats.crowns.value ? statRow('👑', quietStats.crowns.value, `Crowns Held${rankSuffix(quietStats.crowns.rank)}`, 'Matches where you currently hold the top score.', 'crowns') : '';
+  const lifetimeWinsPart = quietStats.lifetimeWins.value ? statRow('🏆', quietStats.lifetimeWins.value, `Lifetime Wins${rankSuffix(quietStats.lifetimeWins.rank)}`, 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.', 'lifetimeWins') : '';
   const moreCount = [streakPart, crownsHeldPart, lifetimeWinsPart].filter(Boolean).length + 6;
   moreHolder.innerHTML = `
     <div id="home-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-      ${statRow('🔻', stats.dethroned, 'Dethroned', 'Times someone has beaten your top score after you set it.')}
-      ${statRow('✍️', stats.wordsPlayed, 'Words Played', 'Total words answered across every match, right or wrong.')}
-      ${statRow('📜', stats.startMatch, 'Start Match', 'Matches you started yourself.')}
-      ${statRow('🎯', stats.counter, 'Counter', 'Times you fired back after being challenged.')}
-      ${statRow('☝️', stats.firstFights, 'First Fights', 'Matches you were the very first to play.')}
-      ${statRow('⚔️', stats.joinMatch, 'Join Match', 'Matches someone else started that you joined.')}
+      ${statRow('🔻', quietStats.dethroned.value, `Dethroned${rankSuffix(quietStats.dethroned.rank)}`, 'Times someone has beaten your top score after you set it.', 'dethroned')}
+      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
+      ${statRow('📜', quietStats.startMatch.value, `Start Match${rankSuffix(quietStats.startMatch.rank)}`, 'Matches you started yourself.', 'startMatch')}
+      ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
+      ${statRow('☝️', quietStats.firstFights.value, `First Fights${rankSuffix(quietStats.firstFights.rank)}`, 'Matches you were the very first to play.', 'firstFights')}
+      ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
     </div>
     <span class="room-stats-toggle" id="home-stats-toggle">▸ ${moreCount} more stats</span>
   `;
@@ -1765,11 +1795,7 @@ async function openTrialScreen(round) {
     const opponent = me === round.creator_username ? round.target_username : round.creator_username;
     const record = await computeDuelRecord(me, opponent);
     if (record.total > 0) {
-      duelHolder.innerHTML = `<div class="duel-record-card">
-        <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
-        <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponent)}</span></div>
-        <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
-      </div>`;
+      duelHolder.innerHTML = duelRecordCard(opponent, record);
     }
   }
 
@@ -1939,6 +1965,202 @@ async function computeWordsMasteredRanking() {
   return { myCount: myRow ? myRow.mastered_count : 0, myRank: rankIdx[me] || null };
 }
 
+// Ranks the 9 "overflow" stats that previously showed a raw number with no
+// rank at all. Descending sort (more = better rank) for all of them EXCEPT
+// Dethroned, which sorts ascending — getting dethroned less is the good
+// outcome, so a lower count earns the better rank, the opposite convention
+// from every other stat here.
+// scope: 'global' ranks against everyone who's played at least once (same
+// pool policy as computeGlobalStatRankings); 'room' ranks against every
+// member of roomId (same pool policy as computeRoomStatRankings, zero-count
+// members included). Room-scoped queries filter by room_id via an
+// intersection on rounds.id rather than `rounds!inner(room_id)` embedding
+// for trial_leaderboard/lifetime_wins specifically — those are views and,
+// unlike first_fighters (also a view, already embeds fine elsewhere in this
+// file), weren't independently confirmed to support the embed, so this
+// sidesteps the question rather than gambling on it.
+// The metric definitions (value getter + sort direction) for the 9 overflow
+// stats — shared by computeQuietStatsByUser (ranking) and the stat
+// leaderboard feature, so both read off one definition instead of two.
+const QUIET_STAT_METRICS = {
+  streak: { fn: x => x.streak, dir: 'desc' }, crowns: { fn: x => x.crowns, dir: 'desc' }, lifetimeWins: { fn: x => x.lifetimeWins, dir: 'desc' },
+  // 'asc' means a LOWER raw value earns the better (#1) rank — Dethroned is
+  // the one exception: getting dethroned less is the good outcome, so it
+  // ranks the opposite direction from every other stat's descending
+  // "more is higher-ranked" convention.
+  dethroned: { fn: x => x.dethroned, dir: 'asc' }, wordsPlayed: { fn: x => x.wordsPlayed.size, dir: 'desc' }, startMatch: { fn: x => x.startMatch, dir: 'desc' },
+  counter: { fn: x => x.counter, dir: 'desc' }, firstFights: { fn: x => x.firstFights, dir: 'desc' }, joinMatch: { fn: x => x.joinMatch, dir: 'desc' },
+};
+
+// Fetches and tallies the 9 overflow stats for EVERY user in scope (global =
+// everyone who's played, room = every member) — the shared data both
+// computeQuietStatRankings (reduces to "my rank") and the stat-leaderboard
+// feature (shows everyone, sorted) are built on.
+async function computeQuietStatsByUser(scope, roomId) {
+  const isRoom = scope === 'room';
+  let roomRoundIds = null;
+  if (isRoom) {
+    const { data: roomRounds } = await sb.from('rounds').select('id').eq('room_id', roomId);
+    roomRoundIds = (roomRounds || []).map(r => r.id);
+  }
+  const [
+    { data: members },
+    { data: streakRows },
+    { data: crownRows },
+    { data: winRows },
+    { data: dethroneRows },
+    { data: wordAnswerRows },
+    { data: roundRows },
+    { data: firstFightRows },
+    { data: joinScoreRows },
+  ] = await Promise.all([
+    isRoom ? sb.from('room_members').select('username').eq('room_id', roomId) : Promise.resolve({ data: null }),
+    sb.from('streaks').select('username, current_streak'),
+    isRoom
+      ? sb.from('trial_leaderboard').select('username, round_id').eq('rank', 1).in('round_id', roomRoundIds)
+      : sb.from('trial_leaderboard').select('username').eq('rank', 1),
+    isRoom
+      ? sb.from('lifetime_wins').select('username, round_id').in('round_id', roomRoundIds)
+      : sb.from('lifetime_wins').select('username'),
+    isRoom
+      ? sb.from('dethronement_events').select('dethroned_by_username, round_id').in('round_id', roomRoundIds)
+      : sb.from('dethronement_events').select('dethroned_by_username'),
+    isRoom
+      ? sb.from('word_answers').select('username, word_id, rounds!inner(room_id)').eq('rounds.room_id', roomId)
+      : sb.from('word_answers').select('username, word_id'),
+    isRoom
+      ? sb.from('rounds').select('creator_username, target_username, via_challenge_back').eq('room_id', roomId)
+      : sb.from('rounds').select('creator_username, target_username, via_challenge_back'),
+    isRoom
+      ? sb.from('first_fighters').select('username, round_id').in('round_id', roomRoundIds)
+      : sb.from('first_fighters').select('username'),
+    isRoom
+      ? sb.from('round_scores').select('username, round_id, rounds!inner(room_id, creator_username, target_username)').eq('rounds.room_id', roomId)
+      : sb.from('round_scores').select('username, round_id, rounds!inner(creator_username, target_username)'),
+  ]);
+
+  const byUser = {};
+  const pool = isRoom ? (members || []).map(m => m.username) : null;
+  const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, lifetimeWins: 0, dethroned: 0, wordsPlayed: new Set(), startMatch: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
+  if (pool) pool.forEach(ensure);
+
+  (streakRows || []).forEach(r => { if (!isRoom || byUser[r.username]) ensure(r.username).streak = r.current_streak || 0; });
+  (crownRows || []).forEach(r => ensure(r.username).crowns++);
+  (winRows || []).forEach(r => ensure(r.username).lifetimeWins++);
+  (dethroneRows || []).forEach(r => ensure(r.username).dethroned++);
+  (wordAnswerRows || []).forEach(r => ensure(r.username).wordsPlayed.add(r.word_id));
+  (roundRows || []).forEach(r => { const u = ensure(r.creator_username); if (r.via_challenge_back) u.counter++; else u.startMatch++; });
+  (firstFightRows || []).forEach(r => ensure(r.username).firstFights++);
+  (joinScoreRows || []).forEach(r => { if (r.rounds.creator_username !== r.username && r.rounds.target_username !== r.username) ensure(r.username).joinMatch++; });
+
+  return byUser;
+}
+
+async function computeQuietStatRankings(scope, roomId, forUsername = me) {
+  const byUser = await computeQuietStatsByUser(scope, roomId);
+  const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, lifetimeWins: 0, dethroned: 0, wordsPlayed: new Set(), startMatch: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
+  const allUsers = Object.keys(byUser);
+  const rankOf = (metricFn, direction = 'desc') => {
+    const sorted = allUsers.map(u => ({ u, v: metricFn(byUser[u]) }))
+      .sort((a, b) => direction === 'asc' ? a.v - b.v : b.v - a.v);
+    const idx = {};
+    sorted.forEach((row, i) => { idx[row.u] = i + 1; });
+    return idx;
+  };
+  const mine = byUser[forUsername] || ensure(forUsername);
+  const out = {};
+  for (const key in QUIET_STAT_METRICS) {
+    const { fn, dir } = QUIET_STAT_METRICS[key];
+    const ranks = rankOf(fn, dir);
+    out[key] = { value: fn(mine), rank: ranks[forUsername] || null };
+  }
+  return out;
+}
+
+// Icon+label per rankable stat key — used both for the leaderboard title and
+// (via QUIET_STAT_METRICS/dedicated logic below) as the single source of
+// truth for which stats are even leaderboard-eligible. Accuracy is
+// deliberately absent — self-only, "not ranked," no leaderboard makes sense.
+const STAT_META = {
+  wordsMastered: { icon: '📖', label: 'Words Mastered' }, flawless: { icon: '✨', label: 'Flawless' },
+  played: { icon: '🗡️', label: 'Matches Played' }, activeDays: { icon: '📅', label: 'Active Days' },
+  streak: { icon: '🔥', label: 'Streak' }, crowns: { icon: '👑', label: 'Crowns Held' },
+  lifetimeWins: { icon: '🏆', label: 'Lifetime Wins' }, dethroned: { icon: '🔻', label: 'Dethroned' },
+  wordsPlayed: { icon: '✍️', label: 'Words Played' }, startMatch: { icon: '📜', label: 'Start Match' },
+  counter: { icon: '🎯', label: 'Counter' }, firstFights: { icon: '☝️', label: 'First Fights' },
+  joinMatch: { icon: '⚔️', label: 'Join Match' },
+};
+
+// Full sorted leaderboard for ANY single rankable stat — reuses the exact
+// same query shapes as the ranking functions above (computeGlobalStatRankings/
+// computeRoomStatRankings for the top-4, computeQuietStatsByUser for the
+// other 9) but returns everyone instead of collapsing to "mine". Only
+// queried on demand when a leaderboard is actually opened, not on every
+// stat-row render.
+async function computeStatLeaderboard(statKey, scope, roomId) {
+  const isRoom = scope === 'room';
+  if (statKey === 'wordsMastered') {
+    const { data: rows } = await sb.from('words_mastered_counts').select('*');
+    let list = (rows || []).map(r => ({ username: r.username, value: r.mastered_count }));
+    if (isRoom) {
+      const { data: members } = await sb.from('room_members').select('username').eq('room_id', roomId);
+      const memberSet = new Set((members || []).map(m => m.username));
+      const have = new Set(list.map(r => r.username));
+      list = list.filter(r => memberSet.has(r.username));
+      memberSet.forEach(u => { if (!have.has(u)) list.push({ username: u, value: 0 }); });
+    }
+    return { rows: list.sort((a, b) => b.value - a.value) };
+  }
+  if (statKey === 'flawless' || statKey === 'activeDays' || statKey === 'played') {
+    const { data: scores } = isRoom
+      ? await sb.from('round_scores').select('username, correct_count, total_count, played_at, rounds!inner(room_id)').eq('rounds.room_id', roomId)
+      : await sb.from('round_scores').select('username, correct_count, total_count, played_at');
+    const byUser = {};
+    if (isRoom) {
+      const { data: members } = await sb.from('room_members').select('username').eq('room_id', roomId);
+      (members || []).forEach(m => { byUser[m.username] = { flawless: 0, days: new Set(), played: 0 }; });
+    }
+    (scores || []).forEach(s => {
+      if (!byUser[s.username]) byUser[s.username] = { flawless: 0, days: new Set(), played: 0 };
+      byUser[s.username].played++;
+      if (s.correct_count === s.total_count) byUser[s.username].flawless++;
+      byUser[s.username].days.add(new Date(s.played_at).toISOString().slice(0, 10));
+    });
+    const metricFn = statKey === 'flawless' ? x => x.flawless : statKey === 'activeDays' ? x => x.days.size : x => x.played;
+    const list = Object.keys(byUser).map(u => ({ username: u, value: metricFn(byUser[u]) }));
+    return { rows: list.sort((a, b) => b.value - a.value) };
+  }
+  // The 9 overflow stats share one byUser builder with computeQuietStatRankings.
+  const byUser = await computeQuietStatsByUser(scope, roomId);
+  const { fn, dir } = QUIET_STAT_METRICS[statKey];
+  const list = Object.keys(byUser).map(u => ({ username: u, value: fn(byUser[u]) }));
+  list.sort((a, b) => dir === 'asc' ? a.value - b.value : b.value - a.value);
+  return { rows: list };
+}
+
+let statLeaderboardReturnView = 'view-home';
+async function openStatLeaderboard(statKey, scope, roomId) {
+  const meta = STAT_META[statKey];
+  if (!meta) return; // unranked stat (Accuracy) — tapping it does nothing, no leaderboard exists
+  statLeaderboardReturnView = currentVisibleViewId();
+  show('view-stat-leaderboard');
+  $('stat-leaderboard-title').textContent = `${meta.icon} ${meta.label} — ${scope === 'room' ? 'This Room' : 'Global'}`;
+  $('stat-leaderboard-list').innerHTML = '<div class="empty-state">Loading…</div>';
+  const { rows } = await computeStatLeaderboard(statKey, scope, roomId);
+  if (rows.length === 0) { $('stat-leaderboard-list').innerHTML = '<div class="empty-state">Nobody has a score here yet.</div>'; return; }
+  const list = $('stat-leaderboard-list');
+  list.innerHTML = '';
+  rows.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'lb-row' + (r.username === me ? ' me' : '');
+    div.innerHTML = `<div class="lb-rank">${i + 1}</div><div class="lb-name">${displayName(r.username)}</div><div class="lb-score">${r.value}</div>`;
+    div.style.cursor = 'pointer';
+    div.onclick = () => openPlayerProfile(r.username);
+    list.appendChild(div);
+  });
+}
+$('btn-stat-leaderboard-back').onclick = () => show(statLeaderboardReturnView);
+
 async function renderRoomStatsHeader() {
   const holder = $('room-stats-header');
   holder.innerHTML = '';
@@ -1949,32 +2171,28 @@ async function renderRoomStatsHeader() {
   // slow (13 sequential round-trips before this fix, way back).
   const [
     { data: myScores },
-    activity,
-    { data: myPlayedRounds },
     { data: roomRows },
     { data: allTimeRows },
     { data: streakRow },
     { data: snap },
     roomStats,
     masteredStats,
+    quietStats,
     duelTicker,
   ] = await Promise.all([
     sb.from('round_scores').select('score_points, played_at, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
-    computeRoomActivityStats(me, roomId),
-    sb.from('round_scores').select('round_id, rounds!inner(room_id, creator_username, target_username)').eq('username', me).eq('rounds.room_id', roomId),
     sb.from('room_leaderboard_alltime').select('username, avg_score, rounds_played').eq('room_id', roomId),
     sb.from('global_leaderboard_alltime').select('username, rounds_played'),
     sb.from('streaks').select('current_streak, last_played_date').eq('username', me).maybeSingle(),
     sb.from('room_visit_snapshots').select('*').eq('username', me).eq('room_id', roomId).maybeSingle(),
     computeRoomStatRankings(roomId),
     computeWordsMasteredRanking(),
+    computeQuietStatRankings('room', roomId),
     computeDuelTicker().catch(err => { console.error('Duel ticker failed:', err); return null; }),
   ]);
 
   const gamesPlayed = (myScores || []).length;
   if (gamesPlayed === 0) return;
-
-  const joinedMatches = (myPlayedRounds || []).filter(r => r.rounds.creator_username !== me && r.rounds.target_username !== me).length;
 
   const totalGamesMap = new Map((allTimeRows || []).map(r => [r.username, r.rounds_played]));
   const isRanked = u => (totalGamesMap.get(u) || 0) >= MIN_GAMES_TO_RANK;
@@ -2034,13 +2252,7 @@ async function renderRoomStatsHeader() {
   // deliberately excluded, they live in the ticker and Rivalry card instead).
   // Format: volume + rank in parens, per explicit request — "8 Flawless (#3)".
   const rankSuffix = r => r ? ` (#${r})` : '';
-  const [{ count: dethronedCount }, { data: myWordAnswers }] = await Promise.all([
-    sb.from('dethronement_events').select('*, rounds!inner(room_id)', { count: 'exact', head: true }).eq('dethroned_by_username', me).eq('rounds.room_id', roomId),
-    sb.from('word_answers').select('word_id, rounds!inner(room_id)').eq('username', me).eq('rounds.room_id', roomId),
-  ]);
-  const wordsPlayed = new Set((myWordAnswers || []).map(w => w.word_id)).size;
-
-  const quietCount = 7; // Dethroned, Words Played, Start Match, Counter, First Fights, Join Match, Accuracy
+  const quietCount = 6; // Dethroned, Words Played, Start Match, Counter, First Fights, Join Match
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
@@ -2049,18 +2261,18 @@ async function renderRoomStatsHeader() {
     <div class="room-ticker${duelTicker ? ' stacked-top' : ''}">${ticker}</div>
     <div id="room-duel-ticker-holder"></div>
     <div class="room-stat-grid primary">
-      ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
-      ${statRow('✨', roomStats.myFlawless, `Flawless${rankSuffix(roomStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
-      ${statRow('🗡️', roomStats.myPlayed, `Matches Played${rankSuffix(roomStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.')}
-      ${statRow('📅', roomStats.myActiveDays, `Active Days${rankSuffix(roomStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.')}
+      ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
+      ${statRow('✨', roomStats.myFlawless, `Flawless${rankSuffix(roomStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
+      ${statRow('🗡️', roomStats.myPlayed, `Matches Played${rankSuffix(roomStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
+      ${statRow('📅', roomStats.myActiveDays, `Active Days${rankSuffix(roomStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
     </div>
     <div id="room-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
-      ${statRow('🔻', dethronedCount || 0, 'Dethroned', 'Times someone has beaten your top score after you set it.')}
-      ${statRow('✍️', wordsPlayed, 'Words Played', 'Total words answered across every match, right or wrong.')}
-      ${statRow('📜', activity.challenges, 'Start Match', 'Matches you started yourself.')}
-      ${statRow('🎯', activity.challengeBacks, 'Counter', 'Times you fired back after being challenged.')}
-      ${statRow('☝️', activity.firstFights, 'First Fights', 'Matches you were the very first to play.')}
-      ${statRow('⚔️', joinedMatches, 'Join Match', 'Matches someone else started that you joined.')}
+      ${statRow('🔻', quietStats.dethroned.value, `Dethroned${rankSuffix(quietStats.dethroned.rank)}`, 'Times someone has beaten your top score after you set it.', 'dethroned')}
+      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
+      ${statRow('📜', quietStats.startMatch.value, `Start Match${rankSuffix(quietStats.startMatch.rank)}`, 'Matches you started yourself.', 'startMatch')}
+      ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
+      ${statRow('☝️', quietStats.firstFights.value, `First Fights${rankSuffix(quietStats.firstFights.rank)}`, 'Matches you were the very first to play.', 'firstFights')}
+      ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;
@@ -2577,11 +2789,7 @@ async function renderScorecard(correct, points, newBadges) {
     const opponent = me === currentRound.creator_username ? currentRound.target_username : currentRound.creator_username;
     const record = await computeDuelRecordLifetime(me, opponent);
     if (record.total > 0) {
-      duelHolder.innerHTML = `<div class="duel-record-card">
-        <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
-        <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponent)}</span></div>
-        <div class="duel-record-score">${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''}</div>
-      </div>`;
+      duelHolder.innerHTML = duelRecordCard(opponent, record);
     }
   }
 

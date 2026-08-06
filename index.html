@@ -672,7 +672,7 @@ async function openPlayerProfile(username) {
     $('player-profile-activity-holder').innerHTML = `
       <div class="room-stat-grid primary">
         ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
-        ${statRow('✨', globalStats.myFlawless, `Flawless Matches${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
+        ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
         ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.')}
         ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.')}
       </div>`;
@@ -1167,7 +1167,7 @@ async function renderStatusRow() {
   activityHolder.innerHTML = `
     <div class="room-stat-grid primary">
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless Matches${rankSuffix(globalStats.flawlessRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless${rankSuffix(globalStats.flawlessRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${played}</span><span>Matches Played${rankSuffix(globalStats.playedRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${globalStats.myActiveDays}</span><span>Active Days${rankSuffix(globalStats.activeDaysRank)}</span></div>
     </div>`;
@@ -2020,7 +2020,7 @@ async function renderRoomStatsHeader() {
     <div id="room-duel-ticker-holder"></div>
     <div class="room-stat-grid primary">
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
-      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless Matches${rankSuffix(roomStats.flawlessRank)}</span></div>
+      <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${roomStats.myFlawless}</span><span>Flawless${rankSuffix(roomStats.flawlessRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${roomStats.myPlayed}</span><span>Matches Played${rankSuffix(roomStats.playedRank)}</span></div>
       <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${roomStats.myActiveDays}</span><span>Active Days${rankSuffix(roomStats.activeDaysRank)}</span></div>
     </div>

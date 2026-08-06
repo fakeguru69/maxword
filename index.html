@@ -513,6 +513,17 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
   </div>
 
+  <!-- CROWN TAKEN MODAL — the positive mirror of Dethroned: fires for the
+       person who DID the dethroning, not the victim. Reuses the Challenged
+       banner's gold styling since this is good news, same as being called out. -->
+  <div class="modal-overlay hidden" id="crown-taken-modal">
+    <div class="card modal-card">
+      <div class="challenged-banner" style="margin-bottom:14px;">👑 Crown Taken</div>
+      <p id="crown-taken-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
+      <button class="btn-primary" id="btn-crown-taken-ok">Nice!</button>
+    </div>
+  </div>
+
   <!-- ADD TO HOME SCREEN MODAL -->
   <div class="modal-overlay hidden" id="a2hs-modal">
     <div class="card modal-card">
@@ -1041,6 +1052,7 @@ async function afterLogin() {
   if (deepLinkParams) await handleDeepLink();
   await checkDethronements();
   await checkNewChallenges();
+  await checkCrownsTaken();
 }
 
 // Reusable "explain this the very first time it happens, then get out of the way
@@ -1085,6 +1097,32 @@ async function checkDethronements() {
   $('dethroned-modal').classList.remove('hidden');
 }
 $('btn-dethroned-ok').onclick = () => $('dethroned-modal').classList.add('hidden');
+
+// Positive mirror of checkDethronements() — fires for the person who DID the
+// dethroning, not the victim. Same exactly-once pattern via its own flag
+// (dethroner_notified, separate column from the victim's `notified` — same
+// row, two independent "have I told this person about it yet" states).
+// Backfilled to true for all pre-existing rows at migration time, so this
+// only ever fires for NEW dethronements from here on, never floods anyone
+// with a backlog of old ones. Wording matches the ticker's crown-snatch
+// message exactly, per explicit request to reuse ticker text where the
+// event is discrete enough to deserve a popup.
+async function checkCrownsTaken() {
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(trial_number)').eq('dethroned_by_username', me).eq('dethroner_notified', false).order('created_at', { ascending: true });
+  if (!events || events.length === 0) return;
+  const ids = events.map(e => e.id);
+  await sb.from('dethronement_events').update({ dethroner_notified: true }).in('id', ids);
+  let text;
+  if (events.length === 1) {
+    const e = events[0];
+    text = `You just snatched Match #${e.rounds.trial_number} from ${displayName(e.dethroned_username)} — nice!`;
+  } else {
+    text = `You've snatched ${events.length} crowns — open your Game Rooms to see who.`;
+  }
+  $('crown-taken-modal-text').textContent = text;
+  $('crown-taken-modal').classList.remove('hidden');
+}
+$('btn-crown-taken-ok').onclick = () => $('crown-taken-modal').classList.add('hidden');
 
 // Mirrors checkDethronements() — the other half of "something happened that you'd
 // want to know about live." Fires for a Trial someone's aimed straight at you,
@@ -1556,6 +1594,7 @@ async function openRoom(room) {
     renderRoomStatsHeader(),
     checkDethronements(),
     checkNewChallenges(),
+    checkCrownsTaken(),
   ]);
   // Kept last, deliberately sequential: this tip explains the card badges
   // loadDares() just rendered, so it should appear once that list has
@@ -1600,7 +1639,7 @@ function subscribeRoomRealtime(roomId) {
   unsubscribeRoomRealtime();
   roomChannel = sb.channel(`room-${roomId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `room_id=eq.${roomId}` }, () => { refreshActiveRoomPanel(); checkNewChallengesLive(); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'round_scores' }, () => { refreshActiveRoomPanel(); checkDethronementsLive(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'round_scores' }, () => { refreshActiveRoomPanel(); checkDethronementsLive(); checkCrownsTakenLive(); })
     .subscribe();
 }
 // Only pops the dethroned modal live if you're NOT mid-quiz — never interrupt an
@@ -1613,6 +1652,12 @@ function checkDethronementsLive() {
 // Same idea, for a fresh challenge landing on you while you're browsing the room.
 function checkNewChallengesLive() {
   if ($('view-game').classList.contains('hidden')) checkNewChallenges();
+}
+// Same idea, for the moment YOUR score just took someone else's crown — caused
+// by the exact same round_scores event as checkDethronementsLive, just the
+// other person's side of it.
+function checkCrownsTakenLive() {
+  if ($('view-game').classList.contains('hidden')) checkCrownsTaken();
 }
 function unsubscribeRoomRealtime() {
   if (roomChannel) { sb.removeChannel(roomChannel); roomChannel = null; }
@@ -2839,8 +2884,14 @@ async function finishRound() {
 
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
+  // Suppress the Crown Taken popup for the round you JUST played — the verdict
+  // above already celebrated it inline ("🎉 You're the Game Champion!"), so a
+  // second popup announcing the same thing would be redundant. Still checks
+  // for (and pops) any OTHER pending crown-take from an unrelated Match below.
+  await sb.from('dethronement_events').update({ dethroner_notified: true }).eq('round_id', currentRound.id).eq('dethroned_by_username', me).eq('dethroner_notified', false);
   await checkDethronements(); // catches anything that happened while you were mid-quiz and got skipped live
   await checkNewChallenges();
+  await checkCrownsTaken();
   // The generic "first badge earned" explainer is suppressed during the forced
   // 2-game onboarding window (renderScorecard already shows its own tailored
   // forced-flow card there) — stacking a second modal on top would be exactly

@@ -276,17 +276,16 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 
   <!-- HOME -->
   <section id="view-home" class="card hidden">
-    <div style="display:flex; justify-content:flex-end;">
-      <button class="link-btn" id="btn-logout">Log out</button>
-    </div>
-    <div class="room-stats-header-block" style="margin:0 -18px;">
-      <div class="account-name-line" id="account-username-display" style="margin-bottom:0; cursor:pointer;">Signed in</div>
+    <div class="room-stats-header-block">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div class="account-name-line" id="account-username-display" style="margin-bottom:0; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">Signed in</div>
+        <button class="link-btn" id="btn-logout" style="flex-shrink:0;">Log out</button>
+      </div>
       <div id="status-row-holder"></div>
       <div id="home-ticker-holder"></div>
       <div id="home-activity-holder"></div>
       <div id="home-more-holder"></div>
     </div>
-    <div id="badge-showcase-holder"></div>
     <div id="a2hs-banner-holder"></div>
     <div class="section-label strong">Game Rooms</div>
     <div id="rooms-list"></div>
@@ -402,10 +401,12 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
        and never appears here, except when viewing your own profile. -->
   <section id="view-player-profile" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-player-profile-back">&larr; Back</button>
-    <div class="account-name-line" id="player-profile-name"></div>
-    <div id="player-profile-status-holder"></div>
-    <div id="player-profile-activity-holder"></div>
-    <div id="player-profile-more-holder"></div>
+    <div class="room-stats-header-block">
+      <div class="account-name-line" id="player-profile-name" style="margin-bottom:0;"></div>
+      <div id="player-profile-status-holder"></div>
+      <div id="player-profile-activity-holder"></div>
+      <div id="player-profile-more-holder"></div>
+    </div>
     <div id="player-profile-mastery-holder"></div>
     <div id="player-profile-badges-holder"></div>
     <div id="player-profile-duel-holder"></div>
@@ -593,7 +594,7 @@ async function openPlayerProfile(username) {
   // Headline — two ranks, nothing else, matching Room's exact format/weight.
   const activityPart = activityRank ? `#${activityRank}` : '–';
   if (played && theirIndex !== -1) {
-    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL RANK · 🗡️ ${activityPart} PLAYED</div>`;
+    $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">🌍 #${theirIndex + 1} GLOBAL · 🗡️ ${activityPart} PLAYED</div>`;
   } else if (played) {
     $('player-profile-status-holder').innerHTML = `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
   } else {
@@ -899,7 +900,6 @@ async function afterLogin() {
   // chance to fire). Catches that gap retroactively so the badge/banner
   // state stays correct everywhere, not just through our own button.
   if (isStandalone()) await awardBadgeOnce('home_screen');
-  await renderBadgeShowcase();
   renderHomeScreenBanner();
   show('view-home');
   if (deepLinkParams) await handleDeepLink();
@@ -1070,7 +1070,7 @@ async function renderStatusRow() {
   const activityPart = activityRank ? `#${activityRank}` : '–';
 
   statusHolder.innerHTML = myIndex !== -1
-    ? `<div class="room-headline" style="color:var(--cream);">🌍 #${myIndex + 1} GLOBAL RANK · 🗡️ ${activityPart} PLAYED</div>`
+    ? `<div class="room-headline" style="color:var(--cream);">🌍 #${myIndex + 1} GLOBAL · 🗡️ ${activityPart} PLAYED</div>`
     : `<div class="room-headline" style="color:var(--cream);">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
 
   // Ticker — same priority-pick pattern as Room's (streak-risk > near-miss),
@@ -1480,7 +1480,7 @@ function refreshActiveRoomPanel() {
 async function renderMemberLine() {
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
   const n = (members || []).length;
-  $('member-count-line').innerHTML = `${currentRoom.code} · ${currentRoom.is_open ? 'Open' : 'Closed'} · ${n} member${n === 1 ? '' : 's'} · <span class="manage-link" id="link-manage-members">Manage</span> · <span class="manage-link" id="link-invite-room">🔗 Invite</span>`;
+  $('member-count-line').innerHTML = `${n} member${n === 1 ? '' : 's'} · ${currentRoom.is_open ? 'Open' : 'Closed'} · <span class="manage-link" id="link-manage-members">Manage</span> · <span class="manage-link" id="link-invite-room">🔗 Invite</span>`;
   $('link-manage-members').onclick = () => { show('view-members'); loadMembers(); };
   $('link-invite-room').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;

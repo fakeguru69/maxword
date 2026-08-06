@@ -192,6 +192,13 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .stat-row .stat-icon { font-size: 15px; }
 .room-stat-grid .stat-val { color: var(--cream); font-weight: 700; text-align: right; }
 .room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--cream-dim); text-decoration: underline; cursor: pointer; margin-top: 6px; }
+/* Profile-only: every stat row gets a tap-to-explain "i". Scoped to this
+   view so Home/Room's .stat-row grid (no reserved 4th column) is untouched. */
+#view-player-profile .stat-row { grid-template-columns: 24px 32px 1fr 20px; }
+#view-player-profile .info-btn { background: none; border: 1px solid var(--line); color: var(--cream-dim); width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer; padding: 0; font-family: inherit; align-self: center; }
+#view-player-profile .info-btn.active { border-color: var(--gold-soft); color: var(--gold); }
+#view-player-profile .info-tip { display: none; grid-column: 1 / -1; font-size: 12px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 8px 10px; margin-top: 4px; line-height: 1.4; }
+#view-player-profile .info-tip.show { display: block; }
 .trial-lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .trial-lb-row.champion { color: var(--gold); font-weight: 700; }
 .championships-line { font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 8px; }
@@ -559,6 +566,14 @@ const currentVisibleViewId = () => { const el = [...document.querySelectorAll('#
 // (every room you've ever shared a direct Trial in, not just the current one).
 // Mastery is deliberately never fetched or shown here — it stays private.
 let playerProfileReturnView = 'view-home';
+// Builds one Profile stat row with a tap-to-reveal "i" explainer. Only used
+// on the Profile page (see scoped CSS above) — Home/Room keep the plain
+// 3-column stat-row, no info button, since their stats already got the
+// psychology audit and don't need re-explaining every time.
+function statRow(icon, val, label, info) {
+  return `<div class="stat-row"><span class="stat-icon">${icon}</span><span class="stat-val">${val}</span><span>${label}</span><button class="info-btn" type="button" aria-label="What is this?">i</button><div class="info-tip">${info}</div></div>`;
+}
+
 async function openPlayerProfile(username) {
   playerProfileReturnView = currentVisibleViewId();
   show('view-player-profile');
@@ -621,10 +636,10 @@ async function openPlayerProfile(username) {
     $('player-profile-activity-holder').innerHTML = `
       <div style="margin-top:14px;"></div>
       <div class="room-stat-grid primary">
-        <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>
-        <div class="stat-row"><span class="stat-icon">✨</span><span class="stat-val">${globalStats.myFlawless}</span><span>Flawless Matches${rankSuffix(globalStats.flawlessRank)}</span></div>
-        <div class="stat-row"><span class="stat-icon">🗡️</span><span class="stat-val">${played}</span><span>Matches Played${rankSuffix(globalStats.playedRank)}</span></div>
-        <div class="stat-row"><span class="stat-icon">📅</span><span class="stat-val">${globalStats.myActiveDays}</span><span>Active Days${rankSuffix(globalStats.activeDaysRank)}</span></div>
+        ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.')}
+        ${statRow('✨', globalStats.myFlawless, `Flawless Matches${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.')}
+        ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.')}
+        ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.')}
       </div>`;
   } else {
     $('player-profile-activity-holder').innerHTML = '';
@@ -635,37 +650,39 @@ async function openPlayerProfile(username) {
   // and Lifetime Wins (bragging-rights flavored but weaker than the top 4),
   // Dethroned, Words Played, and the Contribution stats.
   const moreHolder = $('player-profile-more-holder');
-  const streakPart = streak && streak.current_streak > 0 ? `<div class="stat-row"><span class="stat-icon">🔥</span><span class="stat-val">${streak.current_streak}</span><span>Streak</span></div>` : '';
-  const crownsHeldPart = crowns ? `<div class="stat-row"><span class="stat-icon">👑</span><span class="stat-val">${crowns}</span><span>Crowns Held</span></div>` : '';
-  const lifetimeWinsPart = lifetimeWins ? `<div class="stat-row"><span class="stat-icon">🏆</span><span class="stat-val">${lifetimeWins}</span><span>Lifetime Wins</span></div>` : '';
-  moreHolder.innerHTML = played ? `
-    <div class="room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
-      ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
-      <div class="stat-row"><span class="stat-icon">🔻</span><span class="stat-val">${stats.dethroned}</span><span>Dethroned</span></div>
-      <div class="stat-row"><span class="stat-icon">✍️</span><span class="stat-val">${stats.wordsPlayed}</span><span>Words Played</span></div>
-      <div class="stat-row"><span class="stat-icon">📜</span><span class="stat-val">${stats.startMatch}</span><span>Start Match</span></div>
-      <div class="stat-row"><span class="stat-icon">🎯</span><span class="stat-val">${stats.counter}</span><span>Counter</span></div>
-      <div class="stat-row"><span class="stat-icon">☝️</span><span class="stat-val">${stats.firstFights}</span><span>First Fights</span></div>
-      <div class="stat-row"><span class="stat-icon">⚔️</span><span class="stat-val">${stats.joinMatch}</span><span>Join Match</span></div>
-    </div>` : '';
+  const streakPart = streak && streak.current_streak > 0 ? statRow('🔥', streak.current_streak, 'Streak', 'Consecutive days you\'ve played without a gap.') : '';
+  const crownsHeldPart = crowns ? statRow('👑', crowns, 'Crowns Held', 'Matches where you currently hold the top score.') : '';
+  const lifetimeWinsPart = lifetimeWins ? statRow('🏆', lifetimeWins, 'Lifetime Wins', 'Matches you\'ve won overall, even ones you\'ve since lost the crown on.') : '';
 
   // Accuracy is strictly self-only — never fetched or shown for anyone else
   // (a percentage can discourage further play if it's ever shown publicly).
   // Words Mastered moved OUT of this section into the public top-4 above —
   // it's cumulative/climbing, unlike Accuracy's constant flux, so it earned
-  // public status; Accuracy did not.
-  const masteryHolder = $('player-profile-mastery-holder');
+  // public status; Accuracy did not. Folded in as a plain last row here
+  // (no separate card/holder) rather than floating on its own below.
+  let accuracyPart = '';
   if (isSelf) {
     const { data: mRows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
     const list = mRows || [];
     const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
     if (totalAnswered > 0) {
       const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
-      masteryHolder.innerHTML = `<div class="room-stat-grid"><div class="stat-row"><span class="stat-icon">🏹</span><span class="stat-val">${accuracy}%</span><span>Accuracy</span></div></div>`;
-    } else { masteryHolder.innerHTML = ''; }
-  } else {
-    masteryHolder.innerHTML = '';
+      accuracyPart = statRow('🏹', `${accuracy}%`, 'Accuracy', 'Correct answers out of everything you\'ve ever answered. Not ranked — this one moves constantly.');
+    }
   }
+  $('player-profile-mastery-holder').innerHTML = '';
+
+  moreHolder.innerHTML = played ? `
+    <div class="room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
+      ${streakPart}${crownsHeldPart}${lifetimeWinsPart}
+      ${statRow('🔻', stats.dethroned, 'Dethroned', 'Times someone has beaten your top score after you set it.')}
+      ${statRow('✍️', stats.wordsPlayed, 'Words Played', 'Total words answered across every match, right or wrong.')}
+      ${statRow('📜', stats.startMatch, 'Start Match', 'Matches you started yourself.')}
+      ${statRow('🎯', stats.counter, 'Counter', 'Times you fired back after being challenged.')}
+      ${statRow('☝️', stats.firstFights, 'First Fights', 'Matches you were the very first to play.')}
+      ${statRow('⚔️', stats.joinMatch, 'Join Match', 'Matches someone else started that you joined.')}
+      ${accuracyPart}
+    </div>` : '';
 
   // Full badge list — every badge, always paired with what it actually took to
   // earn it. This is the "always explain yourself" screen; compact chips
@@ -693,6 +710,17 @@ async function openPlayerProfile(username) {
     : `<div class="empty-state">You haven't dueled ${displayName(username)} directly yet.</div>`;
 }
 $('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
+// Single delegated listener for every stat row's "i" — rows are rebuilt via
+// innerHTML each time the page opens, so per-button onclick would be
+// re-attached anyway; delegation avoids that churn entirely.
+$('view-player-profile').addEventListener('click', (e) => {
+  const btn = e.target.closest('.info-btn');
+  if (!btn) return;
+  const tip = btn.nextElementSibling;
+  if (!tip || !tip.classList.contains('info-tip')) return;
+  const showing = tip.classList.toggle('show');
+  btn.classList.toggle('active', showing);
+});
 
 // Same idea as computeDuelRecord, but across every room you've ever shared a
 // direct Trial in — a profile page has no "current room" to scope to, and

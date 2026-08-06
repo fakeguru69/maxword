@@ -199,6 +199,11 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 #view-player-profile .info-btn.active { border-color: var(--gold-soft); color: var(--gold); }
 #view-player-profile .info-tip { display: none; grid-column: 1 / -1; font-size: 12px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 8px 10px; margin-top: 4px; line-height: 1.4; }
 #view-player-profile .info-tip.show { display: block; }
+/* Profile-only: gold border on every card, not just badges — nothing on
+   this page is "actionable" vs "just informational" (unlike Room), so
+   there's no hierarchy for grey to demote; whole page reads as one
+   celebratory case instead. */
+#view-player-profile .room-stats-header-block { border-color: var(--gold); }
 /* Profile-only: badges as a 2-col tap-to-expand grid, feels like a badge
    case rather than a settings list. Scoped under .badge-grid so the
    scorecard's post-round "new badge" popup (plain .badge-earned-card,
@@ -426,7 +431,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="account-name-line" id="player-profile-name" style="margin-bottom:0;"></div>
       <div id="player-profile-status-holder"></div>
     </div>
-    <div class="section-label strong" id="player-profile-stats-label">Your Stats</div>
+    <div class="section-label strong" id="player-profile-stats-label">Stats</div>
     <div class="room-stats-header-block" id="player-profile-stats-card">
       <div id="player-profile-activity-holder"></div>
       <div id="player-profile-more-holder"></div>

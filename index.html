@@ -181,6 +181,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 8px -16px 8px -16px; padding: 6px 16px; }
 .room-ticker.danger { color: #E08478; background: rgba(192,85,74,0.18); }
+.room-ticker.stacked-top { margin-bottom: 0; }
 .room-ticker.clickable { cursor: pointer; }
 .room-stat-grid { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--gold); }
 .room-stat-grid.primary { font-size: 14px; font-weight: 700; color: var(--gold); }
@@ -1946,7 +1947,7 @@ async function renderRoomStatsHeader() {
   block.innerHTML = `
     <div class="account-name-line" id="room-header-username" style="margin-bottom:0; cursor:pointer;">${displayName(me)}</div>
     <div class="room-headline" id="room-headline-link" style="cursor:pointer;">${headlineLine}</div>
-    <div class="room-ticker">${ticker}</div>
+    <div class="room-ticker${duelTicker ? ' stacked-top' : ''}">${ticker}</div>
     <div id="room-duel-ticker-holder"></div>
     <div class="room-stat-grid primary">
       <div class="stat-row"><span class="stat-icon">📖</span><span class="stat-val">${masteredStats.myCount}</span><span>Words Mastered${rankSuffix(masteredStats.myRank)}</span></div>

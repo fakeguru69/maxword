@@ -698,7 +698,7 @@ async function openPlayerProfile(username) {
   // there's nothing for a ticker to be highlighting. Also awkward in
   // other-view, where "pts from #2" reads as a fact with no one to act on it.
 
-  // Top 4 — Flawless / Words Mastered / Matches Played / Active Days: the 4
+  // Top 4 — Avg Score / Words Mastered / Flawless / Matches Played: the 4
   // stats that survived the full psychology audit (Streak and Duel both
   // deliberately excluded — Streak reads oddly without ticker-style urgency
   // framing, Duel needs the Rivalry card's relational treatment, not a flat
@@ -714,7 +714,6 @@ async function openPlayerProfile(username) {
         ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
         ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
         ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
-        ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
       </div>`;
   } else {
     $('player-profile-activity-holder').innerHTML = '';
@@ -750,11 +749,12 @@ async function openPlayerProfile(username) {
   moreHolder.innerHTML = played ? `
     <div class="room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${crownsHeldPart}
-      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
-      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
       ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
-      ${statRow('☝️', quietStats.firstFights.value, `Been First${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
+      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
+      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
+      ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
+      ${statRow('☝️', quietStats.firstFights.value, `First to Fight${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
       ${accuracyPart}
     </div>` : '';
@@ -1280,20 +1280,20 @@ async function renderStatusRow() {
       ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
       ${statRow('✨', globalStats.myFlawless, `Flawless${rankSuffix(globalStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
       ${statRow('🗡️', played, `Matches Played${rankSuffix(globalStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
-      ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
     </div>`;
 
   const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Day Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
   const crownsHeldPart = quietStats.crowns.value ? statRow('👑', quietStats.crowns.value, `Crowns Held${rankSuffix(quietStats.crowns.rank)}`, 'Matches where you currently hold the top score.', 'crowns') : '';
-  const moreCount = [streakPart, crownsHeldPart].filter(Boolean).length + 5;
+  const moreCount = [streakPart, crownsHeldPart].filter(Boolean).length + 7;
   moreHolder.innerHTML = `
     <div id="home-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${crownsHeldPart}
-      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
-      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
       ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
-      ${statRow('☝️', quietStats.firstFights.value, `Been First${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
+      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
+      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
+      ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
+      ${statRow('☝️', quietStats.firstFights.value, `First to Fight${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
     </div>
     <span class="room-stats-toggle" id="home-stats-toggle">▸ ${moreCount} more stats</span>
@@ -1361,7 +1361,7 @@ async function computeFullPlayerStats(username) {
   };
 }
 
-// Flawless/Active Days/Matches Played, ranked among EVERY player account-wide
+// Flawless/Active Days/Matches Played, ranked among EVERY player account-wide (Active Days lives in overflow now, still computed here)
 // (the global equivalent of computeRoomStatRankings). Fetches every player's
 // round_scores in one query — a real cost at scale, acceptable for now given
 // how few real accounts exist; worth revisiting if the player base grows.
@@ -1614,8 +1614,8 @@ async function maybeShowRoomVocabTip() {
   if (played !== 2) return;
   await showOnboardingTipOnce('room_card_vocab', '📜 Reading the room',
     `<div class="tip-list-item">🎯 challenge you / counter challenge — someone's calling you out directly</div>
-     <div class="tip-list-item">⚔️ let's fight! — an open invitation, no pressure</div>
-     <div class="tip-list-item">☝️ be the first — nobody's played it yet</div>
+     <div class="tip-list-item">⚔️ Join Fight — an open invitation, no pressure</div>
+     <div class="tip-list-item">☝️ First to Fight — nobody's played it yet</div>
      <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
     () => {
       // The room screen got a lot taller once the Stats Header/Leaderboard/
@@ -1786,7 +1786,7 @@ async function loadDares() {
     } else {
       // Generic open Trial — still worth a nudge, just a lighter-touch one than a
       // personal callout: an invitation, not a demand.
-      badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
+      badge = champ ? `⚔️ Join Fight` : '☝️ First to Fight'; badgeClass = 'open-invite';
       badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
       statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     }
@@ -1993,7 +1993,7 @@ async function computeRoomActivityStats(username, roomId) {
   return { firstFights: (myFirstFights || []).length, challenges: challenges || 0, challengeBacks: challengeBacks || 0 };
 }
 
-// Flawless/Active Days/Matches Played, ranked among every member of THIS room.
+// Flawless/Active Days/Matches Played, ranked among every member of THIS room (Active Days lives in overflow now, still computed here).
 // Fetches every member's round_scores in one query rather than one query per
 // member — same batching principle used throughout this file.
 async function computeRoomStatRankings(roomId) {
@@ -2165,7 +2165,7 @@ const STAT_META = {
   streak: { icon: '🔥', label: 'Day Streak' }, crowns: { icon: '👑', label: 'Crowns Held' },
   wordsPlayed: { icon: '✍️', label: 'Words Played' }, matchStarted: { icon: '📜', label: 'Match Started' },
   challengesSent: { icon: '📯', label: 'Challenges Sent' },
-  counter: { icon: '🎯', label: 'Counter' }, firstFights: { icon: '☝️', label: 'Been First' },
+  counter: { icon: '🎯', label: 'Counter' }, firstFights: { icon: '☝️', label: 'First to Fight' },
   joinMatch: { icon: '⚔️', label: 'Join Match' },
 };
 
@@ -2358,12 +2358,12 @@ async function renderRoomStatsHeader() {
     slot2 = { text: socialProof, onClick: null };
   }
 
-  // ---- Top 4: Flawless / Words Mastered / Matches Played / Active Days —
+  // ---- Top 4: Avg Score / Words Mastered / Flawless / Matches Played —
   // the 4 stats that survived the full psychology audit (Streak and Duel both
   // deliberately excluded, they live in the ticker and Rivalry card instead).
   // Format: volume + rank in parens, per explicit request — "8 Flawless (#3)".
   const rankSuffix = r => r ? ` (#${r})` : '';
-  const quietCount = 6; // Words Played, Match Started, Challenges Sent, Counter, Been First, Join Match
+  const quietCount = 7; // Challenges Sent, Counter, Words Played, Match Started, Active Days, First to Fight, Join Match
   const myAvgScore = myRank !== null ? Math.round(ranked[myIndex].avg_score) : null;
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
@@ -2377,14 +2377,14 @@ async function renderRoomStatsHeader() {
       ${statRow('📖', masteredStats.myCount, `Words Mastered${rankSuffix(masteredStats.myRank)}`, 'Right on your last attempt, and the one before it (or it\'s your only attempt so far). Can rise or fall as you keep playing.', 'wordsMastered')}
       ${statRow('✨', roomStats.myFlawless, `Flawless${rankSuffix(roomStats.flawlessRank)}`, 'Matches where every single question was answered correctly.', 'flawless')}
       ${statRow('🗡️', roomStats.myPlayed, `Matches Played${rankSuffix(roomStats.playedRank)}`, 'Every match you\'ve taken part in — wins, losses, and ties.', 'played')}
-      ${statRow('📅', roomStats.myActiveDays, `Active Days${rankSuffix(roomStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
     </div>
     <div id="room-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
-      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
-      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
       ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
-      ${statRow('☝️', quietStats.firstFights.value, `Been First${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
+      ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
+      ${statRow('📜', quietStats.matchStarted.value, `Match Started${rankSuffix(quietStats.matchStarted.rank)}`, 'Open Matches you started, with no one specific person named.', 'matchStarted')}
+      ${statRow('📅', roomStats.myActiveDays, `Active Days${rankSuffix(roomStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
+      ${statRow('☝️', quietStats.firstFights.value, `First to Fight${rankSuffix(quietStats.firstFights.rank)}`, 'Open Matches nobody had played yet when you joined.', 'firstFights')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
@@ -2472,7 +2472,7 @@ async function computeSocialProofTicker(roomId) {
     if (rows.length < 2) continue;
     const champ = rows.find(x => x.rank === 1);
     if (!champ) continue;
-    return `${rows.length} have FAILED to beat ${displayName(champ.username)}'s ${champ.score_points} on Match #${r.trial_number} — think you can?`;
+    return `${rows.length} have failed to take ${displayName(champ.username)}'s crown on Match #${r.trial_number} (${champ.score_points} pts) — think you can?`;
   }
   return null;
 }
@@ -2499,7 +2499,10 @@ async function computeDuelTicker() {
   if (!rival) {
     const strongest = pickStrongestDuel(candidates);
     if (!strongest) return null;
-    return { text: `⚔️ Signature Duel — ${strongest.record.wins}–${strongest.record.losses} vs. ${displayName(strongest.opponent)}`, opponent: null };
+    // "Signature Duel" was unexplained jargon — nothing told you which number
+    // was yours or what "signature" even meant. State it plainly instead:
+    // you're leading, first number is always YOUR wins.
+    return { text: `⚔️ Up ${strongest.record.wins}–${strongest.record.losses} against ${displayName(strongest.opponent)} in your duel`, opponent: null };
   }
   const { opponent, record, net } = rival;
 
@@ -3155,7 +3158,7 @@ async function renderOtherDares() {
       if (r.via_challenge_back) { badge = '🎯 counter challenge'; badgeClass = 'challenged-back'; badgeInfo = 'You challenged them back after they challenged you first.'; }
       else { badge = '🎯 challenge you'; badgeClass = 'targeted'; badgeInfo = 'Someone called you out directly on this Match.'; }
     } else {
-      badge = champ ? `⚔️ let's fight!` : '☝️ be the first'; badgeClass = 'open-invite';
+      badge = champ ? `⚔️ Join Fight` : '☝️ First to Fight'; badgeClass = 'open-invite';
       badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
     }
     const div = document.createElement('div');

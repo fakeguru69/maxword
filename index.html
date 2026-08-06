@@ -104,6 +104,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tip-list-item { font-size: 14px; color: var(--cream); line-height: 1.5; margin-bottom: 10px; }
 .tip-list-item:last-child { margin-bottom: 0; }
 .room-leaderboard-btn { width: 100%; background: var(--ink-raised); border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream-dim); cursor: pointer; margin-bottom: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.room-leaderboard-btn.action { border-color: var(--gold); color: var(--gold); }
 @keyframes onboarding-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 50% { box-shadow: 0 0 0 8px rgba(212,175,55,0); } }
 .onboarding-pulse { animation: onboarding-pulse 1s ease-out 3; }
 .room-leaderboard-btn:active { border-color: var(--gold); }
@@ -176,7 +177,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .rivalry-text .opponent-name { font-weight: 700; color: var(--cream); }
 .rivalry-text .rivalry-score { font-weight: 700; }
 .rivalry-card .btn-primary { width: 100%; }
-.room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
+.room-stats-header-block { background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
 .room-headline { font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); margin-bottom: 0; line-height: 1.25; }
 .room-headline .sub { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 400; color: var(--cream-dim); }
 .room-ticker { font-size: 13px; font-weight: 400; color: var(--gold); background: rgba(212,175,55,0.16); margin: 8px -16px 8px -16px; padding: 6px 16px; }
@@ -334,7 +335,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <button class="room-leaderboard-btn" id="btn-open-room-leaderboard">🏆 Leaderboard</button>
 
     <div id="trials-count-label" class="section-label strong" style="margin-top:16px;"></div>
-    <button class="room-leaderboard-btn" id="btn-quick-start-match" style="margin-bottom:14px;">📜 Start a Match</button>
+    <button class="room-leaderboard-btn action" id="btn-quick-start-match" style="margin-bottom:14px;">📜 Start a Match</button>
     <div id="panel-dares">
       <div id="my-open-challenges"></div>
       <div id="dares-list"></div>
@@ -1525,7 +1526,7 @@ async function loadDares() {
   const all = rounds || [];
   $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
 
-  if (all.length === 0) { $('trials-count-label').textContent = '📜 Matches'; list.innerHTML = '<div class="empty-state">No Matches yet. Start one!</div>'; return; }
+  if (all.length === 0) { $('trials-count-label').textContent = 'Matches'; list.innerHTML = '<div class="empty-state">No Matches yet. Start one!</div>'; return; }
 
   // Fetch + compute state for every Trial first, so we can sort by what actually
   // needs attention — a retaliation aimed at you first, then a fresh callout, then
@@ -1560,7 +1561,7 @@ async function loadDares() {
   // counts toward "open," since there's nothing left for you to do on THAT Trial.
   const openStates = new Set(['challenged_back', 'targeted', 'unplayed']);
   const openCount = withState.filter(w => openStates.has(w.state)).length;
-  $('trials-count-label').textContent = openCount > 0 ? `📜 Open Matches (${openCount})` : '📜 Matches';
+  $('trials-count-label').textContent = openCount > 0 ? `Open Matches (${openCount})` : 'Matches';
 
   list.innerHTML = '';
   for (const { r, rows, myRow, champ, state } of withState) {

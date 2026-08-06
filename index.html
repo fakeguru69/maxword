@@ -309,12 +309,12 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <label for="forgot-username">Username</label>
     <input id="forgot-username" />
     <button class="btn-secondary" id="btn-forgot-lookup" style="margin-bottom:14px;">Continue</button>
+    <div class="error-text hidden" id="forgot-error"></div>
     <div id="forgot-question-block" class="hidden">
       <label id="forgot-question-label">Security question</label>
       <input id="forgot-answer" placeholder="Your answer" />
       <label for="forgot-new-pin">New 4-digit PIN</label>
       <input id="forgot-new-pin" type="password" inputmode="numeric" maxlength="4" />
-      <div class="error-text hidden" id="forgot-error"></div>
       <button class="btn-primary" id="btn-forgot-reset">Reset PIN</button>
     </div>
     <button class="link-btn" id="btn-back-from-forgot" style="margin-top:10px;">Back to login</button>
@@ -1006,8 +1006,17 @@ $('btn-login').onclick = async () => {
 
 $('btn-forgot-lookup').onclick = async () => {
   const username = $('forgot-username').value.trim().toLowerCase();
-  const { data: question } = await sb.rpc('get_security_question', { p_username: username });
-  if (!question) { $('forgot-error').textContent = 'No such username.'; $('forgot-error').classList.remove('hidden'); return; }
+  const errEl = $('forgot-error');
+  errEl.classList.add('hidden');
+  let question = null;
+  try {
+    ({ data: question } = await sb.rpc('get_security_question', { p_username: username }));
+  } catch (e) {
+    errEl.textContent = 'Something went wrong — check your connection and try again.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (!question) { errEl.textContent = 'No such username.'; errEl.classList.remove('hidden'); return; }
   $('forgot-question-label').textContent = question;
   $('forgot-question-block').classList.remove('hidden');
   $('btn-forgot-reset').dataset.username = username;
@@ -3008,15 +3017,23 @@ async function renderScorecard(correct, points, newBadges) {
 
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
-    // Call out whoever's actually the champion right now — not always the
-    // round's creator, same reasoning as the verdict above. Nothing to call
-    // out if I'm the one holding the crown.
-    const opponent = champRow && champRow.username !== me ? champRow.username : null;
-    if (opponent) {
-      shareText(`🎯 ${displayName(me)} challenges ${displayName(opponent)} — ${points} pts on Match #${currentRound.trial_number} in MaxWord's "${currentRoom.name}". Can you beat it?\n\n⚔️ ${url}`);
+    const header = `🎯 MAXWORD — GP Vocabulary Showdown\n`;
+    const matchNum = currentRound.trial_number;
+    let body;
+    if (champRow && champRow.username !== me) {
+      // Scenario 1: someone else holds the crown — regardless of who created
+      // the Match. Named, since the recipient is beating THEM, not me.
+      body = `${displayName(champRow.username)} is holding the crown at ${champRow.score_points} pts in Match #${matchNum}. Think you can take his crown?`;
+    } else if ((lbRows || []).length === 1) {
+      // Scenario 2: I'm champion AND nobody else has played this Match yet —
+      // a fresh callout, not a defended record. "Issued a challenge" framing.
+      body = `I just issued a challenge. ${points} pts in Match #${matchNum}. Think you can beat the mighty ${displayName(me)}?`;
     } else {
-      shareText(`🎯 I, ${displayName(me)}, scored ${points} pts on MaxWord's "${currentRoom.name}" — can you beat me?\n\n⚔️ ${url}`);
+      // Scenario 3: I'm champion and at least one other person has already
+      // tried and failed — an established, defended crown. Flex framing.
+      body = `Yours truly, ${displayName(me)}, is undefeated with ${points} pts in Match #${matchNum}. Think you can defeat me?`;
     }
+    shareText(`${header}${body}\n\n${url}`);
   };
 
   // Challenge-back always targets the current champion — hidden entirely

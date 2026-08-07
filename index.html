@@ -644,7 +644,7 @@ function duelRecordCard(opponentUsername, record) {
     <div class="info-tip duel-info-tip">Head-to-head record between you two — counts only direct Challenges and Counter-challenges between you, not other Matches you both happened to join. Ties are common since scores only land in 100-pt steps.</div>
     <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponentUsername)}</span></div>
     <div class="duel-record-score">${record.wins}–${record.losses}</div>
-    ${record.ties ? `<div class="duel-record-ties">${record.ties} tie${record.ties > 1 ? 's' : ''}</div>` : ''}
+    ${record.ties ? `<div class="duel-record-ties">${record.ties} TIE${record.ties > 1 ? 'S' : ''}</div>` : ''}
   </div>`;
 }
 

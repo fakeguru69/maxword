@@ -895,17 +895,28 @@ async function shareText(text) {
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
+// Same 3-scenario template as the Scorecard's share button (see btn-challenge-others)
+// — this is the OTHER place a share can be triggered from (the Match detail
+// screen's "Send" button), and it was missed during that redesign: it kept
+// building its own separate, older text right up until now. Self-contained
+// (fetches its own leaderboard data) rather than reusing renderScorecard's
+// closure variables, since this can be called for any round, not just the
+// one just played.
 async function shareRound(r) {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${r.short_code}`;
-  const { data: creatorScore } = await sb.from('round_scores').select('score_points').eq('round_id', r.id).eq('username', r.creator_username).maybeSingle();
-  const scorePart = creatorScore ? `scored ${creatorScore.score_points} pts` : `posted it`;
-  // Sharing your OWN Trial reads as a first-person callout ("I, X, scored...
-  // can you beat ME?"); sharing someone ELSE's reads as pointing at their
-  // score from the outside ("X scored... can you beat IT?").
-  const isMine = r.creator_username === me;
-  const subject = isMine ? `I, ${displayName(me)},` : displayName(r.creator_username);
-  const ask = isMine ? 'can you beat me?' : 'can you beat it?';
-  shareText(`🎯 ${subject} ${scorePart} on Match #${r.trial_number} in MaxWord's "${currentRoom.name}" — ${ask}\n\n⚔️ ${url}`);
+  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', r.id);
+  const champRow = (lbRows || []).find(x => x.rank === 1);
+  const header = `🎯 MAXWORD — GP Vocabulary Showdown\n`;
+  const matchNum = r.trial_number;
+  let body;
+  if (champRow && champRow.username !== me) {
+    body = `${displayName(champRow.username)} is holding the crown at ${champRow.score_points} pts in Match #${matchNum}. Think you can take his crown?`;
+  } else if ((lbRows || []).length <= 1) {
+    body = `I just issued a challenge. ${champRow ? champRow.score_points : ''} pts in Match #${matchNum}. Think you can beat the mighty ${displayName(me)}?`;
+  } else {
+    body = `Yours truly, ${displayName(me)}, is undefeated with ${champRow.score_points} pts in Match #${matchNum}. Think you can defeat me?`;
+  }
+  shareText(`${header}${body}\n\n${url}`);
 }
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
@@ -1713,7 +1724,7 @@ async function renderMemberLine() {
   $('link-manage-members').onclick = () => { show('view-members'); loadMembers(); };
   $('link-invite-room').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-    shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord\n\n🔗 ${url}`);
+    shareText(`🎯 MAXWORD — GP Vocabulary Showdown\n👋 Join my Game Room "${currentRoom.name}" — think you can out-word me?\n\n🔗 ${url}`);
   };
 }
 
@@ -3148,7 +3159,7 @@ async function renderScorecard(correct, points, newBadges) {
       shareBtn.textContent = '📤 Share challenge';
       shareBtn.onclick = () => {
         const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
-        shareText(`👋 Join my Game Room "${currentRoom.name}" on MaxWord — think you can out-word me?\n\n🔗 ${url}`);
+        shareText(`🎯 MAXWORD — GP Vocabulary Showdown\n👋 Join my Game Room "${currentRoom.name}" — think you can out-word me?\n\n🔗 ${url}`);
       };
       card.appendChild(shareBtn);
       const laterBtn = document.createElement('button');

@@ -595,10 +595,6 @@ const SUPABASE_URL = "https://dowhlyoufjmespcwyrke.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_2ggFlbGiuJIDnSmlyNidaw_I9Mymwa-";
 const POINTS_PER_CORRECT = 100;
 const QUESTIONS_PER_ROUND = 10;
-const HARD_WORD_MIN_SAMPLE = 5;   // min times a word must've been answered before we trust its difficulty
-const HARD_WORD_MAX_RATE = 0.5;   // correct_rate at/below this counts as "hard"
-const HARD_WORDS_PER_ROUND = 3;   // how many hard words to force into a round, when enough data exists
-const RECENT_WORD_COOLDOWN_ROUNDS = 2; // never repeat a word THIS player saw in their last N rounds
 const MAX_OPEN_DARES_PER_DAY = 10;
 const DARE_EXPIRY_MS = 100 * 365 * 24 * 60 * 60 * 1000; // effectively permanent — a Trial's card, leaderboard, and championship status now persist indefinitely, so there's no expiry deadline to create urgency around anymore
 
@@ -912,28 +908,58 @@ async function shareRound(r) {
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
 
-// Picks the word set for a round. Once enough people have answered a word for its
-// difficulty to mean anything, we force a few "hard" (low correct-rate) words in —
-// otherwise (e.g. a fresh install with no data yet) it's plain random, same as before.
-// Recency cooldown: a word THIS player saw in their last couple rounds is excluded
-// first, regardless of hard/easy — without this, a tiny early "hard" pool (e.g. just
-// ONE qualifying word bank-wide) gets force-repeated into nearly every round anyone
-// plays, which is the opposite of the intent. Falls back to allowing repeats only if
-// the cooldown would leave too few words to fill a round (small-bank edge case).
+// Picks the word set for a round. Three tiers, in priority order:
+// 1. FRESH (never answered by this player) — the main pool. Global
+//    difficulty (aggregated across every player) still applies HERE and
+//    only here: among words you've never seen, ones broadly hard for others
+//    get a soft priority bump. The moment YOU personally answer a word, the
+//    global signal stops mattering for it entirely — your own right/wrong
+//    history takes over completely from then on.
+// 2. REVIEW — your own words where the most recent attempt was wrong.
+//    Deliberately brought back, but with a much shorter, dedicated cooldown
+//    than everything else: excluded only from the round IMMEDIATELY before
+//    (no word repeats on consecutive rounds), not a multi-round window —
+//    the whole point is bringing these back soon, just never back-to-back.
+// 3. CORRECT (already gotten right) — near-fully excluded, this is what
+//    "use fresh words" means. Only touched as a last-resort fallback if
+//    fresh + review can't fill the round on their own.
+const GLOBAL_DIFFICULTY_MIN_SAMPLE = 5; // min times a word must've been answered, by anyone, before its global difficulty is trusted
+const REVIEW_WORDS_PER_ROUND = 2; // how many of THIS player's own not-yet-mastered words to bring back, when available
+
 async function pickRoundWords() {
-  const { data: recentAnswers } = await sb.from('word_answers').select('word_id').eq('username', me).order('answered_at', { ascending: false }).limit(QUESTIONS_PER_ROUND * RECENT_WORD_COOLDOWN_ROUNDS);
-  const recentIds = new Set((recentAnswers || []).map(a => a.word_id));
+  const { data: lastRoundAnswers } = await sb.from('word_answers').select('word_id').eq('username', me).order('answered_at', { ascending: false }).limit(QUESTIONS_PER_ROUND);
+  const lastRoundIds = new Set((lastRoundAnswers || []).map(a => a.word_id));
 
-  const { data: stats } = await sb.from('word_stats').select('*').gte('times_answered', HARD_WORD_MIN_SAMPLE).lte('correct_rate', HARD_WORD_MAX_RATE);
-  const hardIds = new Set((stats || []).map(s => s.word_id));
-  const hardPool = shuffle(WORDS.filter(w => hardIds.has(w.id) && !recentIds.has(w.id)));
-  const hardPicks = hardPool.slice(0, HARD_WORDS_PER_ROUND);
-  const pickedIds = new Set(hardPicks.map(w => w.id));
+  const { data: myAnswers } = await sb.from('word_answers').select('word_id, is_correct, answered_at').eq('username', me).order('answered_at', { ascending: false });
+  const latestCorrectByWord = {};
+  (myAnswers || []).forEach(a => { if (!(a.word_id in latestCorrectByWord)) latestCorrectByWord[a.word_id] = a.is_correct; });
+  const answeredIds = new Set(Object.keys(latestCorrectByWord));
+  const reviewIds = new Set(Object.keys(latestCorrectByWord).filter(id => latestCorrectByWord[id] === false));
+  const correctIds = new Set(Object.keys(latestCorrectByWord).filter(id => latestCorrectByWord[id] === true));
 
-  let pool = WORDS.filter(w => !pickedIds.has(w.id) && !recentIds.has(w.id));
-  if (pool.length < QUESTIONS_PER_ROUND - hardPicks.length) pool = WORDS.filter(w => !pickedIds.has(w.id)); // cooldown would starve the round — allow repeats rather than fail
-  const remaining = shuffle(pool).slice(0, QUESTIONS_PER_ROUND - hardPicks.length);
-  return shuffle([...hardPicks, ...remaining]).map(w => w.id);
+  // Review picks — only the immediately-previous round blocks a repeat here,
+  // not the general rule.
+  const reviewPool = shuffle(WORDS.filter(w => reviewIds.has(w.id) && !lastRoundIds.has(w.id)));
+  const reviewPicks = reviewPool.slice(0, REVIEW_WORDS_PER_ROUND);
+  const pickedIds = new Set(reviewPicks.map(w => w.id));
+
+  // Fresh pool, globally-hard-first: only ever consults global stats for
+  // words this player has NEVER touched.
+  const { data: stats } = await sb.from('word_stats').select('word_id, times_answered, correct_rate').gte('times_answered', GLOBAL_DIFFICULTY_MIN_SAMPLE);
+  const globalHardIds = new Set((stats || []).filter(s => s.correct_rate <= 0.5).map(s => s.word_id));
+  const freshAll = WORDS.filter(w => !pickedIds.has(w.id) && !answeredIds.has(w.id));
+  const freshHard = shuffle(freshAll.filter(w => globalHardIds.has(w.id)));
+  const freshOther = shuffle(freshAll.filter(w => !globalHardIds.has(w.id)));
+  let pool = [...freshHard, ...freshOther];
+
+  const needed = QUESTIONS_PER_ROUND - reviewPicks.length;
+  if (pool.length < needed) {
+    // Ran out of fresh words — fall back to already-correct ones, last resort only.
+    pool = [...pool, ...shuffle(WORDS.filter(w => !pickedIds.has(w.id) && correctIds.has(w.id)))];
+  }
+  if (pool.length < needed) pool = WORDS.filter(w => !pickedIds.has(w.id)); // true exhaustion edge case — allow anything rather than fail
+  const remaining = pool.slice(0, needed);
+  return shuffle([...reviewPicks, ...remaining]).map(w => w.id);
 }
 function fmtDate(d) { return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
 function timeLeft(expiresAt) {
@@ -1870,14 +1896,23 @@ async function openTrialScreen(round) {
   // nonsensical "3 of 2 have played."
   $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Match</div>`;
 
-  // duel record — only when this Trial is a direct callout between two specific people, and I'm one of them
+  // duel record — only when this Trial is a direct callout between two specific
+  // people, I'm one of them, AND that person is the CURRENT champion (same gate
+  // as the Scorecard's version — otherwise this card and the leaderboard above
+  // could tell two contradictory stories if a third party has since taken the
+  // lead). Uses the LIFETIME record (computeDuelRecordLifetime), matching
+  // Profile/Scorecard — this screen was wrongly using the room-scoped
+  // computeDuelRecord instead, a real inconsistency: the same two people could
+  // see a different W-L-T here than everywhere else Duel Record appears.
   const duelHolder = $('trial-duel-holder');
   duelHolder.innerHTML = '';
   if (round.target_username && (me === round.creator_username || me === round.target_username)) {
     const opponent = me === round.creator_username ? round.target_username : round.creator_username;
-    const record = await computeDuelRecord(me, opponent);
-    if (record.total > 0) {
-      duelHolder.innerHTML = duelRecordCard(opponent, record);
+    if (champ && champ.username === opponent) {
+      const record = await computeDuelRecordLifetime(me, opponent);
+      if (record.total > 0) {
+        duelHolder.innerHTML = duelRecordCard(opponent, record);
+      }
     }
   }
 

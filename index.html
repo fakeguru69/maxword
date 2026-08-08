@@ -861,6 +861,31 @@ async function sha256(str) {
 }
 function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
+// Seeded RNG (mulberry32-style) + seeded shuffle — used only for rendering a
+// question's multiple-choice options. Everything else in the app keeps using
+// plain Math.random()/shuffle() (word selection, distractor pool order is
+// already deterministic since WORDS is a static array). This exists
+// specifically so the SAME round+word always renders the SAME options for
+// every player who plays it — previously each player got independently
+// randomized wording and distractors for identical words, which became a
+// real fairness gap once speed became a tiebreaker (easier-to-eliminate
+// wrong answers could hand someone a faster time for reasons that had
+// nothing to do with vocabulary skill).
+function seededRandom(seedStr) {
+  let h = 1779033703 ^ seedStr.length;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return function () {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  };
+}
+function seededShuffle(arr, rand) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
 function displayName(u) {
   const name = (u || '').toUpperCase();
   return name.length > 12 ? name.slice(0, 11) + '…' : name;
@@ -1090,7 +1115,6 @@ async function focusMatchCard(round) {
     setTimeout(() => card.classList.remove('onboarding-pulse'), 7400);
   }
 }
-let dethronedFocusRound = null;
 let crownTakenFocusRound = null;
 let challengedFocusRound = null;
 let tiedFocusRound = null;
@@ -1102,12 +1126,21 @@ async function checkDethronements() {
   const ids = events.map(e => e.id);
   await sb.from('dethronement_events').update({ notified: true }).in('id', ids);
   let text;
-  dethronedFocusRound = events.length === 1 ? events[0].rounds : null;
+  const btn = $('btn-dethroned-ok');
   if (events.length === 1) {
     const e = events[0];
-    text = `${displayName(e.dethroned_by_username)} took your crown on Match #${e.rounds.trial_number}${await duelSuffix(e.dethroned_by_username)}.`;
+    const target = e.dethroned_by_username;
+    text = `${displayName(target)} took your crown on Match #${e.rounds.trial_number}${await duelSuffix(target)}.`;
+    // Direct action, not a look-back: this used to just navigate to and blink
+    // the Match you already lost (a dead end — nothing left to do there,
+    // it's one-shot). Tapping the button now immediately starts the fresh
+    // revenge duel instead, same as every other "duel them back" in the app.
+    btn.textContent = `Duel ${displayName(target)} back`;
+    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); startNewRound(target, true); };
   } else {
     text = `${formatNameList(events.map(e => e.dethroned_by_username))} took your crowns — open your Game Rooms to see the damage.`;
+    btn.textContent = 'Got it';
+    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); };
   }
   const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
   if (!seenBefore) {
@@ -1117,7 +1150,6 @@ async function checkDethronements() {
   $('dethroned-modal-text').textContent = text;
   $('dethroned-modal').classList.remove('hidden');
 }
-$('btn-dethroned-ok').onclick = () => { $('dethroned-modal').classList.add('hidden'); focusMatchCard(dethronedFocusRound); };
 
 async function checkCrownsTaken() {
   const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_by_username', me).eq('dethroner_notified', false).eq('outcome', 'taken').order('created_at', { ascending: true });
@@ -2670,7 +2702,8 @@ function renderQuestion() {
   $('game-sentence-card').classList.add('hidden');
   $('btn-next-word').classList.add('hidden');
 
-  const correctAnswer = Math.random() < 0.5 ? w.basic : w.intermediate;
+  const rand = seededRandom(`${currentRound.id}-${w.id}`);
+  const correctAnswer = rand() < 0.5 ? w.basic : w.intermediate;
   w._correctAnswer = correctAnswer;
   const distractorPool = [];
   WORDS.forEach(x => {
@@ -2678,8 +2711,8 @@ function renderQuestion() {
     if (x.basic !== correctAnswer) distractorPool.push(x.basic);
     if (x.intermediate !== correctAnswer) distractorPool.push(x.intermediate);
   });
-  const distractors = shuffle([...new Set(distractorPool)]).slice(0, 2);
-  const options = shuffle([correctAnswer, ...distractors]);
+  const distractors = seededShuffle([...new Set(distractorPool)], rand).slice(0, 2);
+  const options = seededShuffle([correctAnswer, ...distractors], rand);
   const optDiv = $('game-options');
   optDiv.innerHTML = '';
   options.forEach(opt => {
@@ -2901,7 +2934,7 @@ async function renderScorecard(correct, points, newBadges) {
     dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(champRow.username, true); };
   } else if (iWon === true) {
     dareBackBtn.classList.remove('hidden');
-    dareBackBtn.textContent = `Ready to take another?`;
+    dareBackBtn.textContent = `Start another duel`;
     dareBackBtn.onclick = () => { openTargetPicker(); };
   } else {
     dareBackBtn.classList.add('hidden');
@@ -2991,7 +3024,7 @@ async function renderOtherDares(iWon) {
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const open = (rounds || []).filter(r => !playedIds.has(r.id) && r.creator_username !== me);
   if (open.length === 0) {
-    // On a win, "Ready to take another?" right above already opens the exact
+    // On a win, "Start another duel" right above already opens the exact
     // same picker — showing a second "Start a new Match" button here would
     // just be the same action twice. Only show this fallback when there's
     // no other button already covering it (i.e. a loss, where the CTA above

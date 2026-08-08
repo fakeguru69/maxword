@@ -105,8 +105,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tip-list-item:last-child { margin-bottom: 0; }
 .room-leaderboard-btn { width: 100%; background: var(--ink-raised); border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); cursor: pointer; margin-bottom: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .room-leaderboard-btn.action { border-color: var(--gold); color: var(--gold); }
-@keyframes onboarding-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.55); } 50% { box-shadow: 0 0 0 8px rgba(212,175,55,0); } }
-.onboarding-pulse { animation: onboarding-pulse 1s ease-out 3; }
+@keyframes onboarding-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.75); } 50% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
+.onboarding-pulse { animation: onboarding-pulse 1.4s ease-out 6; }
 .room-leaderboard-btn:active { border-color: var(--gold); }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
@@ -1058,7 +1058,7 @@ async function focusMatchCard(round) {
   if (card) {
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     card.classList.add('onboarding-pulse');
-    setTimeout(() => card.classList.remove('onboarding-pulse'), 3200);
+    setTimeout(() => card.classList.remove('onboarding-pulse'), 8600);
   }
 }
 let dethronedFocusRound = null;
@@ -1524,7 +1524,7 @@ async function maybeShowRoomVocabTip() {
       const target = document.getElementById('trials-count-label');
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       const startBtn = document.getElementById('btn-quick-start-match');
-      if (startBtn) { startBtn.classList.add('onboarding-pulse'); setTimeout(() => startBtn.classList.remove('onboarding-pulse'), 3200); }
+      if (startBtn) { startBtn.classList.add('onboarding-pulse'); setTimeout(() => startBtn.classList.remove('onboarding-pulse'), 8600); }
       maybeShowA2HSPopup();
     });
 }

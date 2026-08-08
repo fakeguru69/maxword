@@ -105,8 +105,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tip-list-item:last-child { margin-bottom: 0; }
 .room-leaderboard-btn { width: 100%; background: var(--ink-raised); border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px; font-family: 'Cinzel', serif; font-size: 14px; font-weight: 700; color: var(--cream); cursor: pointer; margin-bottom: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .room-leaderboard-btn.action { border-color: var(--gold); color: var(--gold); }
-@keyframes onboarding-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.75); } 50% { box-shadow: 0 0 0 16px rgba(212,175,55,0); } }
-.onboarding-pulse { animation: onboarding-pulse 1.4s ease-out 6; }
+@keyframes onboarding-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(79,182,168,0.95); transform: scale(1); } 50% { box-shadow: 0 0 0 20px rgba(79,182,168,0); transform: scale(1.02); } }
+.onboarding-pulse { animation: onboarding-pulse 1.2s ease-in-out 6; }
 .room-leaderboard-btn:active { border-color: var(--gold); }
 .streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(192,85,74,0.1); color: #E08A6B; border: 1px solid #7A4A3A; margin-bottom: 10px; }
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
@@ -387,13 +387,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="leaderboard-list"></div>
   </section>
 
-  <!-- CHOOSE TARGET (direct callout is the default/prominent path — "anyone" is the fallback) -->
+  <!-- CHOOSE TARGET — every Match now starts as a named duel. The one
+       exception (a genuinely empty room) is handled in openTargetPicker()
+       by skipping this screen entirely, not by an option here. -->
   <section id="view-choose-target" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-choose-target-back">&larr; Back</button>
-    <h2 class="display" style="margin-bottom:6px;">Send a Challenge</h2>
-    <div class="section-label" style="margin-top:0;">Pick who to challenge</div>
+    <h2 class="display" style="margin-bottom:6px;">Start a Duel</h2>
+    <div class="section-label" style="margin-top:0;">Pick who to duel for the crown</div>
     <div id="target-member-list"></div>
-    <button class="link-btn" id="btn-target-anyone" style="margin-top:6px;">Or just open it to anyone</button>
   </section>
 
   <!-- TRIAL (per-Trial mini-screen — the star of the app: champion, leaderboard, duel record) -->
@@ -510,6 +511,30 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
   </div>
 
+  <!-- TIED MODAL — neither a win nor a loss for either side, so it gets its own
+       neutral wording rather than being squeezed into Dethroned/Crown Taken's
+       win/lose framing. Fires for BOTH people in the tie, same as the other two. -->
+  <div class="modal-overlay hidden" id="tied-modal">
+    <div class="card modal-card">
+      <div class="challenged-banner" style="margin-bottom:14px;">🤝 Tied</div>
+      <p id="tied-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
+      <button class="btn-primary" id="btn-tied-ok">Got it</button>
+    </div>
+  </div>
+
+  <!-- REPELLED MODAL — someone tried to take your crown and failed. Nothing
+       was taken, so this is informational/positive, not urgent — "Nice!" not
+       a forced "duel them back" (re-challenging someone who just lost to you
+       makes no sense). Reuses the Crown Taken banner's gold styling since,
+       from the crown holder's side, this is also good news. -->
+  <div class="modal-overlay hidden" id="repelled-modal">
+    <div class="card modal-card">
+      <div class="challenged-banner" style="margin-bottom:14px;">🛡️ Crown Held</div>
+      <p id="repelled-modal-text" style="font-size:15px; margin-bottom:16px;"></p>
+      <button class="btn-primary" id="btn-repelled-ok">Nice!</button>
+    </div>
+  </div>
+
   <!-- ADD TO HOME SCREEN MODAL -->
   <div class="modal-overlay hidden" id="a2hs-modal">
     <div class="card modal-card">
@@ -532,6 +557,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <!-- GAME VIEW -->
   <section id="view-game" class="card hidden">
     <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="footnote" style="margin: 6px 0 0; text-align: center;">⏱ Speed breaks ties</div>
     <div class="word-card">
       <div class="cat-eyebrow" id="game-category-label"></div>
       <div class="advanced-word" id="game-word"></div>
@@ -932,6 +958,7 @@ let currentRound = null;
 let roundWords = [];
 let roundAnswers = [];
 let qIndex = 0;
+let roundStartTime = null; // wall-clock ms when question 1 appeared — the speed tiebreak clock
 let lbPeriod = 'alltime';
 let globalLbPeriod = 'alltime';
 let deepLinkParams = null;
@@ -1030,6 +1057,8 @@ async function afterLogin() {
   await checkDethronements();
   await checkNewChallenges();
   await checkCrownsTaken();
+  await checkTiedEvents();
+  await checkRepelled();
   subscribeGlobalRealtime();
 }
 
@@ -1058,15 +1087,17 @@ async function focusMatchCard(round) {
   if (card) {
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     card.classList.add('onboarding-pulse');
-    setTimeout(() => card.classList.remove('onboarding-pulse'), 8600);
+    setTimeout(() => card.classList.remove('onboarding-pulse'), 7400);
   }
 }
 let dethronedFocusRound = null;
 let crownTakenFocusRound = null;
 let challengedFocusRound = null;
+let tiedFocusRound = null;
+let repelledFocusRound = null;
 
 async function checkDethronements() {
-  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_username', me).eq('notified', false).order('created_at', { ascending: true });
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_username', me).eq('notified', false).eq('outcome', 'taken').order('created_at', { ascending: true });
   if (!events || events.length === 0) return;
   const ids = events.map(e => e.id);
   await sb.from('dethronement_events').update({ notified: true }).in('id', ids);
@@ -1074,14 +1105,14 @@ async function checkDethronements() {
   dethronedFocusRound = events.length === 1 ? events[0].rounds : null;
   if (events.length === 1) {
     const e = events[0];
-    text = `${displayName(e.dethroned_by_username)} just took Match #${e.rounds.trial_number} from you${await duelSuffix(e.dethroned_by_username)}.`;
+    text = `${displayName(e.dethroned_by_username)} took your crown on Match #${e.rounds.trial_number}${await duelSuffix(e.dethroned_by_username)}.`;
   } else {
-    text = `${formatNameList(events.map(e => e.dethroned_by_username))} dethroned you — open your Game Rooms to see the damage.`;
+    text = `${formatNameList(events.map(e => e.dethroned_by_username))} took your crowns — open your Game Rooms to see the damage.`;
   }
   const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
   if (!seenBefore) {
     await sb.from('reminders_shown').insert({ username: me, reminder_key: 'first_dethroned' });
-    text += ` Matches are one-shot, so you can't replay this one — but you can challenge them back with a fresh Match.`;
+    text += ` Matches are one-shot, so you can't replay this one — but you can duel them back with a fresh Match.`;
   }
   $('dethroned-modal-text').textContent = text;
   $('dethroned-modal').classList.remove('hidden');
@@ -1089,7 +1120,7 @@ async function checkDethronements() {
 $('btn-dethroned-ok').onclick = () => { $('dethroned-modal').classList.add('hidden'); focusMatchCard(dethronedFocusRound); };
 
 async function checkCrownsTaken() {
-  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_by_username', me).eq('dethroner_notified', false).order('created_at', { ascending: true });
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_by_username', me).eq('dethroner_notified', false).eq('outcome', 'taken').order('created_at', { ascending: true });
   if (!events || events.length === 0) return;
   const ids = events.map(e => e.id);
   await sb.from('dethronement_events').update({ dethroner_notified: true }).in('id', ids);
@@ -1099,14 +1130,68 @@ async function checkCrownsTaken() {
     const e = events[0];
     const streak = await computeDuelStreakLifetime(me, e.dethroned_username);
     const streakPart = streak >= 2 ? ` 🔥 ${streak}-win streak!` : '';
-    text = `You just snatched Match #${e.rounds.trial_number} from ${displayName(e.dethroned_username)}${await duelSuffix(e.dethroned_username)} — nice!${streakPart}`;
+    text = `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number}${await duelSuffix(e.dethroned_username)} — nice!${streakPart}`;
   } else {
-    text = `You just snatched crowns from ${formatNameList(events.map(e => e.dethroned_username))} — nice!`;
+    text = `You took crowns from ${formatNameList(events.map(e => e.dethroned_username))} — nice!`;
   }
   $('crown-taken-modal-text').textContent = text;
   $('crown-taken-modal').classList.remove('hidden');
 }
 $('btn-crown-taken-ok').onclick = () => { $('crown-taken-modal').classList.add('hidden'); focusMatchCard(crownTakenFocusRound); };
+
+// Repelled — someone played YOUR crown and fell short. Nothing was taken, so
+// this is deliberately informational, not urgent: "Nice!" not "Duel them
+// back" (challenging the person who just lost to you makes no sense). The
+// challenger side never sees a popup for this at all — dethroner_notified is
+// set true at insert time in the DB trigger, since their own scorecard
+// already told them the result.
+async function checkRepelled() {
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_username', me).eq('notified', false).eq('outcome', 'repelled').order('created_at', { ascending: true });
+  if (!events || events.length === 0) return;
+  const ids = events.map(e => e.id);
+  await sb.from('dethronement_events').update({ notified: true }).in('id', ids);
+  let text;
+  repelledFocusRound = events.length === 1 ? events[0].rounds : null;
+  if (events.length === 1) {
+    const e = events[0];
+    text = `${displayName(e.dethroned_by_username)} tried to take your crown on Match #${e.rounds.trial_number} and lost. Your crown holds!`;
+  } else {
+    text = `${formatNameList(events.map(e => e.dethroned_by_username))} tried to take your crowns and came up short. Your crowns hold!`;
+  }
+  $('repelled-modal-text').textContent = text;
+  $('repelled-modal').classList.remove('hidden');
+}
+$('btn-repelled-ok').onclick = () => { $('repelled-modal').classList.add('hidden'); focusMatchCard(repelledFocusRound); };
+
+// Ties — neither side "dethroned" the other, so this is its own event type
+// (is_tie=true on the same dethronement_events table) and its own neutral
+// popup, rather than being forced into Dethroned/Crown Taken's win/lose
+// framing. Fires for BOTH people in the tie, reusing the same notified/
+// dethroner_notified flags — whichever side "me" is on determines which
+// flag gets cleared, same pattern as the other two checks.
+async function checkTiedEvents() {
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('is_tie', true)
+    .or(`and(dethroned_username.eq.${me},notified.eq.false),and(dethroned_by_username.eq.${me},dethroner_notified.eq.false)`)
+    .order('created_at', { ascending: true });
+  if (!events || events.length === 0) return;
+  const asLeader = events.filter(e => e.dethroned_username === me);
+  const asTier = events.filter(e => e.dethroned_by_username === me);
+  if (asLeader.length) await sb.from('dethronement_events').update({ notified: true }).in('id', asLeader.map(e => e.id));
+  if (asTier.length) await sb.from('dethronement_events').update({ dethroner_notified: true }).in('id', asTier.map(e => e.id));
+  let text;
+  tiedFocusRound = events.length === 1 ? events[0].rounds : null;
+  if (events.length === 1) {
+    const e = events[0];
+    const other = e.dethroned_username === me ? e.dethroned_by_username : e.dethroned_username;
+    text = `You and ${displayName(other)} are now tied on Match #${e.rounds.trial_number}${await duelSuffix(other)}.`;
+  } else {
+    const others = events.map(e => e.dethroned_username === me ? e.dethroned_by_username : e.dethroned_username);
+    text = `You're now tied with ${formatNameList(others)} — open your Game Rooms to see where.`;
+  }
+  $('tied-modal-text').textContent = text;
+  $('tied-modal').classList.remove('hidden');
+}
+$('btn-tied-ok').onclick = () => { $('tied-modal').classList.add('hidden'); focusMatchCard(tiedFocusRound); };
 
 async function checkNewChallenges() {
   const now = new Date().toISOString();
@@ -1507,6 +1592,8 @@ async function openRoom(room) {
     checkDethronements(),
     checkNewChallenges(),
     checkCrownsTaken(),
+    checkTiedEvents(),
+    checkRepelled(),
   ]);
   await maybeShowRoomVocabTip();
   subscribeRoomRealtime(room.id);
@@ -1524,7 +1611,7 @@ async function maybeShowRoomVocabTip() {
       const target = document.getElementById('trials-count-label');
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       const startBtn = document.getElementById('btn-quick-start-match');
-      if (startBtn) { startBtn.classList.add('onboarding-pulse'); setTimeout(() => startBtn.classList.remove('onboarding-pulse'), 8600); }
+      if (startBtn) { startBtn.classList.add('onboarding-pulse'); setTimeout(() => startBtn.classList.remove('onboarding-pulse'), 7400); }
       maybeShowA2HSPopup();
     });
 }
@@ -1583,13 +1670,13 @@ function subscribeRoomRealtime(roomId) {
     .subscribe();
 }
 function checkDethronementsLive() {
-  if ($('view-game').classList.contains('hidden')) checkDethronements();
+  if ($('view-game').classList.contains('hidden')) { checkDethronements(); checkTiedEvents(); checkRepelled(); }
 }
 function checkNewChallengesLive() {
   if ($('view-game').classList.contains('hidden')) checkNewChallenges();
 }
 function checkCrownsTakenLive() {
-  if ($('view-game').classList.contains('hidden')) checkCrownsTaken();
+  if ($('view-game').classList.contains('hidden')) { checkCrownsTaken(); checkTiedEvents(); }
 }
 function unsubscribeRoomRealtime() {
   if (roomChannel) { sb.removeChannel(roomChannel); roomChannel = null; }
@@ -1679,22 +1766,18 @@ async function loadDares() {
 
     let badge, badgeClass, badgeInfo, statusLine, rankLine = '';
     if (state === 'champion') {
-      badge = '👑 crown holder'; badgeClass = 'champion';
-      badgeInfo = 'You\'re currently in the lead on this Match.';
+      badge = '👑 you hold the crown'; badgeClass = 'champion';
+      badgeInfo = 'You\'re the current crown holder on this Match.';
       statusLine = `${myRow.score_points} pts`;
       rankLine = `#1 of ${rows.length}`;
     } else if (state === 'losing') {
-      badge = '👎 lost your crown'; badgeClass = 'losing';
-      badgeInfo = 'Someone beat your score — replay to try to reclaim the lead.';
+      badge = '👎 crown taken'; badgeClass = 'losing';
+      badgeInfo = 'Someone took the crown here — this Match is done, but you can duel them back with a fresh one.';
       statusLine = `${displayName(champ.username)} leads with ${champ.score_points} pts`;
       rankLine = `#${myRow.rank} of ${rows.length}`;
-    } else if (state === 'challenged_back') {
-      badge = '🎯 counter challenge'; badgeClass = 'challenged-back';
-      badgeInfo = 'You challenged them back after they challenged you first.';
-      statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
-    } else if (state === 'targeted') {
-      badge = '🎯 challenge you'; badgeClass = 'targeted';
-      badgeInfo = 'Someone called you out directly on this Match.';
+    } else if (state === 'challenged_back' || state === 'targeted') {
+      badge = '🎯 duelling you for the crown'; badgeClass = 'targeted';
+      badgeInfo = 'Someone is duelling you for the crown on this Match.';
       statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     } else {
       badge = champ ? `⚔️ Join Fight` : '☝️ First to Fight'; badgeClass = 'open-invite';
@@ -2522,20 +2605,19 @@ function renderRankBanner(rows, bannerId, keyBase, period) {
 // GAME
 // ---------------------------------------------------------------
 async function openTargetPicker() {
-  show('view-choose-target');
-  $('btn-target-anyone').disabled = false;
-  $('btn-target-anyone').onclick = () => { disableAllPickerButtons(); startNewRound(); };
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id).neq('username', me);
-  const list = $('target-member-list');
-  list.innerHTML = '';
-  const disableAllPickerButtons = () => {
-    $('btn-target-anyone').disabled = true;
-    list.querySelectorAll('button').forEach(b => b.disabled = true);
-  };
   if (!members || members.length === 0) {
-    list.innerHTML = '<div class="empty-state">No one else has joined this Game Room yet.</div>';
+    // The one honest exception: genuinely nobody else in the room yet, so
+    // there's no name to duel. Skips the picker entirely and starts an
+    // untargeted Match — this used to be reachable any time via "open it to
+    // anyone"; now it only ever happens here, for a real empty room.
+    startNewRound();
     return;
   }
+  show('view-choose-target');
+  const list = $('target-member-list');
+  list.innerHTML = '';
+  const disableAllPickerButtons = () => { list.querySelectorAll('button').forEach(b => b.disabled = true); };
   members.forEach(m => {
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
@@ -2571,10 +2653,11 @@ async function startRound(round) {
   const { count: everPlayed } = await sb.from('round_scores').select('id', { count: 'exact', head: true }).eq('username', me);
   if (!everPlayed) {
     await showOnboardingTipOnce('first_trial_ever', '📜 How Trials work',
-      `Each Match is permanent and one-shot — you only get one attempt at it, ever, so make it count. Beat the current top score to become champion — but stay alert, since someone else can beat YOUR score later and take the throne back.`,
-      () => { show('view-game'); renderQuestion(); });
+      `Each Match is permanent and one-shot — you only get one attempt at it, ever, so make it count. Beat the current top score to take the crown — and if someone ever matches your score exactly, whoever finished faster keeps it, so once you start, see it through.`,
+      () => { roundStartTime = Date.now(); show('view-game'); renderQuestion(); });
     return;
   }
+  roundStartTime = Date.now();
   show('view-game');
   renderQuestion();
 }
@@ -2635,8 +2718,9 @@ async function finishRound() {
   $('progress-fill').style.width = '100%';
   const correct = roundAnswers.filter(Boolean).length;
   const points = correct * POINTS_PER_CORRECT;
+  const durationMs = roundStartTime ? Math.max(0, Date.now() - roundStartTime) : null;
 
-  await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points });
+  await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points, duration_ms: durationMs });
 
   const wordAnswerRows = roundWords.map((w, i) => ({ round_id: currentRound.id, username: me, word_id: w.id, is_correct: !!roundAnswers[i] }));
   await sb.from('word_answers').upsert(wordAnswerRows, { onConflict: 'round_id,username,word_id', ignoreDuplicates: true });
@@ -2658,6 +2742,8 @@ async function finishRound() {
   await checkDethronements();
   await checkNewChallenges();
   await checkCrownsTaken();
+  await checkTiedEvents();
+  await checkRepelled();
   const { count: roundsPlayedSoFar } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
   if (newBadges.length > 0 && roundsPlayedSoFar > 2) {
     await showOnboardingTipOnce('first_badge_earned', '🏅 Your First Badge!',
@@ -2721,38 +2807,39 @@ async function renderScorecard(correct, points, newBadges) {
   const verdictEl = $('score-verdict');
   const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', currentRound.id);
   const champRow = (lbRows || []).find(r => r.rank === 1);
+  const myRow = (lbRows || []).find(r => r.username === me);
   let iWon = null;
-  // Duel-relative wording: when this Match is a direct callout between two
-  // named people and the opponent has actually played it, the verdict talks
-  // about THEM specifically ("You beat X") rather than only about whoever's
-  // currently leading the whole Match — a third player crashing an open
-  // Match shouldn't blur the head-to-head result the two of you actually
-  // care about. iWon still tracks overall champion status (rank 1), unchanged
-  // — only the sentence changes, so challenge-back targeting downstream is unaffected.
+  // Duel-relative wording: compares RANK, not raw score — rank already
+  // embeds the speed tiebreak (trial_leaderboard now orders by score DESC,
+  // duration ASC), so a same-score-but-slower opponent correctly reads as a
+  // loss here, not a tie. A genuine tie (equal rank) is now only reachable
+  // via identical score AND identical duration — practically unreachable.
   const isDuelRound = !!(currentRound.target_username && (me === currentRound.creator_username || me === currentRound.target_username));
   const opponentUsername = isDuelRound ? (me === currentRound.creator_username ? currentRound.target_username : currentRound.creator_username) : null;
   const opponentRow = opponentUsername ? (lbRows || []).find(r => r.username === opponentUsername) : null;
 
-  if (champRow) {
+  if (champRow && myRow) {
     iWon = champRow.username === me;
     if (opponentRow) {
-      const oppGap = opponentRow.score_points - points;
-      if (oppGap < 0) {
+      if (myRow.rank < opponentRow.rank) {
         verdictEl.textContent = iWon
-          ? `🎉 You beat ${displayName(opponentUsername)} and you're the Game Champion! ${points} pts.`
-          : `You beat ${displayName(opponentUsername)}!`;
-      } else if (oppGap === 0) {
+          ? `👑 You took ${displayName(opponentUsername)}'s crown! ${points} pts.`
+          : `👑 You took ${displayName(opponentUsername)}'s crown!`;
+      } else if (myRow.rank === opponentRow.rank) {
         verdictEl.textContent = `🤝 You're tied with ${displayName(opponentUsername)} at ${opponentRow.score_points}!`;
       } else {
-        verdictEl.textContent = `You lost to ${displayName(opponentUsername)} by ${oppGap}.`;
+        const gap = opponentRow.score_points - points;
+        verdictEl.textContent = gap === 0
+          ? `${displayName(opponentUsername)}'s crown holds — they finished faster.`
+          : `${displayName(opponentUsername)}'s crown holds — you lost by ${gap}.`;
       }
     } else if (iWon) {
-      verdictEl.textContent = `🎉 You're the Game Champion! ${points} pts.`;
+      verdictEl.textContent = `👑 You hold the crown! ${points} pts.`;
     } else {
       const gap = champRow.score_points - points;
       verdictEl.textContent = gap === 0
         ? `🤝 Tied with ${displayName(champRow.username)} at ${champRow.score_points}!`
-        : `You missed ${displayName(champRow.username)}'s ${champRow.score_points} by ${gap} — they're the Game Champion.`;
+        : `${displayName(champRow.username)}'s crown holds — you lost by ${gap}.`;
     }
     verdictEl.classList.remove('hidden');
   } else {
@@ -2760,11 +2847,11 @@ async function renderScorecard(correct, points, newBadges) {
   }
 
   // Win-streak line — only when this round was a real duel win against the
-  // opponent (not just overall champion status), and only surfaced once
-  // there's an actual streak (2+) worth naming.
+  // opponent (rank-based now, matching the verdict above), and only
+  // surfaced once there's an actual streak (2+) worth naming.
   const streakEl = $('score-streak-holder');
   streakEl.innerHTML = '';
-  if (opponentRow && (opponentRow.score_points - points) < 0) {
+  if (opponentRow && myRow && myRow.rank < opponentRow.rank) {
     const streak = await computeDuelStreakLifetime(me, opponentUsername);
     if (streak >= 2) {
       streakEl.innerHTML = `<div class="streak-chip">🔥 ${streak}-win streak vs ${displayName(opponentUsername)}</div>`;
@@ -2798,29 +2885,24 @@ async function renderScorecard(correct, points, newBadges) {
     shareText(`${header}${body}\n\n${url}`);
   };
 
-  // Challenge back — ALWAYS shown now, win or lose, same "Challenge back"
-  // wording and same primary-weight styling as Share challenge either way.
-  // Only the hidden target changes: losing targets the current champion
-  // (person to reclaim from), winning targets the runner-up (rank 2 on this
-  // Match's leaderboard) — the closest person worth re-provoking. If there's
-  // truly nobody else on the leaderboard yet (solo Match, first-ever play),
-  // there's no one to challenge back, so the button hides in that one case.
+  // The follow-up action, honest about what actually happened (no dead ends,
+  // no fake urgency on an outcome that doesn't warrant it):
+  // - Lost the crown → urgent, targets the specific person who took it.
+  // - Took (or already held) the crown → momentum, opens the picker fresh
+  //   rather than pointing at a specific runner-up — "ready for another,"
+  //   not "go beat this one specific person who has nothing to do with it."
   const dareBackBtn = $('btn-dare-back');
   $('btn-challenge-others').className = 'btn-primary';
   dareBackBtn.className = 'btn-primary';
 
-  let challengeBackTarget = null;
   if (iWon === false) {
-    challengeBackTarget = champRow.username;
-  } else if (iWon === true) {
-    const runnerUp = (lbRows || []).find(r => r.rank === 2);
-    if (runnerUp) challengeBackTarget = runnerUp.username;
-  }
-
-  if (challengeBackTarget) {
     dareBackBtn.classList.remove('hidden');
-    dareBackBtn.textContent = `Challenge ${displayName(challengeBackTarget)} back`;
-    dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(challengeBackTarget, true); };
+    dareBackBtn.textContent = `Duel ${displayName(champRow.username)} back`;
+    dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(champRow.username, true); };
+  } else if (iWon === true) {
+    dareBackBtn.classList.remove('hidden');
+    dareBackBtn.textContent = `Ready to take another?`;
+    dareBackBtn.onclick = () => { openTargetPicker(); };
   } else {
     dareBackBtn.classList.add('hidden');
   }
@@ -2841,7 +2923,7 @@ async function renderScorecard(correct, points, newBadges) {
       card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Match, aimed straight at whoever's currently the Game Champion.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
-      btn.textContent = `Challenge ${displayName(champRow.username)} back`;
+      btn.textContent = `Duel ${displayName(champRow.username)} back`;
       btn.onclick = () => { btn.disabled = true; startNewRound(champRow.username, true); };
       card.appendChild(btn);
     } else if (soloRoom) {
@@ -2930,8 +3012,7 @@ async function renderOtherDares() {
     const champ = champByRound[r.id] || null;
     let badge, badgeClass, badgeInfo;
     if (r.target_username === me) {
-      if (r.via_challenge_back) { badge = '🎯 counter challenge'; badgeClass = 'challenged-back'; badgeInfo = 'You challenged them back after they challenged you first.'; }
-      else { badge = '🎯 challenge you'; badgeClass = 'targeted'; badgeInfo = 'Someone called you out directly on this Match.'; }
+      badge = '🎯 duelling you for the crown'; badgeClass = 'targeted'; badgeInfo = 'Someone is duelling you for the crown on this Match.';
     } else {
       badge = champ ? `⚔️ Join Fight` : '☝️ First to Fight'; badgeClass = 'open-invite';
       badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';

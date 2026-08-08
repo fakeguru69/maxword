@@ -841,6 +841,19 @@ function displayName(u) {
 }
 function titleCaseName(u) { u = u || ''; return u.charAt(0).toUpperCase() + u.slice(1).toLowerCase(); }
 
+// Turns a list of usernames into natural, personal wording — "X and Y", "X,
+// Y, and Z" — deduping repeats (same person triggering multiple events).
+// Caps at 3 named people before falling back to "and N others", so this
+// never runs away on a genuinely large batch.
+function formatNameList(usernames) {
+  const names = [...new Set(usernames)].map(displayName);
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  if (names.length <= 4) return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+  return `${names.slice(0, 3).join(', ')}, and ${names.length - 3} others`;
+}
+
 async function shareText(text) {
   if (navigator.share) {
     try { await navigator.share({ text }); return; } catch (e) { /* user cancelled — no-op */ return; }
@@ -999,7 +1012,7 @@ $('btn-forgot-reset').onclick = async () => {
   show('view-login');
 };
 
-$('btn-logout').onclick = () => { unsubscribeRoomRealtime(); me = null; currentRoom = null; localStorage.removeItem('mw_session_username'); show('view-login'); };
+$('btn-logout').onclick = () => { unsubscribeRoomRealtime(); unsubscribeGlobalRealtime(); me = null; currentRoom = null; localStorage.removeItem('mw_session_username'); show('view-login'); };
 
 // ---------------------------------------------------------------
 // HOME / ROOMS
@@ -1017,6 +1030,7 @@ async function afterLogin() {
   await checkDethronements();
   await checkNewChallenges();
   await checkCrownsTaken();
+  subscribeGlobalRealtime();
 }
 
 async function showOnboardingTipOnce(key, title, text, onDismiss) {
@@ -1062,7 +1076,7 @@ async function checkDethronements() {
     const e = events[0];
     text = `${displayName(e.dethroned_by_username)} just took Match #${e.rounds.trial_number} from you${await duelSuffix(e.dethroned_by_username)}.`;
   } else {
-    text = `You've been dethroned on ${events.length} Matches — open your Game Rooms to see who got you.`;
+    text = `${formatNameList(events.map(e => e.dethroned_by_username))} dethroned you — open your Game Rooms to see the damage.`;
   }
   const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
   if (!seenBefore) {
@@ -1087,7 +1101,7 @@ async function checkCrownsTaken() {
     const streakPart = streak >= 2 ? ` 🔥 ${streak}-win streak!` : '';
     text = `You just snatched Match #${e.rounds.trial_number} from ${displayName(e.dethroned_username)}${await duelSuffix(e.dethroned_username)} — nice!${streakPart}`;
   } else {
-    text = `You've snatched ${events.length} crowns — open your Game Rooms to see who.`;
+    text = `You just snatched crowns from ${formatNameList(events.map(e => e.dethroned_username))} — nice!`;
   }
   $('crown-taken-modal-text').textContent = text;
   $('crown-taken-modal').classList.remove('hidden');
@@ -1109,7 +1123,7 @@ async function checkNewChallenges() {
   if (fresh.length === 1) {
     text = `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}${await duelSuffix(fresh[0].creator_username)}.`;
   } else {
-    text = `${fresh.length} new challenges are waiting for you — open your Game Rooms to see them.`;
+    text = `${formatNameList(fresh.map(r => r.creator_username))} challenged you — open your Game Rooms to see them.`;
   }
   $('challenged-modal-text').textContent = text;
   $('challenged-modal').classList.remove('hidden');
@@ -1516,6 +1530,26 @@ async function maybeShowRoomVocabTip() {
 }
 
 let roomChannel = null;
+// Global, always-on subscription — separate from subscribeRoomRealtime, which
+// only listens to whatever ONE room you currently have open. Before this,
+// checkDethronements/checkNewChallenges/checkCrownsTaken only ran at login
+// and whenever a room was opened — sitting on Home, or being in Room A while
+// something happens in Room B, produced no popup until the next navigation.
+// This subscribes once at login, filtered directly to events about ME, and
+// stays active across every screen until logout.
+let globalChannel = null;
+function subscribeGlobalRealtime() {
+  unsubscribeGlobalRealtime();
+  globalChannel = sb.channel(`global-${me}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dethronement_events', filter: `dethroned_username=eq.${me}` }, checkDethronementsLive)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dethronement_events', filter: `dethroned_by_username=eq.${me}` }, checkCrownsTakenLive)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `target_username=eq.${me}` }, checkNewChallengesLive)
+    .subscribe();
+}
+function unsubscribeGlobalRealtime() {
+  if (globalChannel) { sb.removeChannel(globalChannel); globalChannel = null; }
+}
+
 function subscribeRoomRealtime(roomId) {
   unsubscribeRoomRealtime();
   roomChannel = sb.channel(`room-${roomId}`)

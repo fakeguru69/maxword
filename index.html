@@ -552,6 +552,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="grid-emoji" id="score-grid"></div>
       <div class="score-comment" id="score-comment"></div>
       <div class="score-verdict hidden" id="score-verdict"></div>
+      <div id="score-streak-holder"></div>
       <div id="score-duel-holder"></div>
       <div id="score-badges"></div>
     </div>
@@ -798,7 +799,34 @@ async function computeDuelRecordLifetime(userA, userB) {
 async function duelSuffix(opponent) {
   const record = await computeDuelRecordLifetime(me, opponent);
   if (record.total === 0) return '';
-  return ` — you're ${record.wins}–${record.losses}${record.ties ? `–${record.ties}` : ''} against them`;
+  return ` — you're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them`;
+}
+
+// Consecutive-win streak in the head-to-head between userA and userB, from
+// userA's point of view, most-recent duel first. A tie is skipped (neither
+// extends nor breaks the streak) — only a loss breaks it. Walks actual
+// per-round results in reverse chronological order rather than reusing the
+// aggregate W-L-T total, since a streak is inherently order-dependent.
+async function computeDuelStreakLifetime(userA, userB) {
+  const { data: rounds } = await sb.from('rounds').select('id, created_at')
+    .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`)
+    .order('created_at', { ascending: false });
+  const roundIds = (rounds || []).map(r => r.id);
+  if (roundIds.length === 0) return 0;
+  const { data: scores } = await sb.from('round_scores').select('round_id, username, score_points').in('round_id', roundIds);
+  const byRound = {};
+  (scores || []).forEach(s => { (byRound[s.round_id] = byRound[s.round_id] || []).push(s); });
+  let streak = 0;
+  for (const r of rounds) {
+    const pair = byRound[r.id] || [];
+    const a = pair.find(s => s.username === userA);
+    const b = pair.find(s => s.username === userB);
+    if (!a || !b) continue;
+    if (a.score_points === b.score_points) continue;
+    if (a.score_points > b.score_points) streak++;
+    else break;
+  }
+  return streak;
 }
 
 async function sha256(str) {
@@ -1001,12 +1029,35 @@ async function showOnboardingTipOnce(key, title, text, onDismiss) {
   $('onboarding-modal').classList.remove('hidden');
 }
 
+// Shared by the Dethroned/Crown Taken/Challenged popups: after "Got it", jump
+// straight to the room and blink the exact Match card the popup was about —
+// same pulse animation as the tutorial's button-blink, just pointed at a
+// specific card instead. Only wired up for the single-event case (see each
+// popup's caller) since a "3 dethronements at once" summary has no one card
+// to point at.
+async function focusMatchCard(round) {
+  if (!round) return;
+  const { data: room } = await sb.from('rooms').select('*').eq('id', round.room_id).maybeSingle();
+  if (!room) return;
+  await openRoom(room);
+  const card = document.querySelector(`.trial-card[data-round-id="${round.id}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('onboarding-pulse');
+    setTimeout(() => card.classList.remove('onboarding-pulse'), 3200);
+  }
+}
+let dethronedFocusRound = null;
+let crownTakenFocusRound = null;
+let challengedFocusRound = null;
+
 async function checkDethronements() {
-  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(trial_number)').eq('dethroned_username', me).eq('notified', false).order('created_at', { ascending: true });
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_username', me).eq('notified', false).order('created_at', { ascending: true });
   if (!events || events.length === 0) return;
   const ids = events.map(e => e.id);
   await sb.from('dethronement_events').update({ notified: true }).in('id', ids);
   let text;
+  dethronedFocusRound = events.length === 1 ? events[0].rounds : null;
   if (events.length === 1) {
     const e = events[0];
     text = `${displayName(e.dethroned_by_username)} just took Match #${e.rounds.trial_number} from you${await duelSuffix(e.dethroned_by_username)}.`;
@@ -1021,24 +1072,27 @@ async function checkDethronements() {
   $('dethroned-modal-text').textContent = text;
   $('dethroned-modal').classList.remove('hidden');
 }
-$('btn-dethroned-ok').onclick = () => $('dethroned-modal').classList.add('hidden');
+$('btn-dethroned-ok').onclick = () => { $('dethroned-modal').classList.add('hidden'); focusMatchCard(dethronedFocusRound); };
 
 async function checkCrownsTaken() {
-  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(trial_number)').eq('dethroned_by_username', me).eq('dethroner_notified', false).order('created_at', { ascending: true });
+  const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_by_username', me).eq('dethroner_notified', false).order('created_at', { ascending: true });
   if (!events || events.length === 0) return;
   const ids = events.map(e => e.id);
   await sb.from('dethronement_events').update({ dethroner_notified: true }).in('id', ids);
   let text;
+  crownTakenFocusRound = events.length === 1 ? events[0].rounds : null;
   if (events.length === 1) {
     const e = events[0];
-    text = `You just snatched Match #${e.rounds.trial_number} from ${displayName(e.dethroned_username)} — nice!`;
+    const streak = await computeDuelStreakLifetime(me, e.dethroned_username);
+    const streakPart = streak >= 2 ? ` 🔥 ${streak}-win streak!` : '';
+    text = `You just snatched Match #${e.rounds.trial_number} from ${displayName(e.dethroned_username)}${await duelSuffix(e.dethroned_username)} — nice!${streakPart}`;
   } else {
     text = `You've snatched ${events.length} crowns — open your Game Rooms to see who.`;
   }
   $('crown-taken-modal-text').textContent = text;
   $('crown-taken-modal').classList.remove('hidden');
 }
-$('btn-crown-taken-ok').onclick = () => $('crown-taken-modal').classList.add('hidden');
+$('btn-crown-taken-ok').onclick = () => { $('crown-taken-modal').classList.add('hidden'); focusMatchCard(crownTakenFocusRound); };
 
 async function checkNewChallenges() {
   const now = new Date().toISOString();
@@ -1051,6 +1105,7 @@ async function checkNewChallenges() {
   const fresh = rounds.filter(r => !alreadyPlayed.has(r.id));
   if (fresh.length === 0) return;
   let text;
+  challengedFocusRound = fresh.length === 1 ? fresh[0] : null;
   if (fresh.length === 1) {
     text = `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}${await duelSuffix(fresh[0].creator_username)}.`;
   } else {
@@ -1059,7 +1114,7 @@ async function checkNewChallenges() {
   $('challenged-modal-text').textContent = text;
   $('challenged-modal').classList.remove('hidden');
 }
-$('btn-challenged-ok').onclick = () => $('challenged-modal').classList.add('hidden');
+$('btn-challenged-ok').onclick = () => { $('challenged-modal').classList.add('hidden'); focusMatchCard(challengedFocusRound); };
 
 async function hasBadge(key) {
   const { data } = await sb.from('badges').select('badge_key').eq('username', me).eq('badge_key', key).is('room_id', null).maybeSingle();
@@ -1560,6 +1615,7 @@ async function loadDares() {
     const div = document.createElement('div');
     const cardState = (state === 'champion' || state === 'losing') ? 'settled' : 'targeted';
     div.className = `trial-card state-${cardState}`;
+    div.dataset.roundId = r.id;
     div.onclick = () => openTrialScreen(r);
 
     let badge, badgeClass, badgeInfo, statusLine, rankLine = '';
@@ -2172,6 +2228,19 @@ async function computeHomePendingChallengeTicker() {
 
 async function computeDuelTicker() {
   const candidates = await computeMyDuelCandidates();
+
+  // Win streak takes top priority — it's the number someone's most likely to
+  // come back specifically to protect or extend. Checked across every real
+  // duel opponent (candidates already require >=2 games together).
+  let bestStreak = null;
+  for (const { opponent } of candidates) {
+    const streak = await computeDuelStreakLifetime(me, opponent);
+    if (streak >= 2 && (!bestStreak || streak > bestStreak.streak)) bestStreak = { opponent, streak };
+  }
+  if (bestStreak) {
+    return { text: `🔥 ${bestStreak.streak}-win streak vs ${displayName(bestStreak.opponent)} — keep it going!`, opponent: bestStreak.opponent };
+  }
+
   const rival = pickWorstRival(candidates);
   if (!rival) {
     const strongest = pickStrongestDuel(candidates);
@@ -2594,20 +2663,53 @@ async function renderScorecard(correct, points, newBadges) {
   const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', currentRound.id);
   const champRow = (lbRows || []).find(r => r.rank === 1);
   let iWon = null;
+  // Duel-relative wording: when this Match is a direct callout between two
+  // named people and the opponent has actually played it, the verdict talks
+  // about THEM specifically ("You beat X") rather than only about whoever's
+  // currently leading the whole Match — a third player crashing an open
+  // Match shouldn't blur the head-to-head result the two of you actually
+  // care about. iWon still tracks overall champion status (rank 1), unchanged
+  // — only the sentence changes, so challenge-back targeting downstream is unaffected.
+  const isDuelRound = !!(currentRound.target_username && (me === currentRound.creator_username || me === currentRound.target_username));
+  const opponentUsername = isDuelRound ? (me === currentRound.creator_username ? currentRound.target_username : currentRound.creator_username) : null;
+  const opponentRow = opponentUsername ? (lbRows || []).find(r => r.username === opponentUsername) : null;
+
   if (champRow) {
-    if (champRow.username === me) {
+    iWon = champRow.username === me;
+    if (opponentRow) {
+      const oppGap = opponentRow.score_points - points;
+      if (oppGap < 0) {
+        verdictEl.textContent = iWon
+          ? `🎉 You beat ${displayName(opponentUsername)} and you're the Game Champion! ${points} pts.`
+          : `You beat ${displayName(opponentUsername)}!`;
+      } else if (oppGap === 0) {
+        verdictEl.textContent = `🤝 You're tied with ${displayName(opponentUsername)} at ${opponentRow.score_points}!`;
+      } else {
+        verdictEl.textContent = `You lost to ${displayName(opponentUsername)} by ${oppGap}.`;
+      }
+    } else if (iWon) {
       verdictEl.textContent = `🎉 You're the Game Champion! ${points} pts.`;
-      iWon = true;
     } else {
       const gap = champRow.score_points - points;
       verdictEl.textContent = gap === 0
         ? `🤝 Tied with ${displayName(champRow.username)} at ${champRow.score_points}!`
         : `You missed ${displayName(champRow.username)}'s ${champRow.score_points} by ${gap} — they're the Game Champion.`;
-      iWon = false;
     }
     verdictEl.classList.remove('hidden');
   } else {
     verdictEl.classList.add('hidden');
+  }
+
+  // Win-streak line — only when this round was a real duel win against the
+  // opponent (not just overall champion status), and only surfaced once
+  // there's an actual streak (2+) worth naming.
+  const streakEl = $('score-streak-holder');
+  streakEl.innerHTML = '';
+  if (opponentRow && (opponentRow.score_points - points) < 0) {
+    const streak = await computeDuelStreakLifetime(me, opponentUsername);
+    if (streak >= 2) {
+      streakEl.innerHTML = `<div class="streak-chip">🔥 ${streak}-win streak vs ${displayName(opponentUsername)}</div>`;
+    }
   }
 
   const duelHolder = $('score-duel-holder');
@@ -2777,6 +2879,7 @@ async function renderOtherDares() {
     }
     const div = document.createElement('div');
     div.className = 'trial-card state-targeted';
+    div.dataset.roundId = r.id;
     div.onclick = () => openTrialScreen(r);
     div.innerHTML = `
       <div class="trial-card-top">

@@ -1537,17 +1537,42 @@ let roomChannel = null;
 // something happens in Room B, produced no popup until the next navigation.
 // This subscribes once at login, filtered directly to events about ME, and
 // stays active across every screen until logout.
-let globalChannel = null;
+//
+// Uses 3 SEPARATE channels, one per listener, rather than stacking multiple
+// different filters onto one shared channel — safer and closer to Supabase's
+// own documented pattern, since a single channel juggling several filter
+// configs on the same table is a real (if hard to prove from outside) risk.
+//
+// Also backed by a polling safety net (every 20s) — a live push can get
+// dropped on a flaky mobile connection with no visible sign of failure, so
+// this guarantees the popup shows up within ~20s worst case even if a
+// specific Realtime event never arrives, rather than silently waiting
+// forever for a push that didn't make it.
+let globalChannels = [];
+let globalPollInterval = null;
 function subscribeGlobalRealtime() {
   unsubscribeGlobalRealtime();
-  globalChannel = sb.channel(`global-${me}`)
+  const dethronedChannel = sb.channel(`global-dethroned-${me}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dethronement_events', filter: `dethroned_username=eq.${me}` }, checkDethronementsLive)
+    .subscribe();
+  const crownTakenChannel = sb.channel(`global-crowntaken-${me}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dethronement_events', filter: `dethroned_by_username=eq.${me}` }, checkCrownsTakenLive)
+    .subscribe();
+  const challengedChannel = sb.channel(`global-challenged-${me}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rounds', filter: `target_username=eq.${me}` }, checkNewChallengesLive)
     .subscribe();
+  globalChannels = [dethronedChannel, crownTakenChannel, challengedChannel];
+
+  globalPollInterval = setInterval(() => {
+    checkDethronementsLive();
+    checkCrownsTakenLive();
+    checkNewChallengesLive();
+  }, 20000);
 }
 function unsubscribeGlobalRealtime() {
-  if (globalChannel) { sb.removeChannel(globalChannel); globalChannel = null; }
+  globalChannels.forEach(ch => sb.removeChannel(ch));
+  globalChannels = [];
+  if (globalPollInterval) { clearInterval(globalPollInterval); globalPollInterval = null; }
 }
 
 function subscribeRoomRealtime(roomId) {

@@ -686,6 +686,7 @@ async function openPlayerProfile(username) {
     computeQuietStatRankings('global', null, username),
   ]);
   const sorted = (rows || []).sort(compareAllTimeRank);
+  const theirIndex = sorted.findIndex(r => r.username === username);
   const played = globalStats.myPlayed;
 
   // Activity Rank — same second leaderboard concept as Room's headline, just

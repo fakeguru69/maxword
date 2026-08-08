@@ -201,33 +201,18 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .stat-row .stat-icon { font-size: 15px; }
 .room-stat-grid .stat-val { color: var(--cream); font-weight: 700; text-align: right; }
 .room-stats-toggle { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--cream-dim); text-decoration: underline; cursor: pointer; margin-top: 6px; }
-/* Every stat row (Home, Room, Profile) gets a tap-to-explain "i" — was
-   Profile-only at first, now shared everywhere since every stat row uses
-   the same statRow() helper regardless of which screen renders it. */
 .info-btn { background: none; border: 1px solid var(--line); color: var(--cream-dim); width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer; padding: 0; font-family: inherit; align-self: center; }
 .info-btn.active { border-color: var(--gold-soft); color: var(--gold); }
 .info-tip { display: none; grid-column: 1 / -1; font-size: 12px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 8px 10px; margin-top: 4px; line-height: 1.4; }
 .info-tip.show { display: block; }
 .stat-row[data-stat-key] { cursor: pointer; }
-/* Profile-only: gold border on every card, not just badges — nothing on
-   this page is "actionable" vs "just informational" (unlike Room), so
-   there's no hierarchy for grey to demote; whole page reads as one
-   celebratory case instead. */
 #view-player-profile .room-stats-header-block { border-color: var(--gold); }
-/* Profile-only: nameplate treated like a trading-card top third — double
-   border (frame + inner), circular initials avatar (no real photo/icon
-   system exists, so this is a placeholder monogram, not a final art
-   decision), small tagline under the headline. */
 .profile-frame { border: 2px solid var(--gold); border-radius: 16px; padding: 4px; margin-bottom: 12px; background: linear-gradient(180deg, rgba(212,175,55,0.10), rgba(212,175,55,0.02)); }
 .profile-frame-inner { border: 1px solid var(--gold-soft); border-radius: 12px; padding: 20px 16px; text-align: center; }
 .profile-avatar { width: 56px; height: 56px; margin: 0 auto 10px auto; border: 2px solid var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; font-family: 'Cinzel', serif; color: var(--gold); background: rgba(212,175,55,0.08); }
 .profile-frame .account-name-line { text-align: center; }
 .profile-frame .room-headline { text-align: center; }
 .profile-tagline { margin-top: 8px; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold-soft); }
-/* Profile-only: badges as a 2-col tap-to-expand grid, feels like a badge
-   case rather than a settings list. Scoped under .badge-grid so the
-   scorecard's post-round "new badge" popup (plain .badge-earned-card,
-   not inside .badge-grid) keeps its original full-width look untouched. */
 .badge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .badge-grid .badge-earned-card { text-align: center; margin-bottom: 0; cursor: pointer; }
 .badge-grid .badge-earned-title { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 0; }
@@ -691,16 +676,6 @@ async function openPlayerProfile(username) {
     $('player-profile-status-holder').innerHTML = '<div class="empty-state">No games played yet.</div>';
   }
 
-  // Ticker removed entirely — its job (surface something otherwise hidden)
-  // doesn't apply here: Profile shows everything open, all the time, so
-  // there's nothing for a ticker to be highlighting. Also awkward in
-  // other-view, where "pts from #2" reads as a fact with no one to act on it.
-
-  // Top 4 — Avg Score / Words Mastered / Flawless / Matches Played: the 4
-  // stats that survived the full psychology audit (Streak and Duel both
-  // deliberately excluded — Streak reads oddly without ticker-style urgency
-  // framing, Duel needs the Rivalry card's relational treatment, not a flat
-  // number). Format: volume + rank in parens, matching Room exactly.
   const rankSuffix = r => r ? ` (#${r})` : '';
   $('player-profile-stats-label').style.display = played ? '' : 'none';
   $('player-profile-stats-card').style.display = played ? '' : 'none';
@@ -717,21 +692,10 @@ async function openPlayerProfile(username) {
     $('player-profile-activity-holder').innerHTML = '';
   }
 
-  // "See more" — everything real but not top-4-worthy: Streak (no ticker here
-  // to carry its urgency, so it's a plain fact instead), Crowns Held (live —
-  // the only crown stat now; Lifetime Wins/Dethroned cut, both were
-  // redundant with Held and confusingly bidirectional), Words Played, and
-  // the Contribution stats.
   const moreHolder = $('player-profile-more-holder');
   const streakPart = quietStats.streak.value > 0 ? statRow('🔥', quietStats.streak.value, `Day Streak${rankSuffix(quietStats.streak.rank)}`, 'Consecutive days you\'ve played without a gap.', 'streak') : '';
   const crownsHeldPart = quietStats.crowns.value ? statRow('👑', quietStats.crowns.value, `Crowns Held${rankSuffix(quietStats.crowns.rank)}`, 'Matches where you currently hold the top score.', 'crowns') : '';
 
-  // Accuracy is strictly self-only — never fetched or shown for anyone else
-  // (a percentage can discourage further play if it's ever shown publicly).
-  // Words Mastered moved OUT of this section into the public top-4 above —
-  // it's cumulative/climbing, unlike Accuracy's constant flux, so it earned
-  // public status; Accuracy did not. Folded in as a plain last row here
-  // (no separate card/holder) rather than floating on its own below.
   let accuracyPart = '';
   if (isSelf) {
     const { data: mRows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
@@ -757,9 +721,6 @@ async function openPlayerProfile(username) {
       ${accuracyPart}
     </div>` : '';
 
-  // Full badge list — every badge, always paired with what it actually took to
-  // earn it. This is the "always explain yourself" screen; compact chips
-  // elsewhere are fine staying terse because this is where people go to check.
   const { data: badgeRows } = await sb.from('badges').select('badge_key').eq('username', username);
   const uniqueBadgeKeys = [...new Set((badgeRows || []).map(r => r.badge_key))];
   uniqueBadgeKeys.sort((a, b) => (BADGE_META[b]?.rarity || 0) - (BADGE_META[a]?.rarity || 0));
@@ -768,7 +729,6 @@ async function openPlayerProfile(username) {
     uniqueBadgeKeys.map(key => { const meta = BADGE_META[key] || { emoji: '🏅', label: key, req: '' };
       return `<div class="badge-earned-card"><div class="badge-earned-title"><span class="badge-icon">${meta.emoji}</span><span class="badge-name">${meta.label}</span></div><div class="badge-earned-req">${meta.req}</div></div>`; }).join('') + `</div>` : '';
 
-  // Duel Record doesn't apply to your own profile — nothing to compare against yourself.
   if (isSelf) {
     $('player-profile-duel-holder').innerHTML = '';
     return;
@@ -779,16 +739,6 @@ async function openPlayerProfile(username) {
     : `<div class="empty-state">You haven't dueled ${displayName(username)} directly yet.</div>`;
 }
 $('btn-player-profile-back').onclick = () => show(playerProfileReturnView);
-// Shared "i" + stat-row-tap delegation — stat rows are rebuilt via innerHTML
-// every render, so per-button onclick would be re-attached anyway;
-// delegation on the stable outer view avoids that churn. Same handler used
-// on Home/Room/Profile (was Profile-only "i" at first); badge-tile toggling
-// and stat-row-tap-for-leaderboard stay scoped to where they're relevant
-// (Home/Room have no .badge-grid; view-trial/view-scorecard have no
-// data-stat-key rows, so those two just no-op past the info-btn/badge checks).
-// Scope for the leaderboard is inferred from which view the tap happened in
-// — Home/Profile are always global, Room always uses whatever room is
-// currently open, matching the existing scoping rule everywhere else.
 function statLeaderboardScopeFor(viewId) {
   if (viewId === 'view-room') return { scope: 'room', roomId: currentRoom ? currentRoom.id : null };
   return { scope: 'global', roomId: null };
@@ -825,14 +775,7 @@ attachInfoBtnDelegation('view-room');
 attachInfoBtnDelegation('view-trial');
 attachInfoBtnDelegation('view-scorecard');
 
-// Same idea as computeDuelRecord, but across every room you've ever shared a
-// direct Trial in — a profile page has no "current room" to scope to, and
-// "our whole history together" is the more meaningful number here anyway.
 async function computeDuelRecordLifetime(userA, userB) {
-  // Duel is deliberately EXCLUSIVE — it only counts a Trial toward this pair's
-  // head-to-head if one of them directly called the other out (challenged or
-  // challenged back). Just co-existing on the same open/multiplayer Trial does
-  // NOT create Duel history between two people; that's what Trial rank is for.
   const { data: rounds } = await sb.from('rounds').select('id')
     .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`);
   const roundIds = (rounds || []).map(r => r.id);
@@ -852,10 +795,6 @@ async function computeDuelRecordLifetime(userA, userB) {
   }
   return { wins, losses, ties, total: wins + losses + ties };
 }
-// Shared by the Dethroned/Challenged popups (single-opponent case only) — turns
-// a bare stat drop into a rivalry beat when real Duel history exists, and stays
-// silent (no forced number) if this is the first time these two have crossed
-// paths in a direct callout.
 async function duelSuffix(opponent) {
   const record = await computeDuelRecordLifetime(me, opponent);
   if (record.total === 0) return '';
@@ -868,24 +807,10 @@ async function sha256(str) {
 }
 function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
-// Shares plain text via the device's native share sheet (WhatsApp, SMS, email, etc.)
-// Falls back to a WhatsApp web link on browsers without navigator.share (mostly desktop).
-// Usernames are stored lowercase (case-insensitive login) but shown in caps
-// everywhere in the UI to match the Cinzel/seal aesthetic — visual only,
-// never affects storage, matching, or login.
-// Capped at 12 chars everywhere names render — matches the hard signup limit
-// (see btn-signup), so this is now mostly a defensive backstop rather than
-// the primary fix; still the single source every screen's "name + something
-// else" pairing (leaderboard row + score, "started by X", "YOU vs. X")
-// reads from, so any future change to the cap only needs to happen here.
 function displayName(u) {
   const name = (u || '').toUpperCase();
   return name.length > 12 ? name.slice(0, 11) + '…' : name;
 }
-// Same idea, but for the one spot (a button sitting in an otherwise normal
-// sentence) where all-caps clashes with the rest of the label instead of
-// reading as a stylistic seal — e.g. "Challenge Apple back," not the jarring
-// "Challenge APPLE back."
 function titleCaseName(u) { u = u || ''; return u.charAt(0).toUpperCase() + u.slice(1).toLowerCase(); }
 
 async function shareText(text) {
@@ -895,13 +820,6 @@ async function shareText(text) {
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
 
-// Same 3-scenario template as the Scorecard's share button (see btn-challenge-others)
-// — this is the OTHER place a share can be triggered from (the Match detail
-// screen's "Send" button), and it was missed during that redesign: it kept
-// building its own separate, older text right up until now. Self-contained
-// (fetches its own leaderboard data) rather than reusing renderScorecard's
-// closure variables, since this can be called for any round, not just the
-// one just played.
 async function shareRound(r) {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${r.short_code}`;
   const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', r.id);
@@ -921,23 +839,8 @@ async function shareRound(r) {
 function roomCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'MW-' + s; }
 function shortRoundCode() { const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)]; return 'R-' + s; }
 
-// Picks the word set for a round. Three tiers, in priority order:
-// 1. FRESH (never answered by this player) — the main pool. Global
-//    difficulty (aggregated across every player) still applies HERE and
-//    only here: among words you've never seen, ones broadly hard for others
-//    get a soft priority bump. The moment YOU personally answer a word, the
-//    global signal stops mattering for it entirely — your own right/wrong
-//    history takes over completely from then on.
-// 2. REVIEW — your own words where the most recent attempt was wrong.
-//    Deliberately brought back, but with a much shorter, dedicated cooldown
-//    than everything else: excluded only from the round IMMEDIATELY before
-//    (no word repeats on consecutive rounds), not a multi-round window —
-//    the whole point is bringing these back soon, just never back-to-back.
-// 3. CORRECT (already gotten right) — near-fully excluded, this is what
-//    "use fresh words" means. Only touched as a last-resort fallback if
-//    fresh + review can't fill the round on their own.
-const GLOBAL_DIFFICULTY_MIN_SAMPLE = 5; // min times a word must've been answered, by anyone, before its global difficulty is trusted
-const REVIEW_WORDS_PER_ROUND = 2; // how many of THIS player's own not-yet-mastered words to bring back, when available
+const GLOBAL_DIFFICULTY_MIN_SAMPLE = 5;
+const REVIEW_WORDS_PER_ROUND = 2;
 
 async function pickRoundWords() {
   const { data: lastRoundAnswers } = await sb.from('word_answers').select('word_id').eq('username', me).order('answered_at', { ascending: false }).limit(QUESTIONS_PER_ROUND);
@@ -950,14 +853,10 @@ async function pickRoundWords() {
   const reviewIds = new Set(Object.keys(latestCorrectByWord).filter(id => latestCorrectByWord[id] === false));
   const correctIds = new Set(Object.keys(latestCorrectByWord).filter(id => latestCorrectByWord[id] === true));
 
-  // Review picks — only the immediately-previous round blocks a repeat here,
-  // not the general rule.
   const reviewPool = shuffle(WORDS.filter(w => reviewIds.has(w.id) && !lastRoundIds.has(w.id)));
   const reviewPicks = reviewPool.slice(0, REVIEW_WORDS_PER_ROUND);
   const pickedIds = new Set(reviewPicks.map(w => w.id));
 
-  // Fresh pool, globally-hard-first: only ever consults global stats for
-  // words this player has NEVER touched.
   const { data: stats } = await sb.from('word_stats').select('word_id, times_answered, correct_rate').gte('times_answered', GLOBAL_DIFFICULTY_MIN_SAMPLE);
   const globalHardIds = new Set((stats || []).filter(s => s.correct_rate <= 0.5).map(s => s.word_id));
   const freshAll = WORDS.filter(w => !pickedIds.has(w.id) && !answeredIds.has(w.id));
@@ -967,10 +866,9 @@ async function pickRoundWords() {
 
   const needed = QUESTIONS_PER_ROUND - reviewPicks.length;
   if (pool.length < needed) {
-    // Ran out of fresh words — fall back to already-correct ones, last resort only.
     pool = [...pool, ...shuffle(WORDS.filter(w => !pickedIds.has(w.id) && correctIds.has(w.id)))];
   }
-  if (pool.length < needed) pool = WORDS.filter(w => !pickedIds.has(w.id)); // true exhaustion edge case — allow anything rather than fail
+  if (pool.length < needed) pool = WORDS.filter(w => !pickedIds.has(w.id));
   const remaining = pool.slice(0, needed);
   return shuffle([...reviewPicks, ...remaining]).map(w => w.id);
 }
@@ -987,14 +885,14 @@ function timeLeft(expiresAt) {
 // ---------------------------------------------------------------
 // STATE
 // ---------------------------------------------------------------
-let me = null;              // username string
-let currentRoom = null;     // room row
-let currentRound = null;    // { id, room_id, creator_username, target_username, word_ids, ... }
-let roundWords = [];        // resolved word objects
-let roundAnswers = [];      // booleans per question
+let me = null;
+let currentRoom = null;
+let currentRound = null;
+let roundWords = [];
+let roundAnswers = [];
 let qIndex = 0;
-let lbPeriod = 'alltime';         // in-room leaderboard: 'weekly' | 'monthly' | 'alltime'
-let globalLbPeriod = 'alltime';   // standalone Global Leaderboard screen: same options
+let lbPeriod = 'alltime';
+let globalLbPeriod = 'alltime';
 let deepLinkParams = null;
 
 // ---------------------------------------------------------------
@@ -1034,8 +932,6 @@ $('btn-login').onclick = async () => {
   const err = $('login-error');
   err.classList.add('hidden');
   const pin_hash = await sha256(pin + username);
-  // Credential check happens server-side via a SECURITY DEFINER function —
-  // the client never sees pin_hash for any account, its own or anyone else's.
   const { data: ok, error } = await sb.rpc('login_check', { p_username: username, p_pin_hash: pin_hash });
   if (error || !ok) { err.textContent = 'Wrong username or PIN.'; err.classList.remove('hidden'); return; }
   me = username;
@@ -1070,9 +966,6 @@ $('btn-forgot-reset').onclick = async () => {
   if (!/^\d{4}$/.test(newPin)) { err.textContent = 'PIN must be 4 digits.'; err.classList.remove('hidden'); return; }
   const answerHash = await sha256(answer);
   const pin_hash = await sha256(newPin + username);
-  // Answer verification AND the pin_hash write both happen inside this one
-  // server-side function — the client never reads security_answer_hash, and
-  // there's no longer a direct anon UPDATE path to profiles at all.
   const { data: ok } = await sb.rpc('reset_pin', { p_username: username, p_answer_hash: answerHash, p_new_pin_hash: pin_hash });
   if (!ok) { err.textContent = 'Answer did not match.'; err.classList.remove('hidden'); return; }
   show('view-login');
@@ -1089,11 +982,6 @@ async function afterLogin() {
   await updateStreakOnOpen();
   await loadRoomsList();
   await renderStatusRow();
-  // If she's here in standalone mode at all, the app IS on her home screen —
-  // regardless of HOW she got there (our own "Add" button, or Chrome's own
-  // native install menu, which never gives our appinstalled listener a
-  // chance to fire). Catches that gap retroactively so the badge/banner
-  // state stays correct everywhere, not just through our own button.
   if (isStandalone()) await awardBadgeOnce('home_screen');
   renderHomeScreenBanner();
   show('view-home');
@@ -1103,25 +991,16 @@ async function afterLogin() {
   await checkCrownsTaken();
 }
 
-// Reusable "explain this the very first time it happens, then get out of the way
-// forever" popup — server-tracked via reminders_shown. Pass a callback to run
-// once the person dismisses it (or
-// immediately, if they've already seen this one before) so a flow that needs to
-// wait for acknowledgment (e.g. don't start the quiz until they've read the tip)
-// can do so safely either way.
 async function showOnboardingTipOnce(key, title, text, onDismiss) {
   const { data: existing } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', key).maybeSingle();
   if (existing) { if (onDismiss) onDismiss(); return; }
   await sb.from('reminders_shown').insert({ username: me, reminder_key: key });
   $('onboarding-modal-title').textContent = title;
-  $('onboarding-modal-text').innerHTML = text; // innerHTML, not textContent — lets tips use real line breaks/lists instead of one cramped paragraph; safe since every call site passes a hardcoded string we wrote, never user input
+  $('onboarding-modal-text').innerHTML = text;
   $('btn-onboarding-ok').onclick = () => { $('onboarding-modal').classList.add('hidden'); if (onDismiss) onDismiss(); };
   $('onboarding-modal').classList.remove('hidden');
 }
 
-// The sharpest trigger in the whole app: since Trials are one-shot, losing the top
-// spot is permanent — you can never retake it. Checked on every Home/Room load,
-// each event marked notified so it's shown exactly once, ever.
 async function checkDethronements() {
   const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(trial_number)').eq('dethroned_username', me).eq('notified', false).order('created_at', { ascending: true });
   if (!events || events.length === 0) return;
@@ -1134,8 +1013,6 @@ async function checkDethronements() {
   } else {
     text = `You've been dethroned on ${events.length} Matches — open your Game Rooms to see who got you.`;
   }
-  // First dethronement ever gets a longer, one-time explainer tacked on — every
-  // one after this stays short, since by then the person already knows the rule.
   const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
   if (!seenBefore) {
     await sb.from('reminders_shown').insert({ username: me, reminder_key: 'first_dethroned' });
@@ -1146,15 +1023,6 @@ async function checkDethronements() {
 }
 $('btn-dethroned-ok').onclick = () => $('dethroned-modal').classList.add('hidden');
 
-// Positive mirror of checkDethronements() — fires for the person who DID the
-// dethroning, not the victim. Same exactly-once pattern via its own flag
-// (dethroner_notified, separate column from the victim's `notified` — same
-// row, two independent "have I told this person about it yet" states).
-// Backfilled to true for all pre-existing rows at migration time, so this
-// only ever fires for NEW dethronements from here on, never floods anyone
-// with a backlog of old ones. Wording matches the ticker's crown-snatch
-// message exactly, per explicit request to reuse ticker text where the
-// event is discrete enough to deserve a popup.
 async function checkCrownsTaken() {
   const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(trial_number)').eq('dethroned_by_username', me).eq('dethroner_notified', false).order('created_at', { ascending: true });
   if (!events || events.length === 0) return;
@@ -1172,20 +1040,12 @@ async function checkCrownsTaken() {
 }
 $('btn-crown-taken-ok').onclick = () => $('crown-taken-modal').classList.add('hidden');
 
-// Mirrors checkDethronements() — the other half of "something happened that you'd
-// want to know about live." Fires for a Trial someone's aimed straight at you,
-// checked the same way (Home/Room load), each round marked notified so it's shown
-// exactly once. Filters out anything you've already played in the meantime (rare,
-// but possible if you played it mid-session before this check ran).
 async function checkNewChallenges() {
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*').eq('target_username', me).eq('target_notified', false).gt('expires_at', now).order('created_at', { ascending: true });
   if (!rounds || rounds.length === 0) return;
   const ids = rounds.map(r => r.id);
   await sb.from('rounds').update({ target_notified: true }).in('id', ids);
-  // A round you've already played (e.g. you got to it before this check ran) isn't
-  // a fresh callout anymore — drop those from the popup, but they're still marked
-  // notified above so we never re-check them.
   const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', ids);
   const alreadyPlayed = new Set((myScores || []).map(s => s.round_id));
   const fresh = rounds.filter(r => !alreadyPlayed.has(r.id));
@@ -1212,10 +1072,6 @@ async function awardBadgeOnce(key) {
 }
 
 
-// rarity: how prominently a badge should surface on Home's capped display — higher
-// surfaces first. Hard-won badges should never get crowded out by trivial ones.
-// tier/nextKey: only set on naturally-tiered badges (streaks) — lets the earning
-// moment say "N more for the next one" without inventing a fake goal for one-offs.
 const BADGE_META = {
   showed_up: { emoji: '👋', label: 'Showed Up', req: 'Play your first round, ever.', rarity: 1 },
   streak_3: { emoji: '🔥', label: '3-Day Streak', req: 'Play 3 days in a row.', rarity: 2, tier: 3, nextKey: 'streak_7' },
@@ -1226,9 +1082,7 @@ const BADGE_META = {
   home_screen: { emoji: '📲', label: 'Home Base', req: 'Add MaxWord to your Home Screen.', rarity: 2 },
 };
 
-// Tier reflects skill (global all-time average), separate from streak (consistency).
-// Gated behind a minimum sample size so one lucky round can't buy "Grandmaster."
-const MIN_GAMES_TO_RANK = 2; // shared threshold: tier display AND leaderboard rank both gate on this — matches the forced 2-game onboarding window exactly, so finishing it means you're immediately ranked, not left in limbo waiting for an un-forced 3rd game
+const MIN_GAMES_TO_RANK = 2;
 const TIER_BANDS = [
   { min: 900, name: 'Grandmaster' },
   { min: 700, name: 'Sage' },
@@ -1250,18 +1104,11 @@ function commentForScore(points) {
   return band.lines[Math.floor(Math.random() * band.lines.length)];
 }
 
-// Global rank, streak, and Crowns Held — three self-explanatory facts, one
-// compact row. "Crowns Held" deliberately echoes the same "crown holder" badge
-// language already used on Trial cards, so it doesn't need its own explainer.
 async function renderStatusRow() {
   const statusHolder = $('status-row-holder');
   const activityHolder = $('home-activity-holder');
   const moreHolder = $('home-more-holder');
 
-  // Full content-copy of Profile's self-view — deliberately reuses the exact
-  // same global-scoped functions Profile uses (never room-scoped; Home has
-  // no room context, same as Profile). Home/Profile always show GLOBAL rank;
-  // only Room shows ROOM rank — keep that split whenever this is touched.
   const [
     { data: rows },
     { data: streak },
@@ -1293,13 +1140,6 @@ async function renderStatusRow() {
     : `<div class="room-headline" id="home-headline-link" style="color:var(--cream); cursor:pointer;">UNRANKED · 🗡️ ${activityPart} PLAYED</div>`;
   $('home-headline-link').onclick = () => $('btn-global-leaderboard').click();
 
-  // Ticker — same priority-pick pattern as Room's, reusing data already
-  // fetched above where possible. Home is the "what's urgent right now"
-  // landing spot. Unlike Room, Home has only ONE slot (no room-scoped duel
-  // data to fill a 2nd) — so this pools both "about you" and "about someone
-  // else" candidates into that single slot, picked by priority. Now has a
-  // guaranteed fallback, matching Room — previously this could render
-  // completely blank.
   let ticker = null;
   let tickerOnClick = null;
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -1360,7 +1200,6 @@ async function renderBadgeShowcase() {
   const { data: rows } = await sb.from('badges').select('badge_key').eq('username', me);
   const uniqueKeys = [...new Set((rows || []).map(r => r.badge_key))];
   if (uniqueKeys.length === 0) return;
-  // Rarest/hardest-won first, so a trivial badge never crowds out a real one.
   uniqueKeys.sort((a, b) => (BADGE_META[b]?.rarity || 0) - (BADGE_META[a]?.rarity || 0));
   const row = document.createElement('div');
   row.className = 'badge-showcase';
@@ -1381,10 +1220,6 @@ async function renderBadgeShowcase() {
   holder.appendChild(row);
 }
 
-// Full account-wide player stats — the same 9 "public" metrics as the Room
-// Stats Header, just without a room_id filter. Words Mastered/Accuracy are
-// deliberately NOT in here — those stay strictly self-only (see Mastery
-// rendering in openPlayerProfile), everything here is public/braggable.
 async function computeFullPlayerStats(username) {
   const [
     { data: myFirstFights },
@@ -1409,10 +1244,6 @@ async function computeFullPlayerStats(username) {
   };
 }
 
-// Flawless/Active Days/Matches Played, ranked among EVERY player account-wide (Active Days lives in overflow now, still computed here)
-// (the global equivalent of computeRoomStatRankings). Fetches every player's
-// round_scores in one query — a real cost at scale, acceptable for now given
-// how few real accounts exist; worth revisiting if the player base grows.
 async function computeGlobalStatRankings(username) {
   const { data: scores } = await sb.from('round_scores').select('username, correct_count, total_count, played_at');
   const byUser = {};
@@ -1439,7 +1270,6 @@ async function computeGlobalStatRankings(username) {
 }
 
 async function updateStreakOnOpen() {
-  // Only advances on actually PLAYING a round (see recordRoundPlayed), not just opening the app.
 }
 
 async function maybeAwardShowedUp() {
@@ -1457,9 +1287,6 @@ async function loadRoomsList() {
   if (roomIds.length === 0) { list.innerHTML = '<div class="empty-state">No Game Rooms yet — create one or join with a code.</div>'; return; }
   const { data: rooms } = await sb.from('rooms').select('*').in('id', roomIds);
 
-  // Most active/recently-touched room first — "latest Match created in this room"
-  // as the activity signal, falling back to the room's own creation date for one
-  // that's never had a Trial yet.
   const { data: latestRounds } = await sb.from('rounds').select('room_id, created_at').in('room_id', roomIds).order('created_at', { ascending: false });
   const lastActivity = {};
   (latestRounds || []).forEach(r => { if (!lastActivity[r.room_id]) lastActivity[r.room_id] = r.created_at; });
@@ -1476,10 +1303,6 @@ async function loadRoomsList() {
   }
 }
 
-// Shows a small "🎯 N" badge on a room card when N challenges are aimed
-// specifically at you in that room and you haven't played them yet — an
-// always-visible signal that doesn't depend on catching a popup at the
-// right moment.
 async function loadRoomTargetBadge(roomId) {
   const el = $(`room-target-badge-${roomId}`);
   if (!el) return;
@@ -1540,25 +1363,13 @@ async function joinRoomRow(room) {
   if (!existing) await sb.from('room_members').insert({ room_id: room.id, username: me, role: 'member' });
 }
 
-// Registered unconditionally at boot (not tied to any permission ask) — a
-// registered service worker is one of the signals Chrome's installability
-// heuristic looks at, so this helps the Add-to-Home-Screen prompt actually
-// fire reliably. See sw.js — kept intentionally minimal now that the
-// browser-push feature has been removed.
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 // ---------------------------------------------------------------
 // ADD TO HOME SCREEN
 // ---------------------------------------------------------------
-// Android/Chrome fires this instead of letting us trigger install directly — we
-// stash it and replay it later from our own button, since the browser's native
-// mini-infobar is easy to miss and doesn't fit our own "ask once, then a quiet
-// persistent reminder" pattern.
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; });
-// Only a reliable completion signal on Android/Chrome — iOS Safari has no such
-// event, which is why the iOS path below awards the badge on "shown you how"
-// instead of a verified install (see maybeShowA2HSPopup/btn-a2hs-add).
 window.addEventListener('appinstalled', async () => { await awardBadgeOnce('home_screen'); renderHomeScreenBanner(); });
 
 function isStandalone() { return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
@@ -1571,9 +1382,6 @@ function setA2HSModalContent() {
   $('btn-a2hs-add').textContent = isIOS() ? 'Show me how' : 'Add to Home Screen';
 }
 
-// One-time popup, fired right after the "Reading the room" tip on the landing
-// right after game 2 — the moment onboarding just ended and a tab could get
-// closed for good. Silently skips if already installed or already badged.
 async function maybeShowA2HSPopup() {
   if (isStandalone()) return;
   if (await hasBadge('home_screen')) return;
@@ -1585,29 +1393,21 @@ async function maybeShowA2HSPopup() {
 }
 $('btn-a2hs-add').onclick = async () => {
   if (isIOS()) {
-    // No install-confirmation event exists on iOS Safari — we can only confirm we
-    // SHOWED her how, not that she actually did it, so the badge fires on this tap.
     $('a2hs-modal').classList.add('hidden');
     await awardBadgeOnce('home_screen');
     renderHomeScreenBanner();
   } else if (deferredInstallPrompt) {
     $('a2hs-modal').classList.add('hidden');
     deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice; // badge itself awarded by the 'appinstalled' listener above, only if she actually accepts
+    await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
     renderHomeScreenBanner();
   } else {
-    // Browser doesn't support the install prompt (or it already fired once and
-    // wasn't recaptured) — nothing we can trigger programmatically, just close.
     $('a2hs-modal').classList.add('hidden');
   }
 };
 $('btn-a2hs-later').onclick = () => { $('a2hs-modal').classList.add('hidden'); renderHomeScreenBanner(); };
 
-// Persistent quiet reminder on Home, same pattern as the notification banner —
-// this is what makes the ask "occasional" without any nag/snooze logic: it just
-// sits there, low-friction, until she acts (or the badge is earned, or the app's
-// already installed), then disappears for good.
 async function renderHomeScreenBanner() {
   const holder = $('a2hs-banner-holder');
   holder.innerHTML = '';
@@ -1631,11 +1431,6 @@ async function openRoom(room) {
   currentRoom = room;
   $('room-title').textContent = room.name;
   show('view-room');
-  // These 5 each populate their own separate part of the screen and don't
-  // depend on each other's results — running them together instead of one
-  // at a time is what actually made opening a room feel slow. (Duel ticker
-  // used to be a 6th here as its own card — now computed inside
-  // renderRoomStatsHeader() alongside everything else in that card.)
   await Promise.all([
     loadDares(),
     renderMemberLine(),
@@ -1644,19 +1439,10 @@ async function openRoom(room) {
     checkNewChallenges(),
     checkCrownsTaken(),
   ]);
-  // Kept last, deliberately sequential: this tip explains the card badges
-  // loadDares() just rendered, so it should appear once that list has
-  // actually settled, not race it.
   await maybeShowRoomVocabTip();
   subscribeRoomRealtime(room.id);
 }
 
-// One-time, fires the moment she lands back in a room right after her 2nd-ever
-// game (the point our forced onboarding flow routes her to) — explains the four
-// card badges she's now looking at. Silently skips at any other games-played count.
-// Chains straight into the Add-to-Home-Screen popup once dismissed — this landing
-// is the real "before she quits" moment (onboarding just ended, tab could just get
-// closed), so it's the one place worth a second, separate ask right after the first.
 async function maybeShowRoomVocabTip() {
   const { count: played } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
   if (played !== 2) return;
@@ -1666,11 +1452,6 @@ async function maybeShowRoomVocabTip() {
      <div class="tip-list-item">☝️ First to Fight — nobody's played it yet</div>
      <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
     () => {
-      // The room screen got a lot taller once the Stats Header/Leaderboard/
-      // Rivalry card were added — dismissing this tip used to just drop her
-      // back at the top of all that, nowhere near the Match cards it was
-      // just explaining. Scroll straight to them instead of leaving her to
-      // hunt — a navigation fix, not another ask or badge.
       const target = document.getElementById('trials-count-label');
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       const startBtn = document.getElementById('btn-quick-start-match');
@@ -1679,9 +1460,6 @@ async function maybeShowRoomVocabTip() {
     });
 }
 
-// Keeps the Challenges/Leaderboard tabs current while you're actually looking at them —
-// without this, a screen only reflects reality at the moment it was opened, and stays
-// stale until you navigate away and back, which is exactly what felt unreliable.
 let roomChannel = null;
 function subscribeRoomRealtime(roomId) {
   unsubscribeRoomRealtime();
@@ -1690,20 +1468,12 @@ function subscribeRoomRealtime(roomId) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'round_scores' }, () => { refreshActiveRoomPanel(); checkDethronementsLive(); checkCrownsTakenLive(); })
     .subscribe();
 }
-// Only pops the dethroned modal live if you're NOT mid-quiz — never interrupt an
-// active question. If you are mid-quiz, this is a no-op and the event stays
-// unnotified, so it's picked up right after you finish (see finishRound) or the
-// next time you open a room, instead of being lost.
 function checkDethronementsLive() {
   if ($('view-game').classList.contains('hidden')) checkDethronements();
 }
-// Same idea, for a fresh challenge landing on you while you're browsing the room.
 function checkNewChallengesLive() {
   if ($('view-game').classList.contains('hidden')) checkNewChallenges();
 }
-// Same idea, for the moment YOUR score just took someone else's crown — caused
-// by the exact same round_scores event as checkDethronementsLive, just the
-// other person's side of it.
 function checkCrownsTakenLive() {
   if ($('view-game').classList.contains('hidden')) checkCrownsTaken();
 }
@@ -1755,19 +1525,12 @@ async function loadDares() {
   list.innerHTML = '<div class="empty-state">Loading…</div>';
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*').eq('room_id', currentRoom.id).gt('expires_at', now).order('created_at', { ascending: false });
-  if (myToken !== daresLoadToken) return; // a newer loadDares() call has since started — abandon this one
+  if (myToken !== daresLoadToken) return;
   const all = rounds || [];
-  $('my-open-challenges').innerHTML = ''; // superseded — every Trial (including your own) now shows its live status right in the list below
+  $('my-open-challenges').innerHTML = '';
 
   if (all.length === 0) { $('trials-count-label').textContent = 'Matches'; list.innerHTML = '<div class="empty-state">No Matches yet. Start one!</div>'; return; }
 
-  // Fetch + compute state for every Trial first, so we can sort by what actually
-  // needs attention — a retaliation aimed at you first, then a fresh callout, then
-  // generic open ones, then losing, then settled/champion last — instead of just
-  // chronological order burying the most personal, urgent items under old history.
-  // One batched query for every Trial's leaderboard rows, grouped client-side —
-  // used to be one round-trip PER Trial in a loop, which visibly slowed down as
-  // a room's Trial count grew past a couple dozen.
   const roundIds = all.map(r => r.id);
   const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', roundIds).order('rank');
   if (myToken !== daresLoadToken) return;
@@ -1788,10 +1551,6 @@ async function loadDares() {
   const statePriority = { challenged_back: 0, targeted: 1, unplayed: 2, losing: 3, champion: 4 };
   withState.sort((a, b) => statePriority[a.state] - statePriority[b.state]);
 
-  // "Open" = Trials you haven't played yet — a callout aimed at you, or a generic
-  // open invite nobody's claimed. Once you've played a Trial (win or lose), it's
-  // settled — it stays visible in the list as a status card, but it no longer
-  // counts toward "open," since there's nothing left for you to do on THAT Trial.
   const openStates = new Set(['challenged_back', 'targeted', 'unplayed']);
   const openCount = withState.filter(w => openStates.has(w.state)).length;
   $('trials-count-label').textContent = openCount > 0 ? `Open Matches (${openCount})` : 'Matches';
@@ -1799,19 +1558,10 @@ async function loadDares() {
   list.innerHTML = '';
   for (const { r, rows, myRow, champ, state } of withState) {
     const div = document.createElement('div');
-    // Both played-states get the same neutral, settled border — the card itself
-    // isn't the thing to act on anymore (you can't replay it either way); color
-    // lives in the badge alone. Loud/colored card borders are reserved for states
-    // where tapping THIS card is the direct next step.
     const cardState = (state === 'champion' || state === 'losing') ? 'settled' : 'targeted';
     div.className = `trial-card state-${cardState}`;
     div.onclick = () => openTrialScreen(r);
 
-    // statusLine always uses ONE consistent phrase — "X leads with N pts" — whether
-    // you've played and lost, or haven't played yet and it's just the target to beat.
-    // rankLine is kept as its own separate line (never concatenated into statusLine)
-    // so "#R of T" doesn't wrap unpredictably depending on username length — it only
-    // appears once you've actually played and have a rank to show.
     let badge, badgeClass, badgeInfo, statusLine, rankLine = '';
     if (state === 'champion') {
       badge = '👑 crown holder'; badgeClass = 'champion';
@@ -1832,8 +1582,6 @@ async function loadDares() {
       badgeInfo = 'Someone called you out directly on this Match.';
       statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
     } else {
-      // Generic open Trial — still worth a nudge, just a lighter-touch one than a
-      // personal callout: an invitation, not a demand.
       badge = champ ? `⚔️ Join Fight` : '☝️ First to Fight'; badgeClass = 'open-invite';
       badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
       statusLine = champ ? `${displayName(champ.username)} leads with ${champ.score_points} pts` : 'nobody has played yet';
@@ -1861,7 +1609,6 @@ async function loadDares() {
     list.appendChild(div);
   }
 
-  // daily dare-creation cap note
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const { count } = await sb.from('rounds').select('id', { count: 'exact', head: true }).eq('room_id', currentRoom.id).eq('creator_username', me).gte('created_at', startOfDay.toISOString());
   const used = count || 0;
@@ -1875,15 +1622,13 @@ async function openTrialScreen(round) {
   currentTrialRound = round;
   show('view-trial');
   $('trial-number-display').textContent = round.trial_number;
-  $('trial-urgency-holder').innerHTML = ''; // Trials are permanent now — nothing to count down
+  $('trial-urgency-holder').innerHTML = '';
 
   const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', round.id).order('rank');
   const rows = lb || [];
   const myRow = rows.find(row => row.username === me);
   const iPlayed = !!myRow;
 
-  // Tags: duel-framing before you've played it (why should I tap in?), rank-framing
-  // after (am I still winning?) — same card, different question depending on state.
   const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
   if (!iPlayed && round.target_username === me) {
     tags.push(`<span class="trial-tag mine">${round.via_challenge_back ? 'challenged you back' : 'aimed at you'}</span>`);
@@ -1893,30 +1638,16 @@ async function openTrialScreen(round) {
   }
   $('trial-tags').innerHTML = tags.join('');
 
-  // champion banner
   const championHolder = $('trial-champion-holder');
   const champ = rows[0] || null;
   championHolder.innerHTML = champ
     ? `<div class="champion-banner"><div class="crown">👑</div><div class="champ-name">${displayName(champ.username)}</div><div class="dare-sub">${champ.score_points} pts</div></div>`
     : '';
 
-  // completionist line
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
   const totalMembers = (members || []).length;
-  // Guarded with Math.max: if someone plays a Trial and later leaves the room,
-  // their score stays (leaving only removes the room_members row) but they no
-  // longer count toward totalMembers — without this, that could read as a
-  // nonsensical "3 of 2 have played."
   $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Match</div>`;
 
-  // duel record — only when this Trial is a direct callout between two specific
-  // people, I'm one of them, AND that person is the CURRENT champion (same gate
-  // as the Scorecard's version — otherwise this card and the leaderboard above
-  // could tell two contradictory stories if a third party has since taken the
-  // lead). Uses the LIFETIME record (computeDuelRecordLifetime), matching
-  // Profile/Scorecard — this screen was wrongly using the room-scoped
-  // computeDuelRecord instead, a real inconsistency: the same two people could
-  // see a different W-L-T here than everywhere else Duel Record appears.
   const duelHolder = $('trial-duel-holder');
   duelHolder.innerHTML = '';
   if (round.target_username && (me === round.creator_username || me === round.target_username)) {
@@ -1929,7 +1660,6 @@ async function openTrialScreen(round) {
     }
   }
 
-  // leaderboard — plain rank, no medals, matches Room/Global
   const lbList = $('trial-leaderboard-list');
   lbList.innerHTML = '';
   if (rows.length === 0) { lbList.innerHTML = '<div class="empty-state">Nobody has played this Match yet.</div>'; }
@@ -1941,9 +1671,6 @@ async function openTrialScreen(round) {
     lbList.appendChild(div);
   });
 
-  // play / status state — once you've played, there's nothing left to "play" here;
-  // if you're not on top, the same slot becomes a Challenge-them-back action instead
-  // of just silently disappearing, so the throne always has an obvious next move.
   const playBtn = $('btn-trial-play');
   if (!iPlayed) {
     playBtn.classList.remove('hidden');
@@ -1954,16 +1681,12 @@ async function openTrialScreen(round) {
     playBtn.textContent = '⚔️ Challenge back';
     playBtn.onclick = () => startNewRound(champ.username, true);
   } else {
-    playBtn.classList.add('hidden'); // you're already champion — nothing to challenge
+    playBtn.classList.add('hidden');
   }
   $('btn-trial-send').onclick = () => shareRound(round);
 }
 
-// Head-to-head tally between two people, scoped to this room, across every direct
-// Trial between them that both have actually played.
 async function computeDuelRecord(userA, userB) {
-  // Same exclusive creator/target-only logic as the lifetime version, scoped to
-  // this room.
   const { data: rounds } = await sb.from('rounds').select('id')
     .eq('room_id', currentRoom.id)
     .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`);
@@ -1976,7 +1699,7 @@ async function computeDuelRecord(userA, userB) {
     Object.values(byRound).forEach(pair => {
       const a = pair.find(s => s.username === userA);
       const b = pair.find(s => s.username === userB);
-      if (!a || !b) return; // only counts once both have actually played it
+      if (!a || !b) return;
       if (a.score_points > b.score_points) wins++;
       else if (a.score_points < b.score_points) losses++;
       else ties++;
@@ -1985,11 +1708,6 @@ async function computeDuelRecord(userA, userB) {
   return { wins, losses, ties, total: wins + losses + ties };
 }
 
-// Shared by both halves of the Rivalry card (who I'm behind/tied with, and —
-// when that's empty — who I'm most ahead of) — computes every opponent with
-// real Duel history ONCE, with per-opponent records fetched in parallel,
-// instead of each half separately re-deriving the same opponent list and
-// re-querying every record from scratch.
 async function computeMyDuelCandidates() {
   const { data: rounds } = await sb.from('rounds').select('creator_username, target_username')
     .eq('room_id', currentRoom.id)
@@ -2003,13 +1721,13 @@ async function computeMyDuelCandidates() {
   const records = await Promise.all(opponentList.map(opp => computeDuelRecord(me, opp)));
   return opponentList
     .map((opponent, i) => ({ opponent, record: records[i] }))
-    .filter(c => c.record.total >= 2); // floor: at least 2 duels before this counts as a real pattern
+    .filter(c => c.record.total >= 2);
 }
 function pickWorstRival(candidates) {
-  let best = null; // "worst" for me = most worth acting on
+  let best = null;
   for (const { opponent, record } of candidates) {
-    const net = record.losses - record.wins; // positive = I'm behind
-    if (net < 0) continue; // ahead of them — not a rivalry to feature here
+    const net = record.losses - record.wins;
+    if (net < 0) continue;
     if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = { opponent, record, net };
   }
   return best;
@@ -2017,30 +1735,18 @@ function pickWorstRival(candidates) {
 function pickStrongestDuel(candidates) {
   let best = null;
   for (const { opponent, record } of candidates) {
-    const net = record.wins - record.losses; // positive = I'm ahead
+    const net = record.wins - record.losses;
     if (net <= 0) continue;
     if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = { opponent, record, net };
   }
   return best;
 }
 
-// The room's personal "why this matters" header — headline (rank + activity,
-// adaptive framing so it never states an absurd/demoralizing goal), a single
-// ticker line picked from a priority-ordered candidate pool (loss-aversion >
-// near-miss > social threat > pride > belonging > generic fallback — only ONE
-// shown, never stacked), and two plain stat rows (activity / achievement) with
-// no narration of their own, matching the existing Activity-section pattern.
-// Silent (renders nothing) before your first game in this room — nothing to
-// show yet, and an empty/zeroed header would just be noise on day one.
 function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-// Room-scoped mirror of the exact same definitions used in computeFullPlayerStats
-// (the account-wide version, powering Home/Profile) — reused unchanged, just joined
-// through rounds.room_id, so a player never has to learn a second meaning
-// for "Challenges" depending on which screen they're looking at.
 async function computeRoomActivityStats(username, roomId) {
   const [{ data: myFirstFights }, { count: challenges }, { count: challengeBacks }] = await Promise.all([
     sb.from('first_fighters').select('round_id, rounds!inner(room_id)').eq('username', username).eq('rounds.room_id', roomId),
@@ -2050,9 +1756,6 @@ async function computeRoomActivityStats(username, roomId) {
   return { firstFights: (myFirstFights || []).length, challenges: challenges || 0, challengeBacks: challengeBacks || 0 };
 }
 
-// Flawless/Active Days/Matches Played, ranked among every member of THIS room (Active Days lives in overflow now, still computed here).
-// Fetches every member's round_scores in one query rather than one query per
-// member — same batching principle used throughout this file.
 async function computeRoomStatRankings(roomId) {
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', roomId);
   const usernames = (members || []).map(m => m.username);
@@ -2082,10 +1785,6 @@ async function computeRoomStatRankings(roomId) {
   };
 }
 
-// Words Mastered is inherently a GLOBAL skill property (mastery of a word
-// depends on your last 2 attempts ever, wherever they happened — it can't be
-// meaningfully scoped to "answers given inside this one room"), so this is
-// shared as-is by both Room and Profile rather than room-scoped like the rest.
 async function computeWordsMasteredRanking() {
   const { data: rows } = await sb.from('words_mastered_counts').select('*');
   const sorted = (rows || []).sort((a, b) => b.mastered_count - a.mastered_count);
@@ -2095,23 +1794,6 @@ async function computeWordsMasteredRanking() {
   return { myCount: myRow ? myRow.mastered_count : 0, myRank: rankIdx[me] || null };
 }
 
-// Ranks the overflow stats that show a raw number with a rank alongside it.
-// All of them sort descending (more = better rank) — the one stat that used
-// to need an ascending exception (Dethroned) was cut entirely (see stats
-// brainstorm notes: redundant with Crowns Held, and inherently ambiguous —
-// no wording fixed "did I dethrone someone, or did someone dethrone me").
-// scope: 'global' ranks against everyone who's played at least once (same
-// pool policy as computeGlobalStatRankings); 'room' ranks against every
-// member of roomId (same pool policy as computeRoomStatRankings, zero-count
-// members included). Room-scoped queries filter by room_id via an
-// intersection on rounds.id rather than `rounds!inner(room_id)` embedding
-// for trial_leaderboard/lifetime_wins specifically — those are views and,
-// unlike first_fighters (also a view, already embeds fine elsewhere in this
-// file), weren't independently confirmed to support the embed, so this
-// sidesteps the question rather than gambling on it.
-// The metric definitions (value getter + sort direction) for the 9 overflow
-// stats — shared by computeQuietStatsByUser (ranking) and the stat
-// leaderboard feature, so both read off one definition instead of two.
 const QUIET_STAT_METRICS = {
   streak: { fn: x => x.streak, dir: 'desc' }, crowns: { fn: x => x.crowns, dir: 'desc' },
   wordsPlayed: { fn: x => x.wordsPlayed.size, dir: 'desc' }, matchStarted: { fn: x => x.matchStarted, dir: 'desc' },
@@ -2119,10 +1801,6 @@ const QUIET_STAT_METRICS = {
   counter: { fn: x => x.counter, dir: 'desc' }, firstFights: { fn: x => x.firstFights, dir: 'desc' }, joinMatch: { fn: x => x.joinMatch, dir: 'desc' },
 };
 
-// Fetches and tallies the overflow stats for EVERY user in scope (global =
-// everyone who's played, room = every member) — the shared data both
-// computeQuietStatRankings (reduces to "my rank") and the stat-leaderboard
-// feature (shows everyone, sorted) are built on.
 async function computeQuietStatsByUser(scope, roomId) {
   const isRoom = scope === 'room';
   let roomRoundIds = null;
@@ -2163,20 +1841,9 @@ async function computeQuietStatsByUser(scope, roomId) {
   const ensure = u => { if (!byUser[u]) byUser[u] = { streak: 0, crowns: 0, wordsPlayed: new Set(), matchStarted: 0, challengesSent: 0, counter: 0, firstFights: 0, joinMatch: 0 }; return byUser[u]; };
   if (pool) pool.forEach(ensure);
 
-  // Every row is guarded against a missing username field before touching
-  // `ensure()` — confirmed via direct DB query that none of these columns
-  // are ever NULL, but a missing/misshapen embed on any one row (e.g. an
-  // unexpected array instead of object from a !inner join) silently reading
-  // as JS `undefined` would otherwise create a phantom "undefined" entry
-  // that then shows up as a fake player in every leaderboard. Cheap
-  // insurance regardless of which exact row it ever was.
   (streakRows || []).forEach(r => { if (r.username && (!isRoom || byUser[r.username])) ensure(r.username).streak = r.current_streak || 0; });
   (crownRows || []).forEach(r => { if (r.username) ensure(r.username).crowns++; });
   (wordAnswerRows || []).forEach(r => { if (r.username) ensure(r.username).wordsPlayed.add(r.word_id); });
-  // Split what used to be one "Start Match" bucket into two honest actions:
-  // opening a plain, un-aimed Match (matchStarted) vs. directly naming
-  // someone (challengesSent) — those are different intents and deserve
-  // different numbers, same principle as splitting Crowns from Duel.
   (roundRows || []).forEach(r => {
     if (!r.creator_username) return;
     const u = ensure(r.creator_username);
@@ -2211,10 +1878,6 @@ async function computeQuietStatRankings(scope, roomId, forUsername = me) {
   return out;
 }
 
-// Icon+label per rankable stat key — used both for the leaderboard title and
-// (via QUIET_STAT_METRICS/dedicated logic below) as the single source of
-// truth for which stats are even leaderboard-eligible. Accuracy is
-// deliberately absent — self-only, "not ranked," no leaderboard makes sense.
 const STAT_META = {
   wordsMastered: { icon: '📖', label: 'Words Mastered' }, flawless: { icon: '✨', label: 'Flawless' },
   played: { icon: '🗡️', label: 'Matches Played' }, activeDays: { icon: '📅', label: 'Active Days' },
@@ -2227,12 +1890,6 @@ const STAT_META = {
 };
 
 
-// Full sorted leaderboard for ANY single rankable stat — reuses the exact
-// same query shapes as the ranking functions above (computeGlobalStatRankings/
-// computeRoomStatRankings for the top-4, computeQuietStatsByUser for the
-// other 9) but returns everyone instead of collapsing to "mine". Only
-// queried on demand when a leaderboard is actually opened, not on every
-// stat-row render.
 async function computeStatLeaderboard(statKey, scope, roomId) {
   const isRoom = scope === 'room';
   if (statKey === 'avgScore') {
@@ -2274,7 +1931,6 @@ async function computeStatLeaderboard(statKey, scope, roomId) {
     const list = Object.keys(byUser).map(u => ({ username: u, value: metricFn(byUser[u]) }));
     return { rows: list.sort((a, b) => b.value - a.value) };
   }
-  // The 9 overflow stats share one byUser builder with computeQuietStatRankings.
   const byUser = await computeQuietStatsByUser(scope, roomId);
   const { fn, dir } = QUIET_STAT_METRICS[statKey];
   const list = Object.keys(byUser).map(u => ({ username: u, value: fn(byUser[u]) }));
@@ -2285,7 +1941,7 @@ async function computeStatLeaderboard(statKey, scope, roomId) {
 let statLeaderboardReturnView = 'view-home';
 async function openStatLeaderboard(statKey, scope, roomId) {
   const meta = STAT_META[statKey];
-  if (!meta) return; // unranked stat (Accuracy) — tapping it does nothing, no leaderboard exists
+  if (!meta) return;
   statLeaderboardReturnView = currentVisibleViewId();
   show('view-stat-leaderboard');
   $('stat-leaderboard-title').textContent = `${meta.icon} ${meta.label}`;
@@ -2311,9 +1967,6 @@ async function renderRoomStatsHeader() {
   holder.innerHTML = '';
   const roomId = currentRoom.id;
 
-  // All of these are independent of each other's results — firing them
-  // together instead of one-at-a-time is what actually made this screen feel
-  // slow (13 sequential round-trips before this fix, way back).
   const [
     { data: myScores },
     { data: roomRows },
@@ -2353,11 +2006,6 @@ async function renderRoomStatsHeader() {
   const myIndex = ranked.findIndex(r => r.username === me);
   const myRank = myIndex >= 0 ? myIndex + 1 : null;
 
-  // Activity Rank — a second, independent leaderboard by raw participation
-  // (rounds_played), not skill. Includes EVERY room member, not just ranked
-  // ones — this axis is about showing up, not being good. This IS the number
-  // shown in the headline now (a rank, not a raw count) per the "headline =
-  // ranks, grid = raw evidence" principle.
   const activitySorted = [...(roomRows || [])].sort((a, b) => b.rounds_played - a.rounds_played);
   const activityIndex = activitySorted.findIndex(r => r.username === me);
   const activityRank = activityIndex >= 0 ? activityIndex + 1 : null;
@@ -2365,7 +2013,6 @@ async function renderRoomStatsHeader() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const streakAtRisk = !!(streakRow && streakRow.current_streak > 0 && streakRow.last_played_date !== todayStr);
 
-  // ---- Headline: two ranks, nothing else. Skill standing + effort standing.
   let headlineLine;
   const activityPart = activityRank ? `#${activityRank}` : '–';
   if (myRank === null) {
@@ -2378,8 +2025,6 @@ async function renderRoomStatsHeader() {
 
   $('btn-open-room-leaderboard').innerHTML = myRank ? `🏆 Leaderboard (#${myRank})` : '🏆 Leaderboard';
 
-  // ---- Slot 1 (gold, "about you"): your own standing, self-contained,
-  // never depends on what a specific rival just did. Always has a fallback.
   let ticker = null;
   if (streakAtRisk) {
     ticker = `Play today or lose your ${streakRow.current_streak}-day streak!`;
@@ -2396,9 +2041,6 @@ async function renderRoomStatsHeader() {
   }
   if (!ticker) ticker = `Start a Match to make your mark`;
 
-  // ---- Slot 2 (red, "about someone else"): only fires when another named
-  // person is the reason this matters right now — allowed to stay empty on
-  // a quiet day rather than manufacture false urgency.
   let slot2 = null;
   if (duelTicker) {
     slot2 = { text: duelTicker.text, onClick: duelTicker.opponent ? () => startNewRound(duelTicker.opponent) : null };
@@ -2415,12 +2057,8 @@ async function renderRoomStatsHeader() {
     slot2 = { text: socialProof, onClick: null };
   }
 
-  // ---- Top 4: Avg Score / Words Mastered / Flawless / Matches Played —
-  // the 4 stats that survived the full psychology audit (Streak and Duel both
-  // deliberately excluded, they live in the ticker and Rivalry card instead).
-  // Format: volume + rank in parens, per explicit request — "8 Flawless (#3)".
   const rankSuffix = r => r ? ` (#${r})` : '';
-  const quietCount = 7; // Challenges Sent, Counter, Words Played, Match Started, Active Days, First to Fight, Join Match
+  const quietCount = 7;
   const myAvgScore = myRank !== null ? Math.round(ranked[myIndex].avg_score) : null;
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
@@ -2466,13 +2104,6 @@ async function renderRoomStatsHeader() {
   await sb.from('room_visit_snapshots').upsert({ username: me, room_id: roomId, last_rank: myRank, last_rounds_played: gamesPlayed });
 }
 
-// Second "breaking news" ticker — currently Duel-only, but written generally
-// enough that other news types (dethronement, etc.) could feed in here later
-// once we decide priority/color rules for those. Returns null when there's
-// nothing worth saying (never fabricates filler for this one).
-// Crown-snatch tickers reuse dethronement_events — the exact same data the
-// dethronement popup already runs on — windowed to the last 24h so "just"
-// stays honest instead of being permanently true forever after one event.
 async function computeCrownSnatchByMe(roomId) {
   const since = new Date(Date.now() - 24 * 3600000).toISOString();
   const { data } = await sb.from('dethronement_events')
@@ -2494,10 +2125,6 @@ async function computeCrownSnatchFromMe(roomId) {
   return `${displayName(row.dethroned_by_username)} just snatched Match #${row.rounds.trial_number} from you!`;
 }
 
-// A pending direct Challenge needs zero history to be worth surfacing —
-// unlike every other ticker candidate, it works even for a brand-new player
-// with no rank or rivalry yet, which makes it valuable in exactly the
-// cold-start window where nothing else in the pool has anything to say.
 async function computePendingChallengeTicker(roomId) {
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*')
@@ -2510,9 +2137,6 @@ async function computePendingChallengeTicker(roomId) {
   return { text: `${displayName(unanswered.creator_username)} is waiting for your move!`, round: unanswered };
 }
 
-// Social proof — doesn't require ME to be behind anyone; the crowd's
-// failure is the hook on its own. Picks any open Match in the room I
-// haven't played yet with at least 2 failed attempts against the champion.
 async function computeSocialProofTicker(roomId) {
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('id, trial_number').eq('room_id', roomId).gt('expires_at', now);
@@ -2534,10 +2158,6 @@ async function computeSocialProofTicker(roomId) {
   return null;
 }
 
-// Home's cross-room version of the same idea — checks every room at once
-// rather than one, since Home has no single room context. Embeds the full
-// room row (not just its name) so a click can jump straight there via the
-// same openRoom() used everywhere else, then open the Match itself.
 async function computeHomePendingChallengeTicker() {
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*, rooms!inner(*)')
@@ -2556,16 +2176,10 @@ async function computeDuelTicker() {
   if (!rival) {
     const strongest = pickStrongestDuel(candidates);
     if (!strongest) return null;
-    // "Signature Duel" was unexplained jargon — nothing told you which number
-    // was yours or what "signature" even meant. State it plainly instead:
-    // you're leading, first number is always YOUR wins.
     return { text: `⚔️ Up ${strongest.record.wins}–${strongest.record.losses} against ${displayName(strongest.opponent)} in your duel`, opponent: null };
   }
   const { opponent, record, net } = rival;
 
-  // Don't offer to settle again if a Match between us is already unanswered
-  // — without this, the ticker looks identical every visit and repeated taps
-  // would leave duplicate open Matches against the same person.
   const now = new Date().toISOString();
   const { data: pendingRounds } = await sb.from('rounds').select('id')
     .eq('room_id', currentRoom.id)
@@ -2612,8 +2226,6 @@ async function loadMembers() {
   renderRoomDangerZone(members || []);
 }
 
-// Creator gets both Leave (with auto-promote handoff) and Delete (destroys the room for
-// everyone). Non-creator members only get Leave — they can't destroy a room they don't own.
 function renderRoomDangerZone(members) {
   const holder = $('room-danger-zone');
   holder.innerHTML = '';
@@ -2637,7 +2249,7 @@ function renderRoomDangerZone(members) {
 
 async function leaveRoom(members) {
   const isCreator = currentRoom.creator_username === me;
-  const others = (members || []).filter(m => m.username !== me); // already sorted by joined_at (longest-standing first)
+  const others = (members || []).filter(m => m.username !== me);
 
   if (isCreator && others.length === 0) {
     alert("You're the only member — use \"Delete Game Room\" instead, or invite someone else before leaving.");
@@ -2646,7 +2258,6 @@ async function leaveRoom(members) {
   if (!confirm(`Leave "${currentRoom.name}"? You can rejoin later with the room code (${currentRoom.code}) if you change your mind. Your past scores in this room stay on its leaderboard.`)) return;
 
   if (isCreator) {
-    // Auto-promote: longest-standing remaining admin, else longest-standing remaining member.
     const nextOwner = others.find(m => m.role === 'admin') || others[0];
     await sb.from('rooms').update({ creator_username: nextOwner.username }).eq('id', currentRoom.id);
     if (nextOwner.role !== 'admin') {
@@ -2673,8 +2284,6 @@ $('btn-delete-room-confirm').onclick = async () => {
     $('delete-room-error').classList.remove('hidden');
     return;
   }
-  // Deleting the room cascades (via foreign keys) to room_members, rounds, round_scores,
-  // word_answers, and room-scoped badges — destroys the whole room's history for everyone.
   await sb.from('rooms').delete().eq('id', currentRoom.id);
   $('delete-room-modal').classList.add('hidden');
   await loadRoomsList();
@@ -2704,16 +2313,13 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
     const now = new Date();
     rows = (rows || []).filter(r => { const m = new Date(r.month); return m.getUTCFullYear() === now.getUTCFullYear() && m.getUTCMonth() === now.getUTCMonth(); });
   } else if (period === 'weekly') {
-    // date_trunc('week', ...) buckets by ISO week (Monday start) — match against this week's Monday.
     const now = new Date();
-    const dayIdx = (now.getUTCDay() + 6) % 7; // 0 = Monday
+    const dayIdx = (now.getUTCDay() + 6) % 7;
     const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - dayIdx));
     rows = (rows || []).filter(r => Math.abs(new Date(r.week) - monday) < 86400000);
   }
   rows = (rows || []).sort((a, b) => b.avg_score - a.avg_score);
 
-  // "Ranked" is gated on TOTAL games played all-time, globally — independent of which
-  // scoped/period view is showing, so someone's ranked status doesn't flicker between tabs.
   const { data: allTimeRows } = await sb.from('global_leaderboard_alltime').select('username, rounds_played');
   const totalGamesMap = new Map((allTimeRows || []).map(r => [r.username, r.rounds_played]));
   const isRanked = username => (totalGamesMap.get(username) || 0) >= MIN_GAMES_TO_RANK;
@@ -2721,8 +2327,6 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
   const ranked = rows.filter(r => isRanked(r.username));
   const unranked = rows.filter(r => !isRanked(r.username));
 
-  // decaying "defending champion" marker — only meaningful for the monthly view, and only
-  // among people who are actually ranked (a lucky unranked score shouldn't be "champion")
   let defendingChamp = null;
   if (period === 'monthly') {
     const lastMonth = new Date(); lastMonth.setMonth(lastMonth.getMonth() - 1);
@@ -2734,8 +2338,6 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const decay = Math.max(0.15, 1 - (dayOfMonth / daysInMonth));
 
-  // Rank-movement banner only tracks position within the ranked group — an unranked
-  // person has no real rank yet to report movement on.
   renderRankBanner(ranked, bannerId, keyBase, period);
 
   list.innerHTML = '';
@@ -2765,8 +2367,6 @@ async function renderLeaderboard({ scope, roomId, period, listId, bannerId, keyB
   }
 }
 
-// Rank-movement banner: shows what changed since the last time THIS user
-// viewed THIS scope/period, instead of just a static "you are #3" number.
 function renderRankBanner(rows, bannerId, keyBase, period) {
   const banner = $(bannerId);
   const myIndex = rows.findIndex(r => r.username === me);
@@ -2796,9 +2396,6 @@ function renderRankBanner(rows, bannerId, keyBase, period) {
 async function openTargetPicker() {
   show('view-choose-target');
   $('btn-target-anyone').disabled = false;
-  // Always wire this up before the early-return below — it used to only get
-  // assigned AFTER the empty-room check, so a solo room's "Or just open it to
-  // anyone" button was visibly enabled but completely dead (no handler at all).
   $('btn-target-anyone').onclick = () => { disableAllPickerButtons(); startNewRound(); };
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id).neq('username', me);
   const list = $('target-member-list');
@@ -2843,10 +2440,6 @@ async function startRound(round) {
   finishingRound = false;
   $('btn-next-word').disabled = false;
 
-  // Fires before the very first Trial this person has EVER played, however they
-  // got here — self-created, tapped from the list, a WhatsApp link, or a reminder.
-  // One check at the one chokepoint every path already funnels through, so a
-  // WhatsApp arrival gets the same explainer as anyone who tapped "Start a game."
   const { count: everPlayed } = await sb.from('round_scores').select('id', { count: 'exact', head: true }).eq('username', me);
   if (!everPlayed) {
     await showOnboardingTipOnce('first_trial_ever', '📜 How Trials work',
@@ -2866,8 +2459,6 @@ function renderQuestion() {
   $('game-sentence-card').classList.add('hidden');
   $('btn-next-word').classList.add('hidden');
 
-  // Question = advanced word. Correct answer = its basic OR intermediate match (chosen at random).
-  // The other 2 choices are distractor basic/intermediate words pulled from other entries.
   const correctAnswer = Math.random() < 0.5 ? w.basic : w.intermediate;
   w._correctAnswer = correctAnswer;
   const distractorPool = [];
@@ -2909,11 +2500,6 @@ $('btn-next-word').onclick = () => {
   else { renderQuestion(); }
 };
 
-// Reentrancy guard: a fast double-tap on "See result" used to be able to fire
-// finishRound() twice concurrently — the second round_scores insert silently
-// failed (its error was never checked), but badge/streak logic still ran a
-// second time regardless. The button-disable above covers the common case;
-// this covers any other path that might call finishRound() directly.
 let finishingRound = false;
 async function finishRound() {
   if (finishingRound) return;
@@ -2925,10 +2511,6 @@ async function finishRound() {
   await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points });
 
   const wordAnswerRows = roundWords.map((w, i) => ({ round_id: currentRound.id, username: me, word_id: w.id, is_correct: !!roundAnswers[i] }));
-  // upsert + ignoreDuplicates instead of a plain insert: if this ever fires twice for the
-  // same play (a retried network call, a double-tap slipping past some other guard), the
-  // unique constraint on (round_id, username, word_id) makes the second attempt a safe
-  // no-op instead of either erroring or silently duplicating rows in word_stats.
   await sb.from('word_answers').upsert(wordAnswerRows, { onConflict: 'round_id,username,word_id', ignoreDuplicates: true });
 
   const { count } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('round_id', currentRound.id);
@@ -2944,18 +2526,10 @@ async function finishRound() {
 
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
-  // Suppress the Crown Taken popup for the round you JUST played — the verdict
-  // above already celebrated it inline ("🎉 You're the Game Champion!"), so a
-  // second popup announcing the same thing would be redundant. Still checks
-  // for (and pops) any OTHER pending crown-take from an unrelated Match below.
   await sb.from('dethronement_events').update({ dethroner_notified: true }).eq('round_id', currentRound.id).eq('dethroned_by_username', me).eq('dethroner_notified', false);
-  await checkDethronements(); // catches anything that happened while you were mid-quiz and got skipped live
+  await checkDethronements();
   await checkNewChallenges();
   await checkCrownsTaken();
-  // The generic "first badge earned" explainer is suppressed during the forced
-  // 2-game onboarding window (renderScorecard already shows its own tailored
-  // forced-flow card there) — stacking a second modal on top would be exactly
-  // the over-explaining we're trying to avoid. It resumes normally from game 3 on.
   const { count: roundsPlayedSoFar } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
   if (newBadges.length > 0 && roundsPlayedSoFar > 2) {
     await showOnboardingTipOnce('first_badge_earned', '🏅 Your First Badge!',
@@ -2963,8 +2537,6 @@ async function finishRound() {
   }
 }
 
-// Fires exactly once, the moment someone crosses from "Unranked" into their first
-// real tier — a real congratulatory milestone, not just a quiet threshold crossing.
 async function maybeAwardRankedUp() {
   const { data: existing } = await sb.from('badges').select('badge_key').eq('username', me).eq('badge_key', 'ranked_up').is('room_id', null).maybeSingle();
   if (existing) return null;
@@ -2978,7 +2550,7 @@ async function recordRoundPlayed() {
   const today = new Date().toISOString().slice(0, 10);
   const { data: s } = await sb.from('streaks').select('*').eq('username', me).maybeSingle();
   if (!s) { await sb.from('streaks').insert({ username: me, current_streak: 1, best_streak: 1, last_played_date: today }); return []; }
-  if (s.last_played_date === today) return []; // already counted today
+  if (s.last_played_date === today) return [];
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const newStreak = s.last_played_date === yesterday ? s.current_streak + 1 : 1;
   await sb.from('streaks').update({ current_streak: newStreak, best_streak: Math.max(newStreak, s.best_streak), last_played_date: today }).eq('username', me);
@@ -3018,16 +2590,10 @@ async function renderScorecard(correct, points, newBadges) {
     badgeDiv.appendChild(card);
   });
 
-  // Win/lose verdict compares against the CURRENT CHAMPION (rank 1 on this
-  // Match), not the round's creator — a round can pick up new players after
-  // creation, so "did I beat the creator" stopped being the right question
-  // once a third player could be the one actually leading. Same logic the
-  // Trial screen's own "Challenge back" button already used; this brings
-  // the Scorecard in line with it instead of the two disagreeing.
   const verdictEl = $('score-verdict');
   const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', currentRound.id);
   const champRow = (lbRows || []).find(r => r.rank === 1);
-  let iWon = null; // true = I'm the Game Champion now, false = someone else is
+  let iWon = null;
   if (champRow) {
     if (champRow.username === me) {
       verdictEl.textContent = `🎉 You're the Game Champion! ${points} pts.`;
@@ -3044,13 +2610,6 @@ async function renderScorecard(correct, points, newBadges) {
     verdictEl.classList.add('hidden');
   }
 
-  // Duel Record on the scorecard — same exclusive gate as everywhere else
-  // (a direct Challenge/Challenge-back, I'm one of the two named), PLUS one
-  // more condition: only when that same person is ALSO the current
-  // champion. Otherwise this card and the verdict above tell two different,
-  // contradictory-feeling stories at once (e.g. "3-1 lifetime vs A" sitting
-  // right next to "you lost to B this Match") — A's record doesn't
-  // disappear, it just waits until A and you are actually facing off.
   const duelHolder = $('score-duel-holder');
   duelHolder.innerHTML = '';
   if (currentRound.target_username && (me === currentRound.creator_username || me === currentRound.target_username)) {
@@ -3069,50 +2628,47 @@ async function renderScorecard(correct, points, newBadges) {
     const matchNum = currentRound.trial_number;
     let body;
     if (champRow && champRow.username !== me) {
-      // Scenario 1: someone else holds the crown — regardless of who created
-      // the Match. Named, since the recipient is beating THEM, not me.
       body = `${displayName(champRow.username)} is holding the crown at ${champRow.score_points} pts in Match #${matchNum}. Think you can take his crown?`;
     } else if ((lbRows || []).length === 1) {
-      // Scenario 2: I'm champion AND nobody else has played this Match yet —
-      // a fresh callout, not a defended record. "Issued a challenge" framing.
       body = `I just issued a challenge. ${points} pts in Match #${matchNum}. Think you can beat the mighty ${displayName(me)}?`;
     } else {
-      // Scenario 3: I'm champion and at least one other person has already
-      // tried and failed — an established, defended crown. Flex framing.
       body = `Yours truly, ${displayName(me)}, is undefeated with ${points} pts in Match #${matchNum}. Think you can defeat me?`;
     }
     shareText(`${header}${body}\n\n${url}`);
   };
 
-  // Challenge-back always targets the current champion — hidden entirely
-  // when I'm already the champion (nothing to avenge) or when there's no
-  // leaderboard yet at all. One consistent phrase everywhere this action
-  // appears: "Challenge [name] back."
+  // Challenge back — ALWAYS shown now, win or lose, same "Challenge back"
+  // wording and same primary-weight styling as Share challenge either way.
+  // Only the hidden target changes: losing targets the current champion
+  // (person to reclaim from), winning targets the runner-up (rank 2 on this
+  // Match's leaderboard) — the closest person worth re-provoking. If there's
+  // truly nobody else on the leaderboard yet (solo Match, first-ever play),
+  // there's no one to challenge back, so the button hides in that one case.
   const dareBackBtn = $('btn-dare-back');
-  if (iWon === true || iWon === null) {
-    dareBackBtn.classList.add('hidden');
-    $('btn-challenge-others').className = 'btn-primary';
-  } else {
-    dareBackBtn.classList.remove('hidden');
-    dareBackBtn.className = 'btn-primary';
-    dareBackBtn.textContent = `Challenge ${displayName(champRow.username)} back`;
-    $('btn-challenge-others').className = 'btn-secondary';
+  $('btn-challenge-others').className = 'btn-primary';
+  dareBackBtn.className = 'btn-primary';
+
+  let challengeBackTarget = null;
+  if (iWon === false) {
+    challengeBackTarget = champRow.username;
+  } else if (iWon === true) {
+    const runnerUp = (lbRows || []).find(r => r.rank === 2);
+    if (runnerUp) challengeBackTarget = runnerUp.username;
   }
 
-  dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(champRow.username, true); };
+  if (challengeBackTarget) {
+    dareBackBtn.classList.remove('hidden');
+    dareBackBtn.textContent = `Challenge ${displayName(challengeBackTarget)} back`;
+    dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(challengeBackTarget, true); };
+  } else {
+    dareBackBtn.classList.add('hidden');
+  }
 
-  // First two games ever: replace the normal button row entirely with a single
-  // tailored next step, rather than a menu of choices — this is the one place a
-  // genuinely NEW player still expects to be guided. From game 3 on, she's fully
-  // free and sees the normal scorecard exactly as everyone else does.
   const { count: roundsPlayedNow } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
   const forcedHolder = $('forced-flow-holder');
   const normalActions = $('normal-scorecard-actions');
   forcedHolder.innerHTML = '';
 
-  // A genuinely solo room (nobody else has joined yet) used to dead-end the forced
-  // flow: game 1's "Choose a challenger" opened a picker with nothing in it. Now
-  // detected once here and threaded through both branches below instead.
   const { count: otherMembers } = await sb.from('room_members').select('*', { count: 'exact', head: true }).eq('room_id', currentRoom.id).neq('username', me);
   const soloRoom = (otherMembers || 0) === 0;
 
@@ -3128,8 +2684,6 @@ async function renderScorecard(correct, points, newBadges) {
       btn.onclick = () => { btn.disabled = true; startNewRound(champRow.username, true); };
       card.appendChild(btn);
     } else if (soloRoom) {
-      // Nobody to pick from — skip the picker dead-end entirely and go straight
-      // into round two as another open Trial, no target.
       card.innerHTML = `<div class="forced-flow-text">Nice! Ready for round two? You're the only one in this room so far, so this one's open for whenever someone joins.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
@@ -3150,9 +2704,6 @@ async function renderScorecard(correct, points, newBadges) {
     const card = document.createElement('div');
     card.className = 'forced-flow-card';
     if (soloRoom) {
-      // The real "before she quits" moment for a solo player specifically — she's
-      // just done the full onboarding arc alone. A Trial only gets exciting once
-      // someone else is in it, so the ask here is to invite, not just "see room."
       card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! But a Match's no fun alone — invite someone to make it a real contest.</div>`;
       const shareBtn = document.createElement('button');
       shareBtn.className = 'btn-primary';
@@ -3193,12 +2744,10 @@ async function renderOtherDares() {
   const now = new Date().toISOString();
   const { data: rounds } = await sb.from('rounds').select('*').eq('room_id', currentRoom.id).gt('expires_at', now).neq('id', currentRound.id).order('created_at', { ascending: false }).limit(5);
   const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me);
-  if (myToken !== otherDaresLoadToken) return; // a newer call has since started — abandon this one
+  if (myToken !== otherDaresLoadToken) return;
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const open = (rounds || []).filter(r => !playedIds.has(r.id) && r.creator_username !== me);
   if (open.length === 0) {
-    // No outstanding live game to jump into — give a way to start one instead
-    // of just leaving this slot on the scorecard empty.
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
     btn.textContent = 'Start a new Match';
@@ -3206,7 +2755,7 @@ async function renderOtherDares() {
     holder.appendChild(btn);
     return;
   }
-  holder.innerHTML = ''; // clear again — a newer call may have already started filling this since the awaits above
+  holder.innerHTML = '';
   const title = document.createElement('div');
   title.className = 'dare-sub';
   title.textContent = `${open.length} more open Match${open.length > 1 ? 'es' : ''} in this Game Room:`;

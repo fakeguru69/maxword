@@ -2975,12 +2975,12 @@ async function renderScorecard(correct, points, newBadges) {
     forcedHolder.appendChild(card);
   } else {
     normalActions.classList.remove('hidden');
-    renderOtherDares();
+    renderOtherDares(iWon);
   }
 }
 
 let otherDaresLoadToken = 0;
-async function renderOtherDares() {
+async function renderOtherDares(iWon) {
   const myToken = ++otherDaresLoadToken;
   const holder = $('other-dares-holder');
   holder.innerHTML = '';
@@ -2991,6 +2991,12 @@ async function renderOtherDares() {
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const open = (rounds || []).filter(r => !playedIds.has(r.id) && r.creator_username !== me);
   if (open.length === 0) {
+    // On a win, "Ready to take another?" right above already opens the exact
+    // same picker — showing a second "Start a new Match" button here would
+    // just be the same action twice. Only show this fallback when there's
+    // no other button already covering it (i.e. a loss, where the CTA above
+    // is targeted at one specific person, not a general "start anything").
+    if (iWon === true) return;
     const btn = document.createElement('button');
     btn.className = 'btn-primary';
     btn.textContent = 'Start a new Match';

@@ -2928,7 +2928,8 @@ async function finishRound() {
   } catch (err) {
     finishingRound = false;
     console.error('finishRound: failed to save score', err);
-    $('finish-round-error-text').textContent = "Couldn't save your score — check your connection.";
+    const detail = err && err.message ? err.message : String(err);
+    $('finish-round-error-text').textContent = `Couldn't save your score — check your connection. (${detail})`;
     $('finish-round-error').classList.remove('hidden');
     return;
   }
@@ -2963,7 +2964,8 @@ async function finishRound() {
   } catch (err) {
     finishingRound = false;
     console.error('finishRound: renderScorecard failed', err);
-    $('finish-round-error-text').textContent = "Your score saved! Tap Try Again to load your result.";
+    const detail = err && err.message ? err.message : String(err);
+    $('finish-round-error-text').textContent = `Your score saved! Tap Try Again to load your result. (${detail})`;
     $('finish-round-error').classList.remove('hidden');
     return;
   }

@@ -1761,8 +1761,8 @@ async function maybeShowRoomVocabTip() {
   if (played !== 2) return;
   await showOnboardingTipOnce('room_card_vocab', '📜 Reading the room',
     `<div class="tip-list-item">🎯 challenge you / counter challenge — someone's calling you out directly</div>
-     <div class="tip-list-item">⚔️ Join Fight — an open invitation, no pressure</div>
-     <div class="tip-list-item">☝️ First to Fight — nobody's played it yet</div>
+     <div class="tip-list-item">⚔️ join fight — an open invitation, no pressure</div>
+     <div class="tip-list-item">☝️ first to fight — nobody's played it yet</div>
      <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
     () => {
       const target = document.getElementById('trials-count-label');
@@ -1937,7 +1937,7 @@ async function loadDares() {
       badgeInfo = 'Someone is duelling you for the crown on this Match.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     } else {
-      badge = champ ? `⚔️ Join Fight` : '☝️ First to Fight'; badgeClass = 'open-invite';
+      badge = champ ? `⚔️ join fight` : '☝️ first to fight'; badgeClass = 'open-invite';
       badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     }
@@ -1987,9 +1987,8 @@ async function openTrialScreen(round) {
   const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
   if (!iPlayed && round.target_username === me) {
     tags.push(`<span class="trial-tag mine">🎯 ${round.via_challenge_back ? 'duelling you back' : 'duelling you'}</span>`);
-  } else if (iPlayed) {
-    if (myRow.rank === 1) tags.push(`<span class="trial-tag mine">👑 you hold the crown</span>`);
-    else tags.push(`<span class="trial-tag mine">😤 #${myRow.rank} of ${rows.length}</span>`);
+  } else if (iPlayed && myRow.rank === 1) {
+    tags.push(`<span class="trial-tag mine">👑 you hold the crown</span>`);
   }
   $('trial-tags').innerHTML = tags.join('');
 
@@ -2988,7 +2987,12 @@ async function renderScorecard(correct, points, newBadges) {
           : `${displayName(opponentUsername)}'s crown holds — you lost by ${gap}.`;
       }
     } else if (iWon) {
-      verdictEl.textContent = `👑 You hold the crown! ${points} pts.`;
+      const { data: myDethronement } = await sb.from('dethronement_events').select('dethroned_username, same_score').eq('round_id', currentRound.id).eq('dethroned_by_username', me).eq('outcome', 'taken').maybeSingle();
+      verdictEl.textContent = myDethronement
+        ? (myDethronement.same_score
+            ? `👑 You took ${displayName(myDethronement.dethroned_username)}'s crown — you were faster!`
+            : `👑 You took ${displayName(myDethronement.dethroned_username)}'s crown! ${points} pts.`)
+        : `👑 You hold the crown! ${points} pts.`;
     } else {
       const gap = champRow.score_points - points;
       verdictEl.textContent = gap === 0
@@ -3167,7 +3171,7 @@ async function renderOtherDares(iWon) {
     if (r.target_username === me) {
       badge = '🎯 duelling you'; badgeClass = 'targeted'; badgeInfo = 'Someone is duelling you for the crown on this Match.';
     } else {
-      badge = champ ? `⚔️ Join Fight` : '☝️ First to Fight'; badgeClass = 'open-invite';
+      badge = champ ? `⚔️ join fight` : '☝️ first to fight'; badgeClass = 'open-invite';
       badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
     }
     const div = document.createElement('div');

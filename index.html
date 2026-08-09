@@ -570,7 +570,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
     <button class="btn-primary hidden" id="btn-next-word" style="margin-top:16px;">Next word</button>
     <div class="hidden" id="finish-round-error" style="margin-top:16px; padding:14px; border-radius:12px; border:1px solid var(--danger); background:rgba(200,80,80,0.08); text-align:center;">
-      <div style="color:var(--cream); margin-bottom:10px;">Couldn't save your score — check your connection.</div>
+      <div style="color:var(--cream); margin-bottom:10px;" id="finish-round-error-text">Couldn't save your score — check your connection.</div>
       <button class="btn-primary" id="btn-finish-round-retry">Try Again</button>
     </div>
   </section>
@@ -2899,6 +2899,7 @@ async function finishRound() {
   } catch (err) {
     finishingRound = false;
     console.error('finishRound: failed to save score', err);
+    $('finish-round-error-text').textContent = "Couldn't save your score — check your connection.";
     $('finish-round-error').classList.remove('hidden');
     return;
   }
@@ -2919,8 +2920,24 @@ async function finishRound() {
     console.error('finishRound: badge/streak step failed, continuing', err);
   }
 
-  await renderScorecard(correct, points, newBadges);
-  show('view-scorecard');
+  // This was the actual gap: the score is already saved at this point (the
+  // try/catch above succeeded), but rendering the result screen itself was
+  // still completely unwrapped — a throw here (e.g. a fresh read racing the
+  // insert that just happened) was a silent, permanent hang with the score
+  // sitting safely in the DB the whole time and nothing on screen to show
+  // for it. Retry is safe either way: finishRound() re-checks for an
+  // existing score before inserting, so calling it again just re-runs the
+  // render without touching the DB a second time.
+  try {
+    await renderScorecard(correct, points, newBadges);
+    show('view-scorecard');
+  } catch (err) {
+    finishingRound = false;
+    console.error('finishRound: renderScorecard failed', err);
+    $('finish-round-error-text').textContent = "Your score saved! Tap Try Again to load your result.";
+    $('finish-round-error').classList.remove('hidden');
+    return;
+  }
   finishingRound = false;
 
   try {

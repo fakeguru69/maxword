@@ -35,7 +35,7 @@ html, body {
   min-height: 100vh;
 }
 h1, h2, h3, .display { font-family: 'Cinzel', serif; letter-spacing: 0.02em; margin: 0; }
-.app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 20px 18px 40px; display: flex; flex-direction: column; gap: 18px; }
+.app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 14px 18px 40px; display: flex; flex-direction: column; gap: 12px; }
 .hidden { display: none !important; }
 .seal { display: flex; align-items: center; gap: 12px; }
 .seal-mark { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--gold); display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; color: var(--gold); font-weight: 700; background: radial-gradient(circle, rgba(212,175,55,0.15), transparent 70%); flex-shrink: 0; }
@@ -88,13 +88,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .option-btn.correct { border-color: var(--teal); background: rgba(79,182,168,0.12); color: var(--teal); }
 .option-btn.wrong { border-color: var(--danger); background: rgba(192,85,74,0.12); color: var(--danger); }
 .reveal-sentence { margin-top: 14px; font-size: 14px; color: var(--cream-dim); border-left: 2px solid var(--gold-soft); padding-left: 12px; }
-.scorecard { text-align: center; padding: 28px 16px; }
+.scorecard { text-align: center; padding: 20px 16px; }
+.scorecard .cat-eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--teal); margin-bottom: 4px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--gold); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
 .scorecard .score-comment { font-size: 17px; font-weight: 600; color: var(--cream); margin-bottom: 10px; }
-.scorecard-zone-verdict { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.scorecard-zone-verdict { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 #normal-scorecard-actions { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
-.scorecard .score-verdict { font-size: 15px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold-soft); color: var(--gold); }
+.scorecard .score-verdict { font-size: 15px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 10px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold-soft); color: var(--gold); }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .badge-chip-more { cursor: pointer; background: transparent; border-style: dashed; color: var(--cream-dim); }
 .badge-earned-card { text-align: left; border: 1px solid var(--gold); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: rgba(212,175,55,0.08); }
@@ -172,7 +173,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .champion-banner .champ-name { font-family: 'Cinzel', serif; color: var(--gold); font-size: 18px; margin-top: 2px; }
 .dethroned-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(192,85,74,0.15); border: 1px solid var(--danger); color: #F0A898; font-weight: 600; }
 .challenged-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.12); border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
-.completionist-line { font-size: 12px; color: var(--cream-dim); text-align: center; margin-bottom: 10px; }
+.completionist-line-wrap { text-align: center; margin-bottom: 14px; }
+.completionist-line { display: inline-block; font-size: 12px; font-weight: 600; color: var(--gold); background: rgba(212,175,55,0.12); border: 1px solid var(--gold-soft); border-radius: 999px; padding: 4px 12px; }
 .urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
 .duel-record { text-align: center; font-size: 14px; color: var(--cream); margin-bottom: 14px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
 .duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.14); margin-top: 16px; margin-bottom: 14px; cursor: pointer; }
@@ -568,7 +570,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="example-label">Example</div>
       <div class="example-sentence" id="game-sentence"></div>
     </div>
-    <button class="btn-primary hidden" id="btn-next-word" style="margin-top:10px;">Next word</button>
+    <button class="btn-primary hidden" id="btn-next-word" style="margin-top:10px; position: sticky; bottom: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4);">Next word</button>
     <div class="hidden" id="finish-round-error" style="margin-top:16px; padding:14px; border-radius:12px; border:1px solid var(--danger); background:rgba(200,80,80,0.08); text-align:center;">
       <div style="color:var(--cream); margin-bottom:10px;" id="finish-round-error-text">Couldn't save your score — check your connection.</div>
       <button class="btn-primary" id="btn-finish-round-retry">Try Again</button>
@@ -2004,7 +2006,7 @@ async function openTrialScreen(round) {
 
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
   const totalMembers = (members || []).length;
-  $('trial-completionist-holder').innerHTML = `<div class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Match</div>`;
+  $('trial-completionist-holder').innerHTML = `<div class="completionist-line-wrap"><span class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Match</span></div>`;
 
   const duelHolder = $('trial-duel-holder');
   duelHolder.innerHTML = '';

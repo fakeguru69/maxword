@@ -164,9 +164,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .match-info-btn.active { border-color: var(--gold); color: var(--gold); }
 .match-info-tip { display: none; font-size: 11.5px; color: var(--cream-dim); background: rgba(212,175,55,0.06); border-left: 2px solid var(--gold-soft); padding: 6px 8px; margin-bottom: 6px; line-height: 1.4; }
 .match-info-tip.show { display: block; }
-.trial-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-.trial-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--cream-dim); }
-.trial-tag.mine { border-color: var(--gold); color: var(--gold); }
+.trial-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.trial-tag { font-size: 12px; color: var(--cream-dim); }
+.trial-tag.status { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
 .trial-header { text-align: center; margin-bottom: 14px; }
 .trial-header .trial-number { font-family: 'Cinzel', serif; font-size: 26px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
 .champion-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold); }
@@ -175,7 +175,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .dethroned-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(192,85,74,0.15); border: 1px solid var(--danger); color: #F0A898; font-weight: 600; }
 .challenged-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.12); border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
 .completionist-line-wrap { text-align: center; margin-bottom: 14px; }
-.completionist-line { display: inline-block; font-size: 12px; font-weight: 600; color: var(--gold); background: rgba(212,175,55,0.12); border: 1px solid var(--gold-soft); border-radius: 999px; padding: 4px 12px; }
+.completionist-line { font-size: 12px; color: var(--cream-dim); }
 .urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
 .duel-record { text-align: center; font-size: 14px; color: var(--cream); margin-bottom: 14px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
 .duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.14); margin-top: 16px; margin-bottom: 14px; cursor: pointer; }
@@ -2015,11 +2015,11 @@ async function openTrialScreen(round) {
   const myRow = rows.find(row => row.username === me);
   const iPlayed = !!myRow;
 
-  const tags = [`<span class="trial-tag mine">started by ${displayName(round.creator_username)}</span>`];
+  const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
   if (!iPlayed && round.target_username === me) {
-    tags.push(`<span class="trial-tag mine">🎯 ${round.via_challenge_back ? 'duelling you back' : 'duelling you'}</span>`);
+    tags.push(`<span class="trial-tag status">🎯 ${round.via_challenge_back ? 'duelling you back' : 'duelling you'}</span>`);
   } else if (iPlayed && myRow.rank === 1) {
-    tags.push(`<span class="trial-tag mine">👑 you hold the crown</span>`);
+    tags.push(`<span class="trial-tag status">👑 you hold the crown</span>`);
   }
   $('trial-tags').innerHTML = tags.join('');
 

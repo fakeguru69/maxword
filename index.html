@@ -94,7 +94,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--teal); text-shadow: 0 0 24px rgba(79,182,168,0.35); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
 .scorecard .score-comment { font-size: 16px; font-weight: 600; font-style: italic; color: var(--cream-dim); margin-bottom: 10px; }
-#normal-scorecard-actions { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+#normal-scorecard-actions { margin-top: 4px; }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .badge-chip-more { cursor: pointer; background: transparent; border-style: dashed; color: var(--cream-dim); }
 .badge-earned-card { text-align: left; border: 1px solid var(--gold); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: rgba(212,175,55,0.08); }
@@ -604,12 +604,11 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     </div>
     <div id="forced-flow-holder"></div>
     <div id="normal-scorecard-actions">
-      <div class="btn-row" style="margin-top:10px;">
+      <div class="btn-row" style="margin-top:14px;">
         <button class="btn-primary" id="btn-dare-back">Duel Back</button>
-      </div>
-      <div class="btn-row" style="margin-top:10px;">
         <button class="btn-secondary" id="btn-challenge-others">📤 Share the Duel</button>
       </div>
+      <div id="score-leaderboard-list" style="margin-top:16px;"></div>
       <div id="other-dares-holder" style="margin-top:14px;"></div>
       <button class="btn-ghost" id="btn-back-to-room" style="margin-top:10px;">Back to room</button>
     </div>
@@ -1192,6 +1191,19 @@ async function getCrownsHeldInRoom(username, roomId) {
   const { data } = await sb.from('room_leaderboard_alltime').select('crowns_held').eq('room_id', roomId).eq('username', username).maybeSingle();
   return data ? (data.crowns_held || 0) : 0;
 }
+// Popups (Dethroned/Repelled/Challenged/Crown Taken) can fire and be acted on
+// from screens where currentRoom was never set (e.g. Home, before ever
+// browsing into that specific room) — startRound/startNewRound both assume
+// currentRoom.id/.code are already correct, which throws "Cannot read
+// properties of null (reading 'id')" the moment anything downstream (share
+// URL, badge dedup query) touches currentRoom. This makes currentRoom
+// self-heal to the room the round actually belongs to before proceeding.
+async function ensureCurrentRoom(roomId) {
+  if (!currentRoom || currentRoom.id !== roomId) {
+    const { data: room } = await sb.from('rooms').select('*').eq('id', roomId).maybeSingle();
+    if (room) currentRoom = room;
+  }
+}
 async function checkDethronements() {
   if (anyDuelPopupOpen()) return;
   const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_username', me).eq('notified', false).eq('outcome', 'taken').order('created_at', { ascending: true });
@@ -1214,14 +1226,14 @@ async function checkDethronements() {
     // it's one-shot). Tapping the button now immediately starts the fresh
     // revenge duel instead, same as every other "duel them back" in the app.
     btn.textContent = `Duel ${displayName(target)} Back`;
-    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); startNewRound(target, true); };
+    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); startNewRound(target, true, e.rounds.room_id); };
   } else {
     const first = events[0];
     const firstTarget = first.dethroned_by_username;
     const restCount = events.length - 1;
     text = `${displayName(firstTarget)} took your crown on Match #${first.rounds.trial_number}${restCount ? ` — plus ${restCount} more crown${restCount > 1 ? 's' : ''} taken` : ''}.`;
     btn.textContent = `Duel ${displayName(firstTarget)} Back`;
-    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); startNewRound(firstTarget, true); };
+    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); startNewRound(firstTarget, true, first.rounds.room_id); };
   }
   const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
   if (!seenBefore) {
@@ -1294,14 +1306,14 @@ async function checkRepelled() {
     const eventLine = e.same_score ? `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} — same score, but you were faster.` : `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} — they lost.`;
     text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     rpBtn.textContent = `Duel ${displayName(target)} Again`;
-    rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(target, true); };
+    rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(target, true, e.rounds.room_id); };
   } else {
     const first = events[0];
     const firstTarget = first.dethroned_by_username;
     const restCount = events.length - 1;
     text = `${displayName(firstTarget)} came for your crown on Match #${first.rounds.trial_number} and lost${restCount ? ` — plus ${restCount} more attempt${restCount > 1 ? 's' : ''} failed` : ''}. Crowns hold!`;
     rpBtn.textContent = `Duel ${displayName(firstTarget)} Again`;
-    rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(firstTarget, true); };
+    rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(firstTarget, true, first.rounds.room_id); };
   }
   $('repelled-modal-text').textContent = text;
   $('repelled-modal').classList.remove('hidden');
@@ -2817,7 +2829,8 @@ async function openTargetPicker() {
 }
 $('btn-choose-target-back').onclick = () => show('view-room');
 
-async function startNewRound(targetUsername, viaChallengeBack) {
+async function startNewRound(targetUsername, viaChallengeBack, roomId) {
+  if (roomId) await ensureCurrentRoom(roomId);
   $('btn-start-round').disabled = true;
   const wordIds = await pickRoundWords();
   const now = new Date();
@@ -2831,6 +2844,7 @@ async function startNewRound(targetUsername, viaChallengeBack) {
 }
 
 async function startRound(round) {
+  await ensureCurrentRoom(round.room_id);
   currentRound = round;
   roundWords = round.word_ids.map(id => wordById[id]).filter(Boolean);
   roundAnswers = [];
@@ -3070,7 +3084,7 @@ async function renderScorecard(correct, points, newBadges) {
   });
 
   const verdictEl = $('score-verdict');
-  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', currentRound.id);
+  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', currentRound.id).order('rank');
   const champRow = (lbRows || []).find(r => r.rank === 1);
   const myRow = (lbRows || []).find(r => r.username === me);
   let iWon = null;
@@ -3142,6 +3156,16 @@ async function renderScorecard(correct, points, newBadges) {
       duelHolder.classList.remove('hidden');
     }
   }
+
+  const scoreLbList = $('score-leaderboard-list');
+  scoreLbList.innerHTML = '';
+  (lbRows || []).forEach(row => {
+    const div = document.createElement('div');
+    div.className = 'trial-lb-row' + (row.rank === 1 ? ' champion' : '');
+    div.innerHTML = `<div class="lb-rank">#${row.rank}</div><div class="lb-name">${displayName(row.username)}</div><div class="lb-score">${row.score_points} pts</div>`;
+    div.style.cursor = 'pointer'; div.onclick = () => openPlayerProfile(row.username);
+    scoreLbList.appendChild(div);
+  });
 
   $('btn-challenge-others').onclick = () => {
     const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;

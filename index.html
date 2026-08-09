@@ -569,6 +569,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="example-sentence" id="game-sentence"></div>
     </div>
     <button class="btn-primary hidden" id="btn-next-word" style="margin-top:16px;">Next word</button>
+    <div class="hidden" id="finish-round-error" style="margin-top:16px; padding:14px; border-radius:12px; border:1px solid var(--danger); background:rgba(200,80,80,0.08); text-align:center;">
+      <div style="color:var(--cream); margin-bottom:10px;">Couldn't save your score — check your connection.</div>
+      <button class="btn-primary" id="btn-finish-round-retry">Try Again</button>
+    </div>
   </section>
 
   <!-- SCORECARD -->
@@ -2865,41 +2869,77 @@ let finishingRound = false;
 async function finishRound() {
   if (finishingRound) return;
   finishingRound = true;
+  $('finish-round-error').classList.add('hidden');
   $('progress-fill').style.width = '100%';
   const correct = roundAnswers.filter(Boolean).length;
   const points = correct * POINTS_PER_CORRECT;
   const durationMs = roundStartTime ? Math.max(0, Date.now() - roundStartTime) : null;
 
-  await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points, duration_ms: durationMs });
+  // The critical path: saving the score itself. Wrapped so a dropped
+  // connection shows a real retry button instead of leaving the player
+  // stuck on a frozen quiz screen forever — this used to have zero error
+  // handling across ~15 sequential awaits, and finishingRound never reset
+  // on failure, so one network blip anywhere in the chain meant the app
+  // was stuck for the rest of the session, silently.
+  try {
+    // Check first in case an earlier attempt actually saved successfully
+    // server-side before the connection dropped and left the UI hanging —
+    // avoids a duplicate insert (or a unique-constraint error) on retry.
+    const { data: existingScore } = await sb.from('round_scores').select('id').eq('round_id', currentRound.id).eq('username', me).maybeSingle();
+    if (!existingScore) {
+      const { error: insertErr } = await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points, duration_ms: durationMs });
+      if (insertErr) throw insertErr;
+    }
 
-  const wordAnswerRows = roundWords.map((w, i) => ({ round_id: currentRound.id, username: me, word_id: w.id, is_correct: !!roundAnswers[i] }));
-  await sb.from('word_answers').upsert(wordAnswerRows, { onConflict: 'round_id,username,word_id', ignoreDuplicates: true });
+    const wordAnswerRows = roundWords.map((w, i) => ({ round_id: currentRound.id, username: me, word_id: w.id, is_correct: !!roundAnswers[i] }));
+    await sb.from('word_answers').upsert(wordAnswerRows, { onConflict: 'round_id,username,word_id', ignoreDuplicates: true });
 
-  const { count } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('round_id', currentRound.id);
-  if ((count || 0) >= 2) await sb.from('rounds').update({ status: 'locked' }).eq('id', currentRound.id);
+    const { count } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('round_id', currentRound.id);
+    if ((count || 0) >= 2) await sb.from('rounds').update({ status: 'locked' }).eq('id', currentRound.id);
+  } catch (err) {
+    finishingRound = false;
+    console.error('finishRound: failed to save score', err);
+    $('finish-round-error').classList.remove('hidden');
+    return;
+  }
 
-  const newBadges = await maybeAwardBadges(correct);
-  const showedUpBadge = await maybeAwardShowedUp();
-  if (showedUpBadge) newBadges.push(showedUpBadge);
-  const rankedUpBadge = await maybeAwardRankedUp();
-  if (rankedUpBadge) newBadges.push(rankedUpBadge);
-  const streakBadges = await recordRoundPlayed();
-  newBadges.push(...streakBadges);
+  // Best-effort from here — badges, streaks, and notifications shouldn't
+  // block the player from seeing their scorecard now that the score itself
+  // is safely saved.
+  let newBadges = [];
+  try {
+    newBadges = await maybeAwardBadges(correct);
+    const showedUpBadge = await maybeAwardShowedUp();
+    if (showedUpBadge) newBadges.push(showedUpBadge);
+    const rankedUpBadge = await maybeAwardRankedUp();
+    if (rankedUpBadge) newBadges.push(rankedUpBadge);
+    const streakBadges = await recordRoundPlayed();
+    newBadges.push(...streakBadges);
+  } catch (err) {
+    console.error('finishRound: badge/streak step failed, continuing', err);
+  }
 
   await renderScorecard(correct, points, newBadges);
   show('view-scorecard');
-  await sb.from('dethronement_events').update({ dethroner_notified: true }).eq('round_id', currentRound.id).eq('dethroned_by_username', me).eq('dethroner_notified', false);
-  await checkDethronements();
-  await checkNewChallenges();
-  await checkCrownsTaken();
-  await checkTiedEvents();
-  await checkRepelled();
-  const { count: roundsPlayedSoFar } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
-  if (newBadges.length > 0 && roundsPlayedSoFar > 2) {
-    await showOnboardingTipOnce('first_badge_earned', '🏅 Your First Badge!',
-      `Badges are a running collection — check your Game Rooms page anytime to see all the ones you've earned.`);
+  finishingRound = false;
+
+  try {
+    await sb.from('dethronement_events').update({ dethroner_notified: true }).eq('round_id', currentRound.id).eq('dethroned_by_username', me).eq('dethroner_notified', false);
+    await checkDethronements();
+    await checkNewChallenges();
+    await checkCrownsTaken();
+    await checkTiedEvents();
+    await checkRepelled();
+    const { count: roundsPlayedSoFar } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
+    if (newBadges.length > 0 && roundsPlayedSoFar > 2) {
+      await showOnboardingTipOnce('first_badge_earned', '🏅 Your First Badge!',
+        `Badges are a running collection — check your Game Rooms page anytime to see all the ones you've earned.`);
+    }
+  } catch (err) {
+    console.error('finishRound: post-scorecard notifications failed, continuing', err);
   }
 }
+$('btn-finish-round-retry').onclick = () => finishRound();
 
 async function maybeAwardRankedUp() {
   const { data: existing } = await sb.from('badges').select('badge_key').eq('username', me).eq('badge_key', 'ranked_up').is('room_id', null).maybeSingle();

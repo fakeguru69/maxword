@@ -597,10 +597,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="forced-flow-holder"></div>
     <div id="normal-scorecard-actions">
       <div class="btn-row" style="margin-top:10px;">
-        <button class="btn-primary" id="btn-challenge-others">📤 Share the Duel</button>
+        <button class="btn-primary" id="btn-dare-back">Duel Back</button>
       </div>
       <div class="btn-row" style="margin-top:10px;">
-        <button class="btn-secondary" id="btn-dare-back">Duel Back</button>
+        <button class="btn-secondary" id="btn-challenge-others">📤 Share the Duel</button>
       </div>
       <div id="other-dares-holder" style="margin-top:14px;"></div>
       <button class="btn-ghost" id="btn-back-to-room" style="margin-top:10px;">Back to room</button>
@@ -1180,6 +1180,10 @@ function anyDuelPopupOpen() {
     .some(id => !$(id).classList.contains('hidden'));
 }
 
+async function getCrownsHeldInRoom(username, roomId) {
+  const { data } = await sb.from('room_leaderboard_alltime').select('crowns_held').eq('room_id', roomId).eq('username', username).maybeSingle();
+  return data ? (data.crowns_held || 0) : 0;
+}
 async function checkDethronements() {
   if (anyDuelPopupOpen()) return;
   const { data: events } = await sb.from('dethronement_events').select('*, rounds!inner(*)').eq('dethroned_username', me).eq('notified', false).eq('outcome', 'taken').order('created_at', { ascending: true });
@@ -1193,8 +1197,10 @@ async function checkDethronements() {
     const target = e.dethroned_by_username;
     const record = await computeDuelRecordLifetime(me, target);
     const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
-    const line2 = e.same_score ? 'They were faster.' : recordLine;
-    text = `${displayName(target)} took your crown on Match #${e.rounds.trial_number}.${line2 ? '\n' + line2 : ''}`;
+    const myCrowns = await getCrownsHeldInRoom(me, e.rounds.room_id);
+    const crownLine = `You now have ${myCrowns} crown${myCrowns === 1 ? '' : 's'}.`;
+    const eventLine = e.same_score ? `${displayName(target)} took your crown on Match #${e.rounds.trial_number} — they were faster.` : `${displayName(target)} took your crown on Match #${e.rounds.trial_number}.`;
+    text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     // Direct action, not a look-back: this used to just navigate to and blink
     // the Match you already lost (a dead end — nothing left to do there,
     // it's one-shot). Tapping the button now immediately starts the fresh
@@ -1239,8 +1245,10 @@ async function checkCrownsTaken() {
     const streakPart = streak >= 2 ? `\n🔥 ${streak}-win streak!` : '';
     const record = await computeDuelRecordLifetime(me, e.dethroned_username);
     const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
-    const line2 = e.same_score ? 'You were faster!' : recordLine;
-    text = `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number} — nice!${line2 ? '\n' + line2 : ''}${streakPart}`;
+    const myCrowns = await getCrownsHeldInRoom(me, e.rounds.room_id);
+    const crownLine = `You now have ${myCrowns} crown${myCrowns === 1 ? '' : 's'}.`;
+    const eventLine = e.same_score ? `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number} — you were faster!` : `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number} — nice!`;
+    text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}${streakPart}`;
     ctBtn.textContent = 'Start another Duel';
     ctBtn.onclick = () => goToPicker(e.rounds.room_id);
   } else {
@@ -1271,8 +1279,12 @@ async function checkRepelled() {
   if (events.length === 1) {
     const e = events[0];
     const target = e.dethroned_by_username;
-    const line2 = e.same_score ? 'Same score — but you were faster. Crown holds!' : 'They tried and lost. Crown holds!';
-    text = `${displayName(target)} came for your crown on Match #${e.rounds.trial_number}.\n${line2}`;
+    const record = await computeDuelRecordLifetime(me, target);
+    const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
+    const myCrowns = await getCrownsHeldInRoom(me, e.rounds.room_id);
+    const crownLine = `Your ${myCrowns} crown${myCrowns === 1 ? '' : 's'} hold${myCrowns === 1 ? 's' : ''}.`;
+    const eventLine = e.same_score ? `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} — same score, but you were faster.` : `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} — they lost.`;
+    text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     rpBtn.textContent = `Duel ${displayName(target)} Again`;
     rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(target, true); };
   } else {
@@ -1309,7 +1321,11 @@ async function checkTiedEvents() {
   if (events.length === 1) {
     const e = events[0];
     const other = e.dethroned_username === me ? e.dethroned_by_username : e.dethroned_username;
-    text = `You and ${displayName(other)} are now tied on Match #${e.rounds.trial_number}${await duelSuffix(other)}.`;
+    const record = await computeDuelRecordLifetime(me, other);
+    const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
+    const myCrowns = await getCrownsHeldInRoom(me, e.rounds.room_id);
+    const crownLine = `Your ${myCrowns} crown${myCrowns === 1 ? ' is' : 's are'} safe.`;
+    text = `You and ${displayName(other)} are now tied on Match #${e.rounds.trial_number}.\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     tdBtn.textContent = 'See the Tie';
   } else {
     const others = events.map(e => e.dethroned_username === me ? e.dethroned_by_username : e.dethroned_username);
@@ -1337,7 +1353,9 @@ async function checkNewChallenges() {
   if (fresh.length === 1) {
     const record = await computeDuelRecordLifetime(me, fresh[0].creator_username);
     const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
-    text = `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}.${recordLine ? '\n' + recordLine : ''}`;
+    const myCrowns = await getCrownsHeldInRoom(me, fresh[0].room_id);
+    const crownLine = `You hold ${myCrowns} crown${myCrowns === 1 ? '' : 's'} in this room.`;
+    text = `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}.\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     chBtn.textContent = 'Accept the Duel';
     chBtn.onclick = () => { $('challenged-modal').classList.add('hidden'); startRound(fresh[0]); };
   } else {

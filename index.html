@@ -80,10 +80,10 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .champion-tag.defending { opacity: var(--decay, 1); }
 .progress-track { height: 6px; background: var(--ink-raised); border-radius: 999px; overflow: hidden; }
 .progress-fill { height: 100%; background: var(--gold); transition: width 0.3s; }
-.word-card { text-align: center; padding: 34px 16px; }
+.word-card { text-align: center; padding: 20px 16px; }
 .word-card .cat-eyebrow { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--teal); margin-bottom: 10px; }
 .word-card .advanced-word { font-family: 'Cinzel', serif; font-size: 30px; color: var(--cream); }
-.options { display: grid; gap: 10px; margin-top: 18px; }
+.options { display: grid; gap: 10px; margin-top: 10px; }
 .option-btn { background: var(--ink-raised); border: 1px solid var(--line); color: var(--cream); text-align: left; padding: 14px; }
 .option-btn.correct { border-color: var(--teal); background: rgba(79,182,168,0.12); color: var(--teal); }
 .option-btn.wrong { border-color: var(--danger); background: rgba(192,85,74,0.12); color: var(--danger); }
@@ -92,8 +92,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--gold); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
 .scorecard .score-comment { font-size: 17px; font-weight: 600; color: var(--cream); margin-bottom: 10px; }
-.scorecard-zone-verdict { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
-#normal-scorecard-actions { margin-top: 6px; padding-top: 18px; border-top: 1px solid var(--line); }
+.scorecard-zone-verdict { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+#normal-scorecard-actions { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
 .scorecard .score-verdict { font-size: 15px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold-soft); color: var(--gold); }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .badge-chip-more { cursor: pointer; background: transparent; border-style: dashed; color: var(--cream-dim); }
@@ -126,7 +126,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .section-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cream-dim); margin: 14px 0 8px; }
 .room-item-summary { text-align: right; font-size: 12px; color: var(--teal); font-weight: 600; white-space: nowrap; }
 .room-item-summary .sub { display: block; font-size: 10px; color: var(--cream-dim); font-weight: 400; margin-top: 2px; }
-.example-card { margin-top: 16px; padding: 14px; background: var(--ink-raised); border: 1px solid var(--gold-soft); border-radius: 12px; }
+.example-card { margin-top: 10px; padding: 14px; background: var(--ink-raised); border: 1px solid var(--gold-soft); border-radius: 12px; }
 .example-card .example-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
 .example-card .example-sentence { font-size: 16px; line-height: 1.5; color: var(--cream); }
 .custom-question-input.hidden { display: none; }
@@ -408,8 +408,8 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="trial-tags" id="trial-tags"></div>
     </div>
     <div id="trial-urgency-holder"></div>
-    <div id="trial-champion-holder"></div>
     <div id="trial-completionist-holder"></div>
+    <div id="trial-champion-holder"></div>
     <div id="trial-duel-holder"></div>
     <div id="trial-leaderboard-list"></div>
     <div class="btn-row" style="margin-top:14px;">
@@ -568,7 +568,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="example-label">Example</div>
       <div class="example-sentence" id="game-sentence"></div>
     </div>
-    <button class="btn-primary hidden" id="btn-next-word" style="margin-top:16px;">Next word</button>
+    <button class="btn-primary hidden" id="btn-next-word" style="margin-top:10px;">Next word</button>
     <div class="hidden" id="finish-round-error" style="margin-top:16px; padding:14px; border-radius:12px; border:1px solid var(--danger); background:rgba(200,80,80,0.08); text-align:center;">
       <div style="color:var(--cream); margin-bottom:10px;" id="finish-round-error-text">Couldn't save your score — check your connection.</div>
       <button class="btn-primary" id="btn-finish-round-retry">Try Again</button>
@@ -579,7 +579,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <section id="view-scorecard" class="card hidden">
     <div class="scorecard">
       <div class="scorecard-zone-score">
-        <div class="cat-eyebrow">MaxWord result</div>
+        <div class="cat-eyebrow" id="score-eyebrow">MaxWord result</div>
         <div class="big-score" id="score-big"></div>
         <div class="grid-emoji" id="score-grid"></div>
         <div class="score-comment" id="score-comment"></div>
@@ -1988,7 +1988,7 @@ async function openTrialScreen(round) {
   const myRow = rows.find(row => row.username === me);
   const iPlayed = !!myRow;
 
-  const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
+  const tags = [`<span class="trial-tag mine">started by ${displayName(round.creator_username)}</span>`];
   if (!iPlayed && round.target_username === me) {
     tags.push(`<span class="trial-tag mine">🎯 ${round.via_challenge_back ? 'duelling you back' : 'duelling you'}</span>`);
   } else if (iPlayed && myRow.rank === 1) {
@@ -2992,6 +2992,7 @@ async function maybeAwardBadges(correct) {
 }
 
 async function renderScorecard(correct, points, newBadges) {
+  $('score-eyebrow').textContent = `Match #${currentRound.trial_number} Result`;
   $('score-big').textContent = `${points} pts`;
   $('score-grid').innerHTML = roundAnswers.map(a => `<span>${a ? '🟩' : '⬛'}</span>`).join('');
   $('score-comment').textContent = commentForScore(points);

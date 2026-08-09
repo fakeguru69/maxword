@@ -2805,7 +2805,7 @@ async function startRound(round) {
   finishingRound = false;
   $('btn-next-word').disabled = false;
 
-  const { count: everPlayed } = await sb.from('round_scores').select('id', { count: 'exact', head: true }).eq('username', me);
+  const { count: everPlayed } = await sb.from('round_scores').select('round_id', { count: 'exact', head: true }).eq('username', me);
   if (!everPlayed) {
     await showOnboardingTipOnce('first_trial_ever', '📜 How a Duel works',
       `Each Match is permanent and one-shot — you only get one attempt at it, ever, so make it count. Beat the current top score to take the crown — and if someone ever matches your score exactly, whoever finished faster keeps it, so once you start, see it through.`,
@@ -2887,10 +2887,30 @@ async function finishRound() {
     // Check first in case an earlier attempt actually saved successfully
     // server-side before the connection dropped and left the UI hanging —
     // avoids a duplicate insert (or a unique-constraint error) on retry.
-    const { data: existingScore } = await sb.from('round_scores').select('id').eq('round_id', currentRound.id).eq('username', me).maybeSingle();
-    if (!existingScore) {
-      const { error: insertErr } = await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points, duration_ms: durationMs });
-      if (insertErr) throw insertErr;
+    // One silent auto-retry after a short delay: on a flaky connection
+    // ("No service" bar, weak signal) a single dropped packet shouldn't
+    // immediately hand the player an error screen — most blips clear
+    // within a second. Still falls through to the visible Try Again
+    // button if the second attempt also fails.
+    let saveAttempt = 0;
+    while (true) {
+      try {
+        const { data: existingScore, error: checkErr } = await sb.from('round_scores').select('round_id').eq('round_id', currentRound.id).eq('username', me).maybeSingle();
+        if (checkErr) throw checkErr;
+        if (!existingScore) {
+          const { error: insertErr } = await sb.from('round_scores').insert({ round_id: currentRound.id, username: me, correct_count: correct, total_count: roundWords.length, score_points: points, duration_ms: durationMs });
+          // 23505 = unique_violation: a prior attempt already saved this exact
+          // score (e.g. the check above raced or previously failed silently).
+          // That's not a real failure — the score IS saved — so treat it as
+          // success rather than surfacing a false "couldn't save" error.
+          if (insertErr && insertErr.code !== '23505') throw insertErr;
+        }
+        break;
+      } catch (retryErr) {
+        saveAttempt++;
+        if (saveAttempt >= 2) throw retryErr;
+        await new Promise(res => setTimeout(res, 1200));
+      }
     }
 
     const wordAnswerRows = roundWords.map((w, i) => ({ round_id: currentRound.id, username: me, word_id: w.id, is_correct: !!roundAnswers[i] }));

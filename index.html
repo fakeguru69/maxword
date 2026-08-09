@@ -63,6 +63,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .room-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; cursor: pointer; background: var(--ink-raised); }
 .room-item:active { border-color: var(--gold); }
 .room-name { font-weight: 600; }
+.room-badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .room-meta { font-size: 12px; color: var(--cream-dim); }
 .rank-pill { font-size: 12px; color: var(--ink); background: var(--gold); border-radius: 999px; padding: 3px 10px; font-weight: 700; }
 .dare-card { border: 1px dashed var(--gold-soft); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: rgba(212,175,55,0.05); }
@@ -89,7 +90,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .option-btn.wrong { border-color: var(--danger); background: rgba(192,85,74,0.12); color: var(--danger); }
 .reveal-sentence { margin-top: 14px; font-size: 14px; color: var(--cream-dim); border-left: 2px solid var(--gold-soft); padding-left: 12px; }
 .scorecard { text-align: center; padding: 20px 16px; }
-.scorecard .cat-eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--teal); margin-bottom: 4px; }
+.scorecard .cat-eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--gold); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
 .scorecard .score-comment { font-size: 17px; font-weight: 600; color: var(--cream); margin-bottom: 10px; }
@@ -134,7 +135,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .share-icon-btn { background: transparent; color: var(--cream-dim); border: 1px solid var(--line); font-size: 14px; }
 .my-open-row .share-icon-btn { width: auto; flex: 0 0 auto; padding: 8px 12px; }
 .my-open-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 10px; border: 1px dashed var(--gold-soft); border-radius: 10px; font-size: 13px; color: var(--gold); background: rgba(212,175,55,0.05); }
-.section-label.strong { font-size: 16px; letter-spacing: 0.02em; text-transform: none; color: var(--cream); font-family: 'Cinzel', serif; margin: 16px 0 10px; }
+.section-label.strong { font-size: 16px; letter-spacing: 0.02em; text-transform: none; color: var(--cream); font-family: 'Cinzel', serif; margin: 16px 0 6px; }
 .account-name-line { font-size: 22px; font-weight: 700; font-family: 'Cinzel', serif; color: var(--gold); }
 .tier-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--teal-dim); color: var(--teal); background: rgba(79,182,168,0.08); margin: 6px 8px 10px 0; }
 .info-toggle-btn { width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; background: var(--ink-raised); border: 1px solid var(--line); color: var(--cream-dim); font-size: 12px; padding: 0; margin-bottom: 10px; }
@@ -233,7 +234,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .mastery-line.prominent { font-size: 16px; font-weight: 700; color: var(--gold); }
 .room-item { padding: 18px 16px; }
 .room-item .room-name { font-size: 18px; font-family: 'Cinzel', serif; color: var(--gold); }
-.target-badge { display: inline-block; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--danger); color: var(--cream); vertical-align: middle; }
+.target-badge { display: inline-block; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: transparent; border: 1.5px solid var(--danger); color: #F0A898; vertical-align: middle; }
 .crown-badge { display: inline-block; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: transparent; border: 1.5px solid var(--danger); color: #F0A898; vertical-align: middle; }
 .room-item .room-meta { margin-top: 3px; }
 .tabs-sub { display: flex; gap: 0; margin-bottom: 4px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; padding: 2px; background: var(--ink-raised); }
@@ -819,16 +820,22 @@ async function computeDuelRecordLifetime(userA, userB) {
   const roundIds = (rounds || []).map(r => r.id);
   let wins = 0, losses = 0, ties = 0;
   if (roundIds.length > 0) {
-    const { data: scores } = await sb.from('round_scores').select('round_id, username, score_points').in('round_id', roundIds);
+    const { data: scores } = await sb.from('round_scores').select('round_id, username, score_points, duration_ms').in('round_id', roundIds);
     const byRound = {};
     (scores || []).forEach(s => { (byRound[s.round_id] = byRound[s.round_id] || []).push(s); });
     Object.values(byRound).forEach(pair => {
       const a = pair.find(s => s.username === userA);
       const b = pair.find(s => s.username === userB);
       if (!a || !b) return;
+      // Same rule as everywhere else in the app: equal score is decided by
+      // speed, not a tie — a real tie only when score AND duration both
+      // match exactly (or neither has a duration to compare).
       if (a.score_points > b.score_points) wins++;
       else if (a.score_points < b.score_points) losses++;
-      else ties++;
+      else if (a.duration_ms != null && b.duration_ms != null && a.duration_ms !== b.duration_ms) {
+        if (a.duration_ms < b.duration_ms) wins++;
+        else losses++;
+      } else ties++;
     });
   }
   return { wins, losses, ties, total: wins + losses + ties };
@@ -1593,7 +1600,7 @@ async function loadRoomsList() {
   for (const room of sortedRooms) {
     const div = document.createElement('div');
     div.className = 'room-item';
-    div.innerHTML = `<div><div class="room-name">${room.name} <span id="room-target-badge-${room.id}"></span> <span id="room-crown-badge-${room.id}"></span></div><div class="room-meta">${room.code} · ${room.is_open ? 'Open' : 'Closed'}</div></div><div class="room-item-summary" id="room-summary-${room.id}">…</div>`;
+    div.innerHTML = `<div><div class="room-name">${room.name}</div><div class="room-badge-row" id="room-badge-row-${room.id}"><span id="room-target-badge-${room.id}"></span> <span id="room-crown-badge-${room.id}"></span></div><div class="room-meta">${room.code} · ${room.is_open ? 'Open' : 'Closed'}</div></div><div class="room-item-summary" id="room-summary-${room.id}">…</div>`;
     div.onclick = () => openRoom(room);
     list.appendChild(div);
     loadRoomSummary(room.id);

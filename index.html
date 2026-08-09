@@ -90,13 +90,11 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .option-btn.wrong { border-color: var(--danger); background: rgba(192,85,74,0.12); color: var(--danger); }
 .reveal-sentence { margin-top: 14px; font-size: 14px; color: var(--cream-dim); border-left: 2px solid var(--gold-soft); padding-left: 12px; }
 .scorecard { text-align: center; padding: 20px 16px; }
-.scorecard .cat-eyebrow { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
-.scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--gold); }
+.scorecard .cat-eyebrow { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); margin-bottom: 10px; }
+.scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--teal); text-shadow: 0 0 24px rgba(79,182,168,0.35); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
-.scorecard .score-comment { font-size: 17px; font-weight: 600; color: var(--cream); margin-bottom: 10px; }
-.scorecard-zone-verdict { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.scorecard .score-comment { font-size: 16px; font-weight: 600; font-style: italic; color: var(--cream-dim); margin-bottom: 10px; }
 #normal-scorecard-actions { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
-.scorecard .score-verdict { font-size: 15px; font-weight: 700; padding: 10px 14px; border-radius: 10px; margin-bottom: 10px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold-soft); color: var(--gold); }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .badge-chip-more { cursor: pointer; background: transparent; border-style: dashed; color: var(--cream-dim); }
 .badge-earned-card { text-align: left; border: 1px solid var(--gold); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: rgba(212,175,55,0.08); }
@@ -168,22 +166,30 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-tag { font-size: 12px; color: var(--cream-dim); }
 .trial-tag.status { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
 .trial-header { text-align: center; margin-bottom: 14px; }
-.trial-header .trial-number { font-family: 'Cinzel', serif; font-size: 26px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
-.champion-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.1); border: 1px solid var(--gold); }
-.champion-banner .crown { font-size: 26px; }
-.champion-banner .champ-name { font-family: 'Cinzel', serif; color: var(--gold); font-size: 18px; margin-top: 2px; }
+.trial-header .trial-number { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
+.champion-banner { text-align: center; }
+.champion-banner .crown { font-size: 30px; margin-bottom: 4px; }
+.champion-banner .champ-name { font-family: 'Cinzel', serif; font-weight: 700; color: var(--gold); font-size: 22px; margin-top: 6px; letter-spacing: 0.02em; }
+.champ-pts { color: var(--teal); font-size: 15px; font-weight: 700; margin-top: 4px; }
+.card-one { border: 1px solid var(--gold); background: var(--ink-card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 0 24px rgba(212,175,55,0.06); }
+.zone-hero { text-align: center; padding: 22px 16px 18px; }
+.zone-duel { border-top: 1px solid rgba(212,175,55,0.25); background: rgba(0,0,0,0.15); padding: 12px 16px; text-align: center; }
+.verdict-line { font-size: 15px; font-weight: 700; color: var(--gold); margin-top: 12px; line-height: 1.4; }
+.standings-label { font-size: 11px; color: var(--cream-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 4px 0 8px; text-align: center; }
 .dethroned-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(192,85,74,0.15); border: 1px solid var(--danger); color: #F0A898; font-weight: 600; }
 .challenged-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.12); border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
-.completionist-line-wrap { text-align: center; margin-bottom: 14px; }
-.completionist-line { font-size: 12px; color: var(--cream-dim); }
 .urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
 .duel-record { text-align: center; font-size: 14px; color: var(--cream); margin-bottom: 14px; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; }
 .duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.14); margin-top: 16px; margin-bottom: 14px; cursor: pointer; }
+.duel-record-card.nested { border: none; background: transparent; border-radius: 0; margin: 0; padding: 0; }
 .duel-record-title { font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+.duel-record-card.nested .duel-record-title { font-size: 10px; color: var(--gold-soft); margin-bottom: 2px; }
 .duel-info-tip { text-align: left; margin-bottom: 10px; }
 .duel-record-vs { font-size: 13px; color: var(--cream); margin-bottom: 8px; }
+.duel-record-card.nested .duel-record-vs { font-size: 11px; color: var(--cream-dim); margin-bottom: 4px; }
 .duel-record-vs .opponent-name { color: var(--cream); }
-.duel-record-score { font-family: 'Cinzel', serif; font-size: 34px; font-weight: 900; color: var(--gold); letter-spacing: 0.06em; line-height: 1; }
+.duel-record-score { font-family: 'Cinzel', serif; font-size: 34px; font-weight: 900; color: var(--teal); letter-spacing: 0.06em; line-height: 1; }
+.duel-record-card.nested .duel-record-score { font-size: 22px; }
 .duel-record-ties { font-size: 11px; color: var(--cream-dim); margin-top: 4px; }
 .rivalry-card { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 18px; border: 1px solid var(--danger); background: rgba(192,85,74,0.08); }
 .rivalry-card.tied { border-color: var(--gold); background: rgba(212,175,55,0.08); }
@@ -411,9 +417,11 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
       <div class="trial-tags" id="trial-tags"></div>
     </div>
     <div id="trial-urgency-holder"></div>
+    <div class="card-one">
+      <div class="zone-hero" id="trial-champion-holder"></div>
+      <div class="zone-duel" id="trial-duel-holder"></div>
+    </div>
     <div id="trial-completionist-holder"></div>
-    <div id="trial-champion-holder"></div>
-    <div id="trial-duel-holder"></div>
     <div id="trial-leaderboard-list"></div>
     <div class="btn-row" style="margin-top:14px;">
       <button class="btn-primary" id="btn-trial-play">Play this Match</button>
@@ -581,18 +589,18 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <!-- SCORECARD -->
   <section id="view-scorecard" class="card hidden">
     <div class="scorecard">
-      <div class="scorecard-zone-score">
-        <div class="cat-eyebrow" id="score-eyebrow">MaxWord result</div>
-        <div class="big-score" id="score-big"></div>
-        <div class="grid-emoji" id="score-grid"></div>
-        <div class="score-comment" id="score-comment"></div>
+      <div class="cat-eyebrow" id="score-eyebrow">Match #</div>
+      <div class="card-one">
+        <div class="zone-hero">
+          <div class="big-score" id="score-big"></div>
+          <div class="grid-emoji" id="score-grid"></div>
+          <div class="score-comment" id="score-comment"></div>
+          <div class="verdict-line hidden" id="score-verdict"></div>
+        </div>
+        <div id="score-duel-holder" class="zone-duel hidden"></div>
       </div>
-      <div class="scorecard-zone-verdict">
-        <div class="score-verdict hidden" id="score-verdict"></div>
-        <div id="score-streak-holder"></div>
-        <div id="score-duel-holder"></div>
-        <div id="score-badges"></div>
-      </div>
+      <div id="score-streak-holder"></div>
+      <div id="score-badges"></div>
     </div>
     <div id="forced-flow-holder"></div>
     <div id="normal-scorecard-actions">
@@ -662,8 +670,8 @@ function statRow(icon, val, label, info, statKey = null) {
 // else), the Match/Trial screen, and the post-round Scorecard. Was
 // triplicated inline before; now one source of truth for both the markup
 // and the explainer text.
-function duelRecordCard(opponentUsername, record) {
-  return `<div class="duel-record-card" data-expandable="duel">
+function duelRecordCard(opponentUsername, record, nested = false) {
+  return `<div class="duel-record-card${nested ? ' nested' : ''}" data-expandable="duel">
     <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
     <div class="info-tip duel-info-tip">Head-to-head record between you two — counts only direct Duels between you, not other Matches you both happened to join. Ties are common since scores only land in 100-pt steps.</div>
     <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponentUsername)}</span></div>
@@ -2026,22 +2034,22 @@ async function openTrialScreen(round) {
   const championHolder = $('trial-champion-holder');
   const champ = rows[0] || null;
   championHolder.innerHTML = champ
-    ? `<div class="champion-banner"><div class="crown">👑</div><div class="champ-name">${displayName(champ.username)}</div><div class="dare-sub">${champ.score_points} pts</div></div>`
+    ? `<div class="champion-banner"><div class="crown">👑</div><div class="champ-name">${displayName(champ.username)}</div><div class="champ-pts">${champ.score_points} pts</div></div>`
     : '';
 
   const { data: members } = await sb.from('room_members').select('username').eq('room_id', currentRoom.id);
   const totalMembers = (members || []).length;
-  $('trial-completionist-holder').innerHTML = `<div class="completionist-line-wrap"><span class="completionist-line">${rows.length} of ${Math.max(totalMembers, rows.length)} in the room have played this Match</span></div>`;
+  $('trial-completionist-holder').innerHTML = `<div class="standings-label">Standings — ${rows.length} of ${Math.max(totalMembers, rows.length)} played</div>`;
 
   const duelHolder = $('trial-duel-holder');
   duelHolder.innerHTML = '';
+  duelHolder.classList.add('hidden');
   if (round.target_username && (me === round.creator_username || me === round.target_username)) {
     const opponent = me === round.creator_username ? round.target_username : round.creator_username;
-    if (champ && champ.username === opponent) {
-      const record = await computeDuelRecordLifetime(me, opponent);
-      if (record.total > 0) {
-        duelHolder.innerHTML = duelRecordCard(opponent, record);
-      }
+    const record = await computeDuelRecordLifetime(me, opponent);
+    if (record.total > 0) {
+      duelHolder.innerHTML = duelRecordCard(opponent, record, true);
+      duelHolder.classList.remove('hidden');
     }
   }
 
@@ -3041,7 +3049,7 @@ async function maybeAwardBadges(correct) {
 }
 
 async function renderScorecard(correct, points, newBadges) {
-  $('score-eyebrow').textContent = `Match #${currentRound.trial_number} Result`;
+  $('score-eyebrow').textContent = `Match #${currentRound.trial_number}`;
   $('score-big').textContent = `${points} pts`;
   $('score-grid').innerHTML = roundAnswers.map(a => `<span>${a ? '🟩' : '⬛'}</span>`).join('');
   $('score-comment').textContent = commentForScore(points);
@@ -3125,13 +3133,13 @@ async function renderScorecard(correct, points, newBadges) {
 
   const duelHolder = $('score-duel-holder');
   duelHolder.innerHTML = '';
+  duelHolder.classList.add('hidden');
   if (currentRound.target_username && (me === currentRound.creator_username || me === currentRound.target_username)) {
     const opponent = me === currentRound.creator_username ? currentRound.target_username : currentRound.creator_username;
-    if (champRow && champRow.username === opponent) {
-      const record = await computeDuelRecordLifetime(me, opponent);
-      if (record.total > 0) {
-        duelHolder.innerHTML = duelRecordCard(opponent, record);
-      }
+    const record = await computeDuelRecordLifetime(me, opponent);
+    if (record.total > 0) {
+      duelHolder.innerHTML = duelRecordCard(opponent, record, true);
+      duelHolder.classList.remove('hidden');
     }
   }
 

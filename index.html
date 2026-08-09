@@ -508,7 +508,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
        banner's gold styling since this is good news, same as being called out. -->
   <div class="modal-overlay hidden" id="crown-taken-modal">
     <div class="card modal-card">
-      <div class="challenged-banner" style="margin-bottom:14px;">👑 Crown Taken</div>
+      <div class="challenged-banner" style="margin-bottom:14px;">🎉 Crown Taken</div>
       <p id="crown-taken-modal-text" style="font-size:15px; margin-bottom:16px; white-space:pre-line;"></p>
       <button class="btn-primary" id="btn-crown-taken-ok">Nice!</button>
     </div>
@@ -627,7 +627,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // index.html reloads fresh — which is exactly what caused a round to
 // silently shrink from 10 questions to 4 for someone whose cached word bank
 // didn't have the newer word IDs yet.
-import { CATEGORIES, WORDS } from './words.js?v=2';
+import { CATEGORIES, WORDS } from './words.js?v=3';
 const wordById = Object.fromEntries(WORDS.map(w => [w.id, w]));
 const catLabel = key => CATEGORIES.find(c => c.key === key)?.label || key;
 
@@ -1606,7 +1606,7 @@ async function loadRoomTargetBadge(roomId) {
   const { data: myScores } = await sb.from('round_scores').select('round_id').eq('username', me).in('round_id', ids);
   const playedIds = new Set((myScores || []).map(s => s.round_id));
   const count = ids.filter(id => !playedIds.has(id)).length;
-  el.innerHTML = count > 0 ? `<span class="target-badge">🎯 ${count}</span>` : '';
+  el.innerHTML = count > 0 ? `<span class="target-badge">🎯 ${count} waiting</span>` : '';
 }
 
 // The persistent, always-true-to-current-state answer to "if I dismissed the

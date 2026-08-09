@@ -589,7 +589,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <!-- SCORECARD -->
   <section id="view-scorecard" class="card hidden">
     <div class="scorecard">
-      <div class="cat-eyebrow" id="score-eyebrow">Match #</div>
+      <div class="cat-eyebrow" id="score-eyebrow">📜 Match #</div>
       <div class="card-one">
         <div class="zone-hero">
           <div class="big-score" id="score-big"></div>
@@ -606,7 +606,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="normal-scorecard-actions">
       <div class="btn-row" style="margin-top:14px;">
         <button class="btn-primary" id="btn-dare-back">Duel Back</button>
-        <button class="btn-secondary" id="btn-challenge-others">📤 Share the Duel</button>
+        <button class="btn-secondary" id="btn-challenge-others">📤 Share</button>
       </div>
       <div id="score-leaderboard-list" style="margin-top:16px;"></div>
       <div id="other-dares-holder" style="margin-top:14px;"></div>
@@ -1269,13 +1269,13 @@ async function checkCrownsTaken() {
     const crownLine = `You now have ${myCrowns} crown${myCrowns === 1 ? '' : 's'}.`;
     const eventLine = e.same_score ? `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number} — you were faster!` : `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number} — nice!`;
     text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}${streakPart}`;
-    ctBtn.textContent = 'Start another Duel';
+    ctBtn.textContent = 'Start Another';
     ctBtn.onclick = () => goToPicker(e.rounds.room_id);
   } else {
     const first = events[0];
     const restCount = events.length - 1;
     text = `You took ${displayName(first.dethroned_username)}'s crown on Match #${first.rounds.trial_number}${restCount ? ` — plus ${restCount} more` : ''} — nice!`;
-    ctBtn.textContent = 'Start another Duel';
+    ctBtn.textContent = 'Start Another';
     ctBtn.onclick = () => goToPicker(first.rounds.room_id);
   }
   $('crown-taken-modal-text').textContent = text;
@@ -2079,11 +2079,11 @@ async function openTrialScreen(round) {
   const playBtn = $('btn-trial-play');
   if (!iPlayed) {
     playBtn.classList.remove('hidden');
-    playBtn.textContent = champ ? `⚔️ Duel ${displayName(champ.username)} for the crown` : '☝️ Start the Duel';
+    playBtn.textContent = champ ? `⚔️ Duel for the Crown` : '☝️ Start the Duel';
     playBtn.onclick = () => startRound(round);
   } else if (myRow.rank !== 1) {
     playBtn.classList.remove('hidden');
-    playBtn.textContent = `Duel ${displayName(champ.username)} Back`;
+    playBtn.textContent = `Duel Back`;
     playBtn.onclick = () => startNewRound(champ.username, true);
   } else {
     playBtn.classList.add('hidden');
@@ -3063,7 +3063,7 @@ async function maybeAwardBadges(correct) {
 }
 
 async function renderScorecard(correct, points, newBadges) {
-  $('score-eyebrow').textContent = `Match #${currentRound.trial_number}`;
+  $('score-eyebrow').textContent = `📜 Match #${currentRound.trial_number}`;
   $('score-big').textContent = `${points} pts`;
   $('score-grid').innerHTML = roundAnswers.map(a => `<span>${a ? '🟩' : '⬛'}</span>`).join('');
   $('score-comment').textContent = commentForScore(points);
@@ -3194,11 +3194,11 @@ async function renderScorecard(correct, points, newBadges) {
 
   if (iWon === false) {
     dareBackBtn.classList.remove('hidden');
-    dareBackBtn.textContent = `Duel ${displayName(champRow.username)} Back`;
+    dareBackBtn.textContent = `Duel Back`;
     dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(champRow.username, true); };
   } else if (iWon === true) {
     dareBackBtn.classList.remove('hidden');
-    dareBackBtn.textContent = `Start another Duel`;
+    dareBackBtn.textContent = `Start Another`;
     dareBackBtn.onclick = () => { openTargetPicker(); };
   } else {
     dareBackBtn.classList.add('hidden');
@@ -3247,7 +3247,7 @@ async function renderScorecard(correct, points, newBadges) {
       card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! But a Match's no fun alone — invite someone to make it a real contest.</div>`;
       const shareBtn = document.createElement('button');
       shareBtn.className = 'btn-primary';
-      shareBtn.textContent = '📤 Share challenge';
+      shareBtn.textContent = '📤 Share';
       shareBtn.onclick = () => {
         const url = `${location.origin}${location.pathname}?room=${currentRoom.code}`;
         shareText(`🎯 MAXWORD — GP Vocabulary Showdown\n👋 Join my Game Room "${currentRoom.name}" — think you can out-word me?\n\n🔗 ${url}`);

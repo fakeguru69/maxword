@@ -1302,7 +1302,16 @@ async function checkRepelled() {
     const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
     const myCrowns = await getCrownsHeldInRoom(me, e.rounds.room_id);
     const crownLine = `Your ${myCrowns} crown${myCrowns === 1 ? '' : 's'} hold${myCrowns === 1 ? 's' : ''}.`;
-    const eventLine = e.same_score ? `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} — same score, but you were faster.` : `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} — they lost.`;
+    // The crown on THIS specific Match may have moved on since this event
+    // happened (e.g. a Dethroned popup for a later event already showed
+    // first) — check live rather than risk claiming "crowns hold" right
+    // after the player was just told they lost this exact crown.
+    const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points').eq('round_id', e.round_id).order('rank').limit(1);
+    const stillHolds = !lb || !lb[0] || lb[0].username === me;
+    const reasonPart = e.same_score ? 'same score, but you were faster' : 'they lost';
+    const eventLine = stillHolds
+      ? `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} — ${reasonPart}.`
+      : `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} and lost — but it's since moved on to ${displayName(lb[0].username)} anyway.`;
     text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     rpBtn.textContent = `Duel ${displayName(target)} Again`;
     rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(target, true, e.rounds.room_id); };
@@ -1343,7 +1352,13 @@ async function checkTiedEvents() {
     const record = await computeDuelRecordLifetime(me, other);
     const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
     const myCrowns = await getCrownsHeldInRoom(me, e.rounds.room_id);
-    const crownLine = `Your ${myCrowns} crown${myCrowns === 1 ? ' is' : 's are'} safe.`;
+    // Same live-check as Repelled — the tie kept the crown in place at the
+    // moment it happened, but a third party may have taken it since.
+    const { data: lb } = await sb.from('trial_leaderboard').select('username').eq('round_id', e.round_id).order('rank').limit(1);
+    const stillHolds = !lb || !lb[0] || lb[0].username === me;
+    const crownLine = stillHolds
+      ? `Your ${myCrowns} crown${myCrowns === 1 ? ' is' : 's are'} safe.`
+      : `It's since moved on to ${displayName(lb[0].username)} anyway.`;
     text = `You and ${displayName(other)} are now tied on Match #${e.rounds.trial_number}.\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     tdBtn.textContent = 'See the Tie';
   } else {
@@ -1370,11 +1385,18 @@ async function checkNewChallenges() {
   let text;
   const chBtn = $('btn-challenged-ok');
   if (fresh.length === 1) {
-    const record = await computeDuelRecordLifetime(me, fresh[0].creator_username);
+    const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points').eq('round_id', fresh[0].id).order('rank').limit(1);
+    const champ = (lb && lb[0]) || null;
+    const crownMoved = champ && champ.username !== fresh[0].creator_username;
+    const opponent = champ ? champ.username : fresh[0].creator_username;
+    const record = await computeDuelRecordLifetime(me, opponent);
     const recordLine = record.total > 0 ? `You're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them.` : '';
     const myCrowns = await getCrownsHeldInRoom(me, fresh[0].room_id);
     const crownLine = `You hold ${myCrowns} crown${myCrowns === 1 ? '' : 's'} in this room.`;
-    text = `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}.\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
+    const eventLine = crownMoved
+      ? `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number} — but ${displayName(champ.username)} has since taken the crown, ${champ.score_points} pts.`
+      : `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}.`;
+    text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     chBtn.textContent = 'Accept the Duel';
     chBtn.onclick = () => { $('challenged-modal').classList.add('hidden'); startRound(fresh[0]); };
   } else {
@@ -1810,8 +1832,8 @@ async function maybeShowRoomVocabTip() {
   const { count: played } = await sb.from('round_scores').select('*', { count: 'exact', head: true }).eq('username', me);
   if (played !== 2) return;
   await showOnboardingTipOnce('room_card_vocab', '📜 Reading the room',
-    `<div class="tip-list-item">🎯 challenge you / counter challenge — someone's calling you out directly</div>
-     <div class="tip-list-item">⚔️ join fight — an open invitation, no pressure</div>
+    `<div class="tip-list-item">🎯 duelling you / duelling you back — someone's calling you out directly</div>
+     <div class="tip-list-item">⚔️ take the crown — open to anyone, no direct callout</div>
      <div class="tip-list-item">☝️ first to fight — nobody's played it yet</div>
      <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
     () => {
@@ -1932,15 +1954,16 @@ function computeMatchState(round, myRow) {
   if (round.target_username === me) return round.via_challenge_back ? 'challenged_back' : 'targeted';
   return 'unplayed';
 }
-function matchStatusBadge(state, champ, rows) {
+function matchStatusBadge(state, champ) {
   if (state === 'champion') return { badge: '👑 you hold the crown', badgeClass: 'champion' };
   if (state === 'losing') return { badge: '👎 crown taken', badgeClass: 'losing' };
   if (state === 'challenged_back') return { badge: '🎯 duelling you back', badgeClass: 'targeted' };
   if (state === 'targeted') return { badge: '🎯 duelling you', badgeClass: 'targeted' };
-  // unplayed by me — distinguish genuinely nobody-yet vs only-the-creator-so-far vs real multi-way competition
+  // unplayed by me — the game is always open to anyone regardless of how
+  // many have already played, so this only needs to distinguish "nobody's
+  // set a score yet" from "there's a crown to take."
   if (!champ) return { badge: '☝️ first to fight', badgeClass: 'open-invite' };
-  if (rows.length === 1) return { badge: `⚔️ duel ${displayName(champ.username)}`, badgeClass: 'open-invite' };
-  return { badge: '⚔️ join fight', badgeClass: 'open-invite' };
+  return { badge: '⚔️ take the crown', badgeClass: 'open-invite' };
 }
 async function loadDares() {
   const myToken = ++daresLoadToken;
@@ -1984,7 +2007,7 @@ async function loadDares() {
     div.onclick = () => openTrialScreen(r);
 
     let statusLine, rankLine = '';
-    const { badge, badgeClass } = matchStatusBadge(state, champ, rows);
+    const { badge, badgeClass } = matchStatusBadge(state, champ);
     let badgeInfo;
     if (state === 'champion') {
       badgeInfo = 'You\'re the current crown holder on this Match.';
@@ -1998,7 +2021,7 @@ async function loadDares() {
       badgeInfo = 'Someone is duelling you for the crown on this Match.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     } else {
-      badgeInfo = rows.length >= 2 ? 'Open to anyone in the room — no direct callout.' : champ ? 'One person has played — be next.' : 'Nobody\'s played this Match yet.';
+      badgeInfo = champ ? 'Open to anyone in the room — take the crown for yourself.' : 'Nobody\'s played this Match yet — you\'d be first.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     }
 
@@ -2045,7 +2068,7 @@ async function openTrialScreen(round) {
   const iPlayed = !!myRow;
   const champ = rows[0] || null;
   const state = computeMatchState(round, myRow);
-  const { badge, badgeClass } = matchStatusBadge(state, champ, rows);
+  const { badge, badgeClass } = matchStatusBadge(state, champ);
   const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
   if (state !== 'unplayed') {
     tags.push(`<span class="trial-tag status${badgeClass === 'losing' ? ' losing' : ''}">${badge}</span>`);
@@ -2084,7 +2107,7 @@ async function openTrialScreen(round) {
   const playBtn = $('btn-trial-play');
   if (!iPlayed) {
     playBtn.classList.remove('hidden');
-    playBtn.textContent = champ ? `⚔️ Duel for the Crown` : '☝️ Start the Duel';
+    playBtn.textContent = champ ? `⚔️ Take the Crown` : '☝️ Start the Duel';
     playBtn.onclick = () => startRound(round);
   } else if (myRow.rank !== 1) {
     playBtn.classList.remove('hidden');
@@ -3334,13 +3357,11 @@ async function renderOtherDares(iWon) {
   (allLb || []).forEach(row => { champByRound[row.round_id] = row; });
   for (const r of shown) {
     const champ = champByRound[r.id] || null;
-    let badge, badgeClass, badgeInfo;
-    if (r.target_username === me) {
-      badge = '🎯 duelling you'; badgeClass = 'targeted'; badgeInfo = 'Someone is duelling you for the crown on this Match.';
-    } else {
-      badge = champ ? `⚔️ join fight` : '☝️ first to fight'; badgeClass = 'open-invite';
-      badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
-    }
+    const state = computeMatchState(r, null);
+    const { badge, badgeClass } = matchStatusBadge(state, champ);
+    const badgeInfo = state === 'unplayed'
+      ? (champ ? 'Open to anyone in the room — take the crown for yourself.' : 'Nobody\'s played this Match yet — you\'d be first.')
+      : 'Someone is duelling you for the crown on this Match.';
     const div = document.createElement('div');
     div.className = 'trial-card state-targeted';
     div.dataset.roundId = r.id;

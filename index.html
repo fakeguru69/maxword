@@ -165,6 +165,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
 .trial-tag { font-size: 12px; color: var(--cream-dim); }
 .trial-tag.status { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
+.trial-tag.status.losing { border-color: var(--danger); color: #F0A898; }
 .trial-header { text-align: center; margin-bottom: 14px; }
 .trial-header .trial-number { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
 .champion-banner { text-align: center; }
@@ -173,7 +174,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .champ-pts { color: var(--teal); font-size: 15px; font-weight: 700; margin-top: 4px; }
 .card-one { border: 1px solid var(--gold); background: var(--ink-card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 0 24px rgba(212,175,55,0.06); }
 .zone-hero { text-align: center; padding: 22px 16px 18px; }
-.zone-duel { border-top: 1px solid rgba(212,175,55,0.25); background: rgba(0,0,0,0.15); padding: 12px 16px; text-align: center; }
+.zone-duel { border-top: 1px solid rgba(212,175,55,0.4); background: rgba(212,175,55,0.05); padding: 16px; text-align: center; }
 .verdict-line { font-size: 15px; font-weight: 700; color: var(--gold); margin-top: 12px; line-height: 1.4; }
 .standings-label { font-size: 11px; color: var(--cream-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 4px 0 8px; text-align: center; }
 .dethroned-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(192,85,74,0.15); border: 1px solid var(--danger); color: #F0A898; font-weight: 600; }
@@ -183,13 +184,14 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .duel-record-card { text-align: center; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; background: rgba(212,175,55,0.14); margin-top: 16px; margin-bottom: 14px; cursor: pointer; }
 .duel-record-card.nested { border: none; background: transparent; border-radius: 0; margin: 0; padding: 0; }
 .duel-record-title { font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
-.duel-record-card.nested .duel-record-title { font-size: 10px; color: var(--gold-soft); margin-bottom: 2px; }
+.duel-record-card.nested .duel-record-title { font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 4px; }
 .duel-info-tip { text-align: left; margin-bottom: 10px; }
 .duel-record-vs { font-size: 13px; color: var(--cream); margin-bottom: 8px; }
-.duel-record-card.nested .duel-record-vs { font-size: 11px; color: var(--cream-dim); margin-bottom: 4px; }
+.duel-record-card.nested .duel-record-vs { font-size: 12px; color: var(--cream); margin-bottom: 6px; }
 .duel-record-vs .opponent-name { color: var(--cream); }
 .duel-record-score { font-family: 'Cinzel', serif; font-size: 34px; font-weight: 900; color: var(--teal); letter-spacing: 0.06em; line-height: 1; }
-.duel-record-card.nested .duel-record-score { font-size: 22px; }
+.duel-record-card.nested .duel-record-score { font-size: 30px; }
+.duel-record-score.first-meeting { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: var(--cream-dim); letter-spacing: normal; }
 .duel-record-ties { font-size: 11px; color: var(--cream-dim); margin-top: 4px; }
 .rivalry-card { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 18px; border: 1px solid var(--danger); background: rgba(192,85,74,0.08); }
 .rivalry-card.tied { border-color: var(--gold); background: rgba(212,175,55,0.08); }
@@ -670,12 +672,14 @@ function statRow(icon, val, label, info, statKey = null) {
 // triplicated inline before; now one source of truth for both the markup
 // and the explainer text.
 function duelRecordCard(opponentUsername, record, nested = false) {
+  const scoreLine = record.total === 0
+    ? `<div class="duel-record-score first-meeting">First time facing them</div>`
+    : `<div class="duel-record-score">${record.wins}–${record.losses}</div>${record.ties ? `<div class="duel-record-ties">${record.ties} TIE${record.ties > 1 ? 'S' : ''}</div>` : ''}`;
   return `<div class="duel-record-card${nested ? ' nested' : ''}" data-expandable="duel">
     <div class="duel-record-title">⚔️ Duel Record ⚔️</div>
-    <div class="info-tip duel-info-tip">Head-to-head record between you two — counts only direct Duels between you, not other Matches you both happened to join. Ties are common since scores only land in 100-pt steps.</div>
+    <div class="info-tip duel-info-tip">Head-to-head record between you two — counts any Match where one of you actually took or defended the crown against the other, direct challenge or not. Ties are common since scores only land in 100-pt steps.</div>
     <div class="duel-record-vs">YOU vs. <span class="opponent-name">${displayName(opponentUsername)}</span></div>
-    <div class="duel-record-score">${record.wins}–${record.losses}</div>
-    ${record.ties ? `<div class="duel-record-ties">${record.ties} TIE${record.ties > 1 ? 'S' : ''}</div>` : ''}
+    ${scoreLine}
   </div>`;
 }
 
@@ -822,29 +826,24 @@ attachInfoBtnDelegation('view-trial');
 attachInfoBtnDelegation('view-scorecard');
 
 async function computeDuelRecordLifetime(userA, userB) {
-  const { data: rounds } = await sb.from('rounds').select('id')
-    .or(`and(creator_username.eq.${userA},target_username.eq.${userB}),and(creator_username.eq.${userB},target_username.eq.${userA})`);
-  const roundIds = (rounds || []).map(r => r.id);
+  // dethronement_events is the canonical record of real fights — it fires
+  // on every play and names exactly who was reigning and who challenged
+  // them at that moment, in order. A raw "both have a score on this round"
+  // comparison overcounts: if A played, got dethroned by X, and later B
+  // dethroned X, A and B share a round_id but never actually faced each
+  // other — X fought both of them separately. Only events that directly
+  // name both A and B are a real encounter between the two of them.
+  const { data: events } = await sb.from('dethronement_events').select('dethroned_username, dethroned_by_username, outcome')
+    .or(`and(dethroned_username.eq.${userA},dethroned_by_username.eq.${userB}),and(dethroned_username.eq.${userB},dethroned_by_username.eq.${userA})`);
   let wins = 0, losses = 0, ties = 0;
-  if (roundIds.length > 0) {
-    const { data: scores } = await sb.from('round_scores').select('round_id, username, score_points, duration_ms').in('round_id', roundIds);
-    const byRound = {};
-    (scores || []).forEach(s => { (byRound[s.round_id] = byRound[s.round_id] || []).push(s); });
-    Object.values(byRound).forEach(pair => {
-      const a = pair.find(s => s.username === userA);
-      const b = pair.find(s => s.username === userB);
-      if (!a || !b) return;
-      // Same rule as everywhere else in the app: equal score is decided by
-      // speed, not a tie — a real tie only when score AND duration both
-      // match exactly (or neither has a duration to compare).
-      if (a.score_points > b.score_points) wins++;
-      else if (a.score_points < b.score_points) losses++;
-      else if (a.duration_ms != null && b.duration_ms != null && a.duration_ms !== b.duration_ms) {
-        if (a.duration_ms < b.duration_ms) wins++;
-        else losses++;
-      } else ties++;
-    });
-  }
+  (events || []).forEach(e => {
+    if (e.outcome === 'tied') { ties++; return; }
+    // 'taken' = the attacker (dethroned_by_username) won; 'repelled' = the
+    // defender (dethroned_username) won.
+    const winner = e.outcome === 'taken' ? e.dethroned_by_username : e.dethroned_username;
+    if (winner === userA) wins++;
+    else if (winner === userB) losses++;
+  });
   return { wins, losses, ties, total: wins + losses + ties };
 }
 async function duelSuffix(opponent) {
@@ -1928,6 +1927,21 @@ $('btn-global-leaderboard').onclick = () => { show('view-global-leaderboard'); l
 $('btn-global-lb-back').onclick = () => show('view-home');
 
 let daresLoadToken = 0;
+function computeMatchState(round, myRow) {
+  if (myRow) return myRow.rank === 1 ? 'champion' : 'losing';
+  if (round.target_username === me) return round.via_challenge_back ? 'challenged_back' : 'targeted';
+  return 'unplayed';
+}
+function matchStatusBadge(state, champ, rows) {
+  if (state === 'champion') return { badge: '👑 you hold the crown', badgeClass: 'champion' };
+  if (state === 'losing') return { badge: '👎 crown taken', badgeClass: 'losing' };
+  if (state === 'challenged_back') return { badge: '🎯 duelling you back', badgeClass: 'targeted' };
+  if (state === 'targeted') return { badge: '🎯 duelling you', badgeClass: 'targeted' };
+  // unplayed by me — distinguish genuinely nobody-yet vs only-the-creator-so-far vs real multi-way competition
+  if (!champ) return { badge: '☝️ first to fight', badgeClass: 'open-invite' };
+  if (rows.length === 1) return { badge: `⚔️ duel ${displayName(champ.username)}`, badgeClass: 'open-invite' };
+  return { badge: '⚔️ join fight', badgeClass: 'open-invite' };
+}
 async function loadDares() {
   const myToken = ++daresLoadToken;
   const list = $('dares-list');
@@ -1951,10 +1965,7 @@ async function loadDares() {
     const rows = lbByRound[r.id] || [];
     const myRow = rows.find(row => row.username === me);
     const champ = rows[0] || null;
-    let state;
-    if (myRow) state = myRow.rank === 1 ? 'champion' : 'losing';
-    else if (r.target_username === me) state = r.via_challenge_back ? 'challenged_back' : 'targeted';
-    else state = 'unplayed';
+    const state = computeMatchState(r, myRow);
     withState.push({ r, rows, myRow, champ, state });
   }
   const statePriority = { challenged_back: 0, targeted: 1, unplayed: 2, losing: 3, champion: 4 };
@@ -1972,24 +1983,22 @@ async function loadDares() {
     div.dataset.roundId = r.id;
     div.onclick = () => openTrialScreen(r);
 
-    let badge, badgeClass, badgeInfo, statusLine, rankLine = '';
+    let statusLine, rankLine = '';
+    const { badge, badgeClass } = matchStatusBadge(state, champ, rows);
+    let badgeInfo;
     if (state === 'champion') {
-      badge = '👑 you hold the crown'; badgeClass = 'champion';
       badgeInfo = 'You\'re the current crown holder on this Match.';
       statusLine = `${myRow.score_points} pts`;
       rankLine = `#1 of ${rows.length}`;
     } else if (state === 'losing') {
-      badge = '👎 crown taken'; badgeClass = 'losing';
       badgeInfo = 'Someone took the crown here — this Match is done, but you can duel them back with a fresh one.';
       statusLine = `👑 ${displayName(champ.username)} — ${champ.score_points} pts`;
       rankLine = `#${myRow.rank} of ${rows.length}`;
     } else if (state === 'challenged_back' || state === 'targeted') {
-      badge = '🎯 duelling you'; badgeClass = 'targeted';
       badgeInfo = 'Someone is duelling you for the crown on this Match.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     } else {
-      badge = champ ? `⚔️ join fight` : '☝️ first to fight'; badgeClass = 'open-invite';
-      badgeInfo = champ ? 'Open to anyone in the room — no direct callout.' : 'Nobody\'s played this Match yet.';
+      badgeInfo = rows.length >= 2 ? 'Open to anyone in the room — no direct callout.' : champ ? 'One person has played — be next.' : 'Nobody\'s played this Match yet.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     }
 
@@ -2034,17 +2043,16 @@ async function openTrialScreen(round) {
   const rows = lb || [];
   const myRow = rows.find(row => row.username === me);
   const iPlayed = !!myRow;
-
+  const champ = rows[0] || null;
+  const state = computeMatchState(round, myRow);
+  const { badge, badgeClass } = matchStatusBadge(state, champ, rows);
   const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
-  if (!iPlayed && round.target_username === me) {
-    tags.push(`<span class="trial-tag status">🎯 ${round.via_challenge_back ? 'duelling you back' : 'duelling you'}</span>`);
-  } else if (iPlayed && myRow.rank === 1) {
-    tags.push(`<span class="trial-tag status">👑 you hold the crown</span>`);
+  if (state !== 'unplayed') {
+    tags.push(`<span class="trial-tag status${badgeClass === 'losing' ? ' losing' : ''}">${badge}</span>`);
   }
   $('trial-tags').innerHTML = tags.join('');
 
   const championHolder = $('trial-champion-holder');
-  const champ = rows[0] || null;
   championHolder.innerHTML = champ
     ? `<div class="champion-banner"><div class="crown">👑</div><div class="champ-name">${displayName(champ.username)}</div><div class="champ-pts">${champ.score_points} pts</div></div>`
     : '';
@@ -2056,13 +2064,10 @@ async function openTrialScreen(round) {
   const duelHolder = $('trial-duel-holder');
   duelHolder.innerHTML = '';
   duelHolder.classList.add('hidden');
-  if (round.target_username && (me === round.creator_username || me === round.target_username)) {
-    const opponent = me === round.creator_username ? round.target_username : round.creator_username;
-    const record = await computeDuelRecordLifetime(me, opponent);
-    if (record.total > 0) {
-      duelHolder.innerHTML = duelRecordCard(opponent, record, true);
-      duelHolder.classList.remove('hidden');
-    }
+  if (champ && champ.username !== me) {
+    const record = await computeDuelRecordLifetime(me, champ.username);
+    duelHolder.innerHTML = duelRecordCard(champ.username, record, true);
+    duelHolder.classList.remove('hidden');
   }
 
   const lbList = $('trial-leaderboard-list');
@@ -2835,12 +2840,21 @@ async function startNewRound(targetUsername, viaChallengeBack, roomId) {
   const wordIds = await pickRoundWords();
   const now = new Date();
   const expires = new Date(now.getTime() + DARE_EXPIRY_MS);
-  const { data: round, error } = await sb.from('rounds').insert({
-    room_id: currentRoom.id, creator_username: me, target_username: targetUsername || null, via_challenge_back: !!viaChallengeBack, word_ids: wordIds, short_code: shortRoundCode(), status: 'open',
-    created_at: now.toISOString(), expires_at: expires.toISOString()
-  }).select().single();
-  if (error) { $('btn-start-round').disabled = false; alert(error.message); return; }
-  startRound(round);
+  // Don't insert into `rounds` yet — only once the creator actually finishes
+  // and their score saves. This is a draft, kept entirely client-side, built
+  // with the same shape a real DB row would have (including a pre-generated
+  // id, since seeding/sharing need a stable value during play). If the
+  // creator abandons the quiz, nothing was ever written — no orphaned,
+  // unplayed "first to fight" Match left behind, and nothing for anyone
+  // else to see or select in the meantime. finishRound() does the real
+  // insert (using this same id) as part of saving the creator's score.
+  const draftRound = {
+    id: crypto.randomUUID(), room_id: currentRoom.id, creator_username: me, target_username: targetUsername || null,
+    via_challenge_back: !!viaChallengeBack, word_ids: wordIds, short_code: shortRoundCode(), status: 'open',
+    created_at: now.toISOString(), expires_at: expires.toISOString(), _isDraft: true
+  };
+  startRound(draftRound);
+  $('btn-start-round').disabled = false;
 }
 
 async function startRound(round) {
@@ -2931,6 +2945,22 @@ async function finishRound() {
   // on failure, so one network blip anywhere in the chain meant the app
   // was stuck for the rest of the session, silently.
   try {
+    // If this round was never actually created in the DB (deferred until
+    // now — see startNewRound), create it first. Upsert on id so a retry
+    // after a dropped connection can't double-insert or error out.
+    if (currentRound._isDraft) {
+      const { id, room_id, creator_username, target_username, via_challenge_back, word_ids, short_code, status, created_at, expires_at } = currentRound;
+      const { error: roundInsertErr } = await sb.from('rounds')
+        .upsert({ id, room_id, creator_username, target_username, via_challenge_back, word_ids, short_code, status, created_at, expires_at }, { onConflict: 'id', ignoreDuplicates: true });
+      if (roundInsertErr) throw roundInsertErr;
+      // Upsert's RETURNING doesn't reliably hand back the row on a retry
+      // (ON CONFLICT DO NOTHING skips it) — fetch it fresh so we actually
+      // get the DB-assigned trial_number the scorecard needs next.
+      const { data: freshRound, error: freshErr } = await sb.from('rounds').select('*').eq('id', id).single();
+      if (freshErr) throw freshErr;
+      currentRound = freshRound;
+    }
+
     // Check first in case an earlier attempt actually saved successfully
     // server-side before the connection dropped and left the UI hanging —
     // avoids a duplicate insert (or a unique-constraint error) on retry.
@@ -3148,13 +3178,11 @@ async function renderScorecard(correct, points, newBadges) {
   const duelHolder = $('score-duel-holder');
   duelHolder.innerHTML = '';
   duelHolder.classList.add('hidden');
-  if (currentRound.target_username && (me === currentRound.creator_username || me === currentRound.target_username)) {
-    const opponent = me === currentRound.creator_username ? currentRound.target_username : currentRound.creator_username;
-    const record = await computeDuelRecordLifetime(me, opponent);
-    if (record.total > 0) {
-      duelHolder.innerHTML = duelRecordCard(opponent, record, true);
-      duelHolder.classList.remove('hidden');
-    }
+  const rivalRow = (myRow && myRow.rank === 1) ? (lbRows || []).find(r => r.rank === 2) : champRow;
+  if (rivalRow && rivalRow.username !== me) {
+    const record = await computeDuelRecordLifetime(me, rivalRow.username);
+    duelHolder.innerHTML = duelRecordCard(rivalRow.username, record, true);
+    duelHolder.classList.remove('hidden');
   }
 
   const scoreLbList = $('score-leaderboard-list');

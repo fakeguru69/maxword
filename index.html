@@ -1306,6 +1306,11 @@ async function checkCrownsTaken() {
   await sb.from('dethronement_events').update({ dethroner_notified: true }).in('id', ids);
   let text;
   const ctBtn = $('btn-crown-taken-ok');
+  // Same fixed-reused-element issue as the Scorecard's dareBackBtn: goToPicker
+  // below sets disabled=true on tap, but this button is shared across every
+  // future Crown Taken popup — without this reset, one past click leaves it
+  // permanently disabled.
+  ctBtn.disabled = false;
   const goToPicker = async (roomId) => {
     ctBtn.disabled = true;
     $('crown-taken-modal').classList.add('hidden');
@@ -3368,6 +3373,13 @@ async function renderScorecard(correct, points, newBadges) {
   const dareBackBtn = $('btn-dare-back');
   $('btn-challenge-others').className = 'btn-primary';
   dareBackBtn.className = 'btn-primary';
+  // This button is a fixed, reused element — not recreated per render — so
+  // a disabled=true set by a PAST visit here (see the iWon===false branch
+  // below, which disables on tap to prevent a double-submit) would
+  // otherwise silently carry over to every future Scorecard, permanently
+  // muting and disabling a button that has nothing to do with that past
+  // click. Reset explicitly on every fresh render.
+  dareBackBtn.disabled = false;
 
   if (iWon === false) {
     dareBackBtn.classList.remove('hidden');

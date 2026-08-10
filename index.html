@@ -192,6 +192,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .duel-record-score { font-family: 'Cinzel', serif; font-size: 34px; font-weight: 900; color: var(--teal); letter-spacing: 0.06em; line-height: 1; }
 .duel-record-card.nested .duel-record-score { font-size: 30px; }
 .duel-record-score.first-meeting { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: var(--cream-dim); letter-spacing: normal; }
+/* Without this, ".nested .duel-record-score" above (3 classes) beats
+   ".first-meeting" (2 classes) on font-size alone, even though this rule
+   comes later — specificity wins over source order. Result: "First time
+   facing them" rendered at 30px on every real screen (Match Detail,
+   Scorecard both pass nested=true) instead of the intended 15px, an
+   oversized sans-serif block clashing with the surrounding Cinzel/gold
+   card. Only the one non-nested spot (Player Profile popup) ever looked
+   right. This re-asserts 15px specifically inside .nested. */
+.duel-record-card.nested .duel-record-score.first-meeting { font-size: 15px; }
 .duel-record-ties { font-size: 11px; color: var(--cream-dim); margin-top: 4px; }
 .rivalry-card { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 18px; border: 1px solid var(--danger); background: rgba(192,85,74,0.08); }
 .rivalry-card.tied { border-color: var(--gold); background: rgba(212,175,55,0.08); }
@@ -750,13 +759,7 @@ async function openPlayerProfile(username) {
 
   let accuracyPart = '';
   if (isSelf) {
-    const { data: mRows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', me);
-    const list = mRows || [];
-    const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
-    if (totalAnswered > 0) {
-      const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
-      accuracyPart = statRow('🏹', `${accuracy}%`, 'Accuracy', 'Correct answers out of everything you\'ve ever answered. Not ranked — this one moves constantly.');
-    }
+    accuracyPart = await computeAccuracyPart(me);
   }
   $('player-profile-mastery-holder').innerHTML = '';
 
@@ -924,14 +927,26 @@ function compareAllTimeRank(a, b) {
   if (aDur != null && bDur != null && aDur !== bDur) return aDur - bDur;
   if (aDur == null && bDur != null) return 1;
   if (aDur != null && bDur == null) return -1;
-  return (b.avg_score || 0) - (a.avg_score || 0);
+  const as = b.avg_score || 0, bs = a.avg_score || 0;
+  if (as !== bs) return as - bs;
+  // Closing the loop: crowns, speed, AND score all equal is vanishingly
+  // rare, but Array.sort is stable, so without this the two players would
+  // just keep whatever order Supabase happened to return — no ties-ever
+  // policy should have a silent exception. No "who got there first" signal
+  // exists for an aggregate stat the way it does for a single Match, so
+  // this is a plain, honestly-arbitrary-but-fixed username sort — it only
+  // exists to guarantee a defined order, not to imply either player is
+  // "better."
+  return String(a.username || '').localeCompare(String(b.username || ''));
 }
 // Weekly/monthly rank by Crowns Taken during that window (a flow metric —
 // "held" doesn't mean anything scoped to a period), same Avg Score fallback.
 function comparePeriodRank(a, b) {
   const ct = (b.crowns_taken || 0) - (a.crowns_taken || 0);
   if (ct !== 0) return ct;
-  return (b.avg_score || 0) - (a.avg_score || 0);
+  const as = b.avg_score || 0, bs = a.avg_score || 0;
+  if (as !== bs) return as - bs;
+  return String(a.username || '').localeCompare(String(b.username || ''));
 }
 
 // DETERMINISTIC CROWN TIEBREAK — single source of truth.
@@ -957,6 +972,21 @@ function dedupeChampionsByRound(rows) {
     if (!cur || championSort(r, cur) < 0) byRound[r.round_id] = r;
   });
   return byRound;
+}
+
+// Shared with Home/Room "more stats" — was only ever computed inline on the
+// Player Profile popup before, which is why Accuracy never showed up
+// anywhere else despite being coded like a first-class stat. Deliberately
+// NOT ranked (no statKey passed to statRow, so no tap-through leaderboard
+// and no cursor:pointer) — a lifetime % is volatile early on for a new
+// player, same reasoning as the original Player Profile version.
+async function computeAccuracyPart(username) {
+  const { data: mRows } = await sb.from('word_mastery').select('correct_count, incorrect_count').eq('username', username);
+  const list = mRows || [];
+  const totalAnswered = list.reduce((s, r) => s + r.correct_count + r.incorrect_count, 0);
+  if (totalAnswered === 0) return '';
+  const accuracy = Math.round((list.reduce((s, r) => s + r.correct_count, 0) / totalAnswered) * 100);
+  return statRow('🏹', `${accuracy}%`, 'Accuracy', 'Correct answers out of everything you\'ve ever answered. Not ranked — this one moves constantly.');
 }
 
 function displayName(u) {
@@ -1344,7 +1374,19 @@ async function checkRepelled() {
     const first = events[0];
     const firstTarget = first.dethroned_by_username;
     const restCount = events.length - 1;
-    text = `${displayName(firstTarget)} came for your crown on Match #${first.rounds.trial_number} and lost${restCount ? ` — plus ${restCount} more attempt${restCount > 1 ? 's' : ''} failed` : ''}. Crowns hold!`;
+    // Same live check the single-event branch above does, just missing
+    // here before now — this branch was claiming "Crowns hold!" as a flat
+    // assumption with no query behind it at all, even though a different
+    // Match's crown could genuinely have been lost in the meantime (or
+    // even this featured Match's crown could have moved on since).
+    const myCrowns = await getCrownsHeldInRoom(me, first.rounds.room_id);
+    const crownLine = `Your ${myCrowns} crown${myCrowns === 1 ? '' : 's'} hold${myCrowns === 1 ? 's' : ''}.`;
+    const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points, played_at').eq('round_id', first.round_id).order('rank').order('played_at').limit(1);
+    const stillHolds = !lb || !lb[0] || lb[0].username === me;
+    const eventLine = stillHolds
+      ? `${displayName(firstTarget)} came for your crown on Match #${first.rounds.trial_number} and lost${restCount ? ` — plus ${restCount} more attempt${restCount > 1 ? 's' : ''} failed` : ''}.`
+      : `${displayName(firstTarget)} came for your crown on Match #${first.rounds.trial_number} and lost${restCount ? ` — plus ${restCount} more attempt${restCount > 1 ? 's' : ''} failed` : ''} — but it's since moved on to ${displayName(lb[0].username)} anyway.`;
+    text = `${eventLine}\n${crownLine}`;
     rpBtn.textContent = `Duel ${displayName(firstTarget)} Again`;
     rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(firstTarget, true, first.rounds.room_id); };
   }
@@ -1587,7 +1629,8 @@ async function renderStatusRow() {
   const avgSorted = [...(rows || [])].sort((a, b) => b.avg_score - a.avg_score);
   const avgIndex = avgSorted.findIndex(r => r.username === me);
   const avgScorePart = myIndex !== -1 ? statRow('⚖️', Math.round(sorted[myIndex].avg_score), `Avg Score${rankSuffix(avgIndex + 1)}`, 'Your average score across every match — no longer what leaderboard rank is built from, but still worth tracking.', 'avgScore') : '';
-  const moreCount = [streakPart, avgScorePart].filter(Boolean).length + 5;
+  const accuracyPart = await computeAccuracyPart(me);
+  const moreCount = [streakPart, avgScorePart, accuracyPart].filter(Boolean).length + 5;
   moreHolder.innerHTML = `
     <div id="home-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${avgScorePart}
@@ -1596,6 +1639,7 @@ async function renderStatusRow() {
       ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
       ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
+      ${accuracyPart}
     </div>
     <span class="room-stats-toggle" id="home-stats-toggle">▸ ${moreCount} more stats</span>
   `;
@@ -2269,6 +2313,7 @@ async function computeQuietStatsByUser(scope, roomId) {
     { data: members },
     { data: streakRows },
     { data: crownRows },
+    { data: contestedRows },
     { data: wordAnswerRows },
     { data: roundRows },
     { data: joinScoreRows },
@@ -2278,6 +2323,12 @@ async function computeQuietStatsByUser(scope, roomId) {
     isRoom
       ? sb.from('trial_leaderboard').select('username, round_id, rank, played_at').eq('rank', 1).in('round_id', roomRoundIds)
       : sb.from('trial_leaderboard').select('username, round_id, rank, played_at').eq('rank', 1),
+    // Same "at least 2 people actually played it" gate the DB's own
+    // crowns_held column uses (see contested_rounds view) — without this,
+    // this tap-through leaderboard disagreed with the headline Crowns Held
+    // number it's supposed to be the detail view of, since a solo score is
+    // trivially rank=1 on its own Match before anyone else has played.
+    sb.from('contested_rounds').select('round_id'),
     isRoom
       ? sb.from('word_answers').select('username, word_id, rounds!inner(room_id)').eq('rounds.room_id', roomId)
       : sb.from('word_answers').select('username, word_id'),
@@ -2295,8 +2346,14 @@ async function computeQuietStatsByUser(scope, roomId) {
   if (pool) pool.forEach(ensure);
 
   (streakRows || []).forEach(r => { if (r.username && (!isRoom || byUser[r.username])) ensure(r.username).streak = r.current_streak || 0; });
-  // Dedupe first: a tied Match has two rank=1 rows, but only one crown.
-  Object.values(dedupeChampionsByRound(crownRows)).forEach(r => { if (r.username) ensure(r.username).crowns++; });
+  // Dedupe first (a tied Match has two rank=1 rows, but only one crown), THEN
+  // drop any round nobody else has played yet — a solo score is trivially
+  // rank=1 on its own Match, but that's not a real crown until it's beaten
+  // someone, matching the same contested_rounds gate the headline stat uses.
+  const contestedIds = new Set((contestedRows || []).map(r => r.round_id));
+  Object.values(dedupeChampionsByRound(crownRows))
+    .filter(r => contestedIds.has(r.round_id))
+    .forEach(r => { if (r.username) ensure(r.username).crowns++; });
   (wordAnswerRows || []).forEach(r => { if (r.username) ensure(r.username).wordsPlayed.add(r.word_id); });
   (roundRows || []).forEach(r => {
     if (!r.creator_username) return;
@@ -2514,11 +2571,16 @@ async function renderRoomStatsHeader() {
   }
 
   const rankSuffix = r => r ? ` (#${r})` : '';
-  const quietCount = 5;
+  const quietCount = 6;
   const myCrowns = myRank !== null ? (ranked[myIndex].crowns_held || 0) : 0;
   const roomAvgSorted = [...(roomRows || [])].filter(r => isRanked(r.username)).sort((a, b) => b.avg_score - a.avg_score);
   const roomAvgIndex = roomAvgSorted.findIndex(r => r.username === me);
   const myAvgScore = myRank !== null ? Math.round(ranked[myIndex].avg_score) : null;
+  // Accuracy has no room_id in its source table (word_mastery) — vocabulary
+  // knowledge isn't naturally room-scoped, same reason Words Mastered above
+  // is already a global number even on this Room screen. Same global value
+  // both places, not a mismatch.
+  const accuracyPart = await computeAccuracyPart(me);
   const block = document.createElement('div');
   block.className = 'room-stats-header-block';
   block.innerHTML = `
@@ -2538,6 +2600,7 @@ async function renderRoomStatsHeader() {
       ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
       ${statRow('📅', roomStats.myActiveDays, `Active Days${rankSuffix(roomStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
       ${statRow('⚔️', quietStats.joinMatch.value, `Join Match${rankSuffix(quietStats.joinMatch.rank)}`, 'Matches someone else started that you joined.', 'joinMatch')}
+      ${accuracyPart}
     </div>
     <span class="room-stats-toggle" id="room-stats-toggle">▸ ${quietCount} more stats</span>
   `;
@@ -3187,19 +3250,36 @@ async function renderScorecard(correct, points, newBadges) {
     iWon = champRow.username === me;
     if (opponentRow) {
       if (myRow.rank < opponentRow.rank) {
-        const winGap = points - opponentRow.score_points;
-        verdictEl.textContent = iWon
-          ? (winGap === 0
-              ? `👑 You took ${displayName(opponentUsername)}'s crown — you were faster!`
-              : `👑 You took ${displayName(opponentUsername)}'s crown! ${points} pts.`)
-          : `👑 You took ${displayName(opponentUsername)}'s crown!`;
+        // Beating your named opponent is NOT the same thing as taking a
+        // crown — a crown is single-holder per Match. If a third party
+        // still outranks you both, no crown changed hands at all, and if
+        // one did, it might not have been opponentUsername's to begin
+        // with (the round can have other players in it). Anchor every
+        // crown claim to the real champion/dethronement record, never to
+        // "who I happened to duel."
+        if (iWon) {
+          const { data: myDethronement } = await sb.from('dethronement_events').select('dethroned_username, same_score').eq('round_id', currentRound.id).eq('dethroned_by_username', me).eq('outcome', 'taken').maybeSingle();
+          verdictEl.textContent = myDethronement
+            ? (myDethronement.same_score
+                ? `👑 You took ${displayName(myDethronement.dethroned_username)}'s crown — you were faster!`
+                : `👑 You took ${displayName(myDethronement.dethroned_username)}'s crown! ${points} pts.`)
+            : `👑 You hold the crown! Beat ${displayName(opponentUsername)}, ${points} pts.`;
+        } else {
+          const gap = champRow.score_points - points;
+          verdictEl.textContent = `You beat ${displayName(opponentUsername)}, but ${displayName(champRow.username)}'s crown holds — you're ${gap} pt${gap === 1 ? '' : 's'} behind.`;
+        }
       } else if (myRow.rank === opponentRow.rank) {
         verdictEl.textContent = `🤝 You're tied with ${displayName(opponentUsername)} at ${opponentRow.score_points}!`;
       } else {
         const gap = opponentRow.score_points - points;
-        verdictEl.textContent = gap === 0
-          ? `${displayName(opponentUsername)}'s crown holds — they finished faster.`
-          : `${displayName(opponentUsername)}'s crown holds — you lost by ${gap}.`;
+        // Same fix, losing side: only call it "their crown" if they're
+        // actually the champion — otherwise name who really holds it.
+        const opponentIsChamp = champRow.username === opponentUsername;
+        verdictEl.textContent = opponentIsChamp
+          ? (gap === 0
+              ? `${displayName(opponentUsername)}'s crown holds — they finished faster.`
+              : `${displayName(opponentUsername)}'s crown holds — you lost by ${gap}.`)
+          : `${displayName(opponentUsername)} beat you by ${gap} — ${displayName(champRow.username)} still holds the crown.`;
       }
     } else if (iWon) {
       const { data: myDethronement } = await sb.from('dethronement_events').select('dethroned_username, same_score').eq('round_id', currentRound.id).eq('dethroned_by_username', me).eq('outcome', 'taken').maybeSingle();

@@ -519,7 +519,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
        targets YOU with a fresh Trial (not yet played by you) -->
   <div class="modal-overlay hidden" id="challenged-modal">
     <div class="card modal-card">
-      <div class="challenged-banner" style="margin-bottom:14px;">🎯 Challenged</div>
+      <div class="challenged-banner" style="margin-bottom:14px;">🎯 Duelling You</div>
       <p id="challenged-modal-text" style="font-size:15px; margin-bottom:16px; white-space:pre-line;"></p>
       <button class="btn-primary" id="btn-challenged-ok">Got it</button>
     </div>
@@ -1323,13 +1323,13 @@ async function checkCrownsTaken() {
     const crownLine = `You now have ${myCrowns} crown${myCrowns === 1 ? '' : 's'}.`;
     const eventLine = e.same_score ? `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number} — you were faster!` : `You took ${displayName(e.dethroned_username)}'s crown on Match #${e.rounds.trial_number} — nice!`;
     text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}${streakPart}`;
-    ctBtn.textContent = 'Start Another';
+    ctBtn.textContent = 'Start New Duel';
     ctBtn.onclick = () => goToPicker(e.rounds.room_id);
   } else {
     const first = events[0];
     const restCount = events.length - 1;
     text = `You took ${displayName(first.dethroned_username)}'s crown on Match #${first.rounds.trial_number}${restCount ? ` — plus ${restCount} more` : ''} — nice!`;
-    ctBtn.textContent = 'Start Another';
+    ctBtn.textContent = 'Start New Duel';
     ctBtn.onclick = () => goToPicker(first.rounds.room_id);
   }
   $('crown-taken-modal-text').textContent = text;
@@ -1903,7 +1903,6 @@ async function maybeShowRoomVocabTip() {
   await showOnboardingTipOnce('room_card_vocab', '📜 Reading the room',
     `<div class="tip-list-item">🎯 duelling you / duelling you back — someone's calling you out directly</div>
      <div class="tip-list-item">⚔️ take the crown — open to anyone, no direct callout</div>
-     <div class="tip-list-item">☝️ first to fight — nobody's played it yet</div>
      <div class="tip-list-item">👑 / 👎 — you've already played this one</div>`,
     () => {
       const target = document.getElementById('trials-count-label');
@@ -2023,15 +2022,21 @@ function computeMatchState(round, myRow) {
   if (round.target_username === me) return round.via_challenge_back ? 'challenged_back' : 'targeted';
   return 'unplayed';
 }
-function matchStatusBadge(state, champ) {
+function matchStatusBadge(state) {
   if (state === 'champion') return { badge: '👑 you hold the crown', badgeClass: 'champion' };
   if (state === 'losing') return { badge: '👎 crown taken', badgeClass: 'losing' };
   if (state === 'challenged_back') return { badge: '🎯 duelling you back', badgeClass: 'targeted' };
   if (state === 'targeted') return { badge: '🎯 duelling you', badgeClass: 'targeted' };
   // unplayed by me — the game is always open to anyone regardless of how
-  // many have already played, so this only needs to distinguish "nobody's
-  // set a score yet" from "there's a crown to take."
-  if (!champ) return { badge: '☝️ first to fight', badgeClass: 'open-invite' };
+  // many have already played. `champ` is null here only in a narrow
+  // failure window (the round row and its first score are two separate
+  // sequential inserts in finishRound, not one atomic write — a dropped
+  // connection between them, before any retry, would leave an orphan).
+  // Confirmed zero such rows exist right now across the whole DB, and a
+  // retry self-heals it, so it's vanishingly rare in practice — but still
+  // real, unlike the true dead code this replaced. Simplifying to always
+  // "take the crown" is fine either way: it's never a false claim, just
+  // slightly less specific in that one rare case.
   return { badge: '⚔️ take the crown', badgeClass: 'open-invite' };
 }
 async function loadDares() {
@@ -2076,7 +2081,7 @@ async function loadDares() {
     div.onclick = () => openTrialScreen(r);
 
     let statusLine, rankLine = '';
-    const { badge, badgeClass } = matchStatusBadge(state, champ);
+    const { badge, badgeClass } = matchStatusBadge(state);
     let badgeInfo;
     if (state === 'champion') {
       badgeInfo = 'You\'re the current crown holder on this Match.';
@@ -2137,7 +2142,7 @@ async function openTrialScreen(round) {
   const iPlayed = !!myRow;
   const champ = pickChampion(rows);
   const state = computeMatchState(round, myRow);
-  const { badge, badgeClass } = matchStatusBadge(state, champ);
+  const { badge, badgeClass } = matchStatusBadge(state);
   const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
   if (state !== 'unplayed') {
     tags.push(`<span class="trial-tag status${badgeClass === 'losing' ? ' losing' : ''}">${badge}</span>`);
@@ -3368,7 +3373,7 @@ async function renderScorecard(correct, points, newBadges) {
     dareBackBtn.onclick = () => { dareBackBtn.disabled = true; startNewRound(champRow.username, true); };
   } else if (iWon === true) {
     dareBackBtn.classList.remove('hidden');
-    dareBackBtn.textContent = `Start Another`;
+    dareBackBtn.textContent = `Start New Duel`;
     dareBackBtn.onclick = () => { openTargetPicker(); };
   } else {
     dareBackBtn.classList.add('hidden');
@@ -3476,7 +3481,7 @@ async function renderOtherDares(iWon) {
   for (const r of shown) {
     const champ = champByRound[r.id] || null;
     const state = computeMatchState(r, null);
-    const { badge, badgeClass } = matchStatusBadge(state, champ);
+    const { badge, badgeClass } = matchStatusBadge(state);
     const badgeInfo = state === 'unplayed'
       ? (champ ? 'Open to anyone in the room — take the crown for yourself.' : 'Nobody\'s played this Match yet — you\'d be first.')
       : 'Someone is duelling you for the crown on this Match.';

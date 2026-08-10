@@ -934,6 +934,31 @@ function comparePeriodRank(a, b) {
   return (b.avg_score || 0) - (a.avg_score || 0);
 }
 
+// DETERMINISTIC CROWN TIEBREAK — single source of truth.
+// trial_leaderboard uses RANK(), so two players with identical score AND
+// identical duration genuinely share rank 1 (and every row from before the
+// duration migration has duration_ms = NULL, so those tie too). Postgres
+// gives no guaranteed order among tied rows, so `rows[0]` was picking the
+// crown holder arbitrarily — it could flip between loads, and the Crowns
+// Held stat counted BOTH tied players, handing out two crowns for one
+// Match and breaking the one-crown-per-Match rule the whole model rests on.
+// Rule: earliest played_at keeps the crown. You hold it until someone
+// STRICTLY beats you; matching you is not enough to take it.
+// NOTE: this only decides who wears the single crown. The standings list
+// still shows the shared "#1" from RANK() untouched — that stays honest.
+const championSort = (a, b) => (a.rank - b.rank) || String(a.played_at || '').localeCompare(String(b.played_at || ''));
+const pickChampion = rows => (rows || []).filter(r => r.rank === 1).sort(championSort)[0] || null;
+// For rank=1 queries spanning many rounds: keep only the one true champion
+// per round, so crown COUNTS can't double-count a tied Match.
+function dedupeChampionsByRound(rows) {
+  const byRound = {};
+  (rows || []).forEach(r => {
+    const cur = byRound[r.round_id];
+    if (!cur || championSort(r, cur) < 0) byRound[r.round_id] = r;
+  });
+  return byRound;
+}
+
 function displayName(u) {
   const name = (u || '').toUpperCase();
   return name.length > 12 ? name.slice(0, 11) + '…' : name;
@@ -962,8 +987,8 @@ async function shareText(text) {
 
 async function shareRound(r) {
   const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${r.short_code}`;
-  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', r.id);
-  const champRow = (lbRows || []).find(x => x.rank === 1);
+  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank, played_at').eq('round_id', r.id);
+  const champRow = pickChampion(lbRows);
   const header = `🎯 MAXWORD — GP Vocabulary Showdown\n`;
   const matchNum = r.trial_number;
   let body;
@@ -1306,7 +1331,7 @@ async function checkRepelled() {
     // happened (e.g. a Dethroned popup for a later event already showed
     // first) — check live rather than risk claiming "crowns hold" right
     // after the player was just told they lost this exact crown.
-    const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points').eq('round_id', e.round_id).order('rank').limit(1);
+    const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points, played_at').eq('round_id', e.round_id).order('rank').order('played_at').limit(1);
     const stillHolds = !lb || !lb[0] || lb[0].username === me;
     const reasonPart = e.same_score ? 'same score, but you were faster' : 'they lost';
     const eventLine = stillHolds
@@ -1354,7 +1379,7 @@ async function checkTiedEvents() {
     const myCrowns = await getCrownsHeldInRoom(me, e.rounds.room_id);
     // Same live-check as Repelled — the tie kept the crown in place at the
     // moment it happened, but a third party may have taken it since.
-    const { data: lb } = await sb.from('trial_leaderboard').select('username').eq('round_id', e.round_id).order('rank').limit(1);
+    const { data: lb } = await sb.from('trial_leaderboard').select('username, played_at').eq('round_id', e.round_id).order('rank').order('played_at').limit(1);
     const stillHolds = !lb || !lb[0] || lb[0].username === me;
     const crownLine = stillHolds
       ? `Your ${myCrowns} crown${myCrowns === 1 ? ' is' : 's are'} safe.`
@@ -1385,7 +1410,7 @@ async function checkNewChallenges() {
   let text;
   const chBtn = $('btn-challenged-ok');
   if (fresh.length === 1) {
-    const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points').eq('round_id', fresh[0].id).order('rank').limit(1);
+    const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points, played_at').eq('round_id', fresh[0].id).order('rank').order('played_at').limit(1);
     const champ = (lb && lb[0]) || null;
     const crownMoved = champ && champ.username !== fresh[0].creator_username;
     const opponent = champ ? champ.username : fresh[0].creator_username;
@@ -1978,7 +2003,7 @@ async function loadDares() {
   if (all.length === 0) { $('trials-count-label').textContent = 'Matches'; list.innerHTML = '<div class="empty-state">No Matches yet. Start one!</div>'; return; }
 
   const roundIds = all.map(r => r.id);
-  const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', roundIds).order('rank');
+  const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', roundIds).order('rank').order('played_at');
   if (myToken !== daresLoadToken) return;
   const lbByRound = {};
   (allLb || []).forEach(row => { (lbByRound[row.round_id] = lbByRound[row.round_id] || []).push(row); });
@@ -1987,7 +2012,7 @@ async function loadDares() {
   for (const r of all) {
     const rows = lbByRound[r.id] || [];
     const myRow = rows.find(row => row.username === me);
-    const champ = rows[0] || null;
+    const champ = pickChampion(rows);
     const state = computeMatchState(r, myRow);
     withState.push({ r, rows, myRow, champ, state });
   }
@@ -2062,11 +2087,11 @@ async function openTrialScreen(round) {
   $('trial-number-display').textContent = round.trial_number;
   $('trial-urgency-holder').innerHTML = '';
 
-  const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', round.id).order('rank');
+  const { data: lb } = await sb.from('trial_leaderboard').select('*').eq('round_id', round.id).order('rank').order('played_at');
   const rows = lb || [];
   const myRow = rows.find(row => row.username === me);
   const iPlayed = !!myRow;
-  const champ = rows[0] || null;
+  const champ = pickChampion(rows);
   const state = computeMatchState(round, myRow);
   const { badge, badgeClass } = matchStatusBadge(state, champ);
   const tags = [`<span class="trial-tag">started by ${displayName(round.creator_username)}</span>`];
@@ -2087,9 +2112,16 @@ async function openTrialScreen(round) {
   const duelHolder = $('trial-duel-holder');
   duelHolder.innerHTML = '';
   duelHolder.classList.add('hidden');
-  if (champ && champ.username !== me) {
-    const record = await computeDuelRecordLifetime(me, champ.username);
-    duelHolder.innerHTML = duelRecordCard(champ.username, record, true);
+  // If you hold the crown there's no "you vs yourself" record to show — so
+  // show your record against the runner-up instead: the person actually
+  // closest to taking it off you. Mirrors the Scorecard, which already did
+  // this; the Match screen was the odd one out and just hid the card.
+  const trialRival = (champ && champ.username === me)
+    ? rows.filter(row => row.username !== me).sort(championSort)[0] || null
+    : champ;
+  if (trialRival && trialRival.username !== me) {
+    const record = await computeDuelRecordLifetime(me, trialRival.username);
+    duelHolder.innerHTML = duelRecordCard(trialRival.username, record, true);
     duelHolder.classList.remove('hidden');
   }
 
@@ -2244,8 +2276,8 @@ async function computeQuietStatsByUser(scope, roomId) {
     isRoom ? sb.from('room_members').select('username').eq('room_id', roomId) : Promise.resolve({ data: null }),
     sb.from('streaks').select('username, current_streak'),
     isRoom
-      ? sb.from('trial_leaderboard').select('username, round_id').eq('rank', 1).in('round_id', roomRoundIds)
-      : sb.from('trial_leaderboard').select('username').eq('rank', 1),
+      ? sb.from('trial_leaderboard').select('username, round_id, rank, played_at').eq('rank', 1).in('round_id', roomRoundIds)
+      : sb.from('trial_leaderboard').select('username, round_id, rank, played_at').eq('rank', 1),
     isRoom
       ? sb.from('word_answers').select('username, word_id, rounds!inner(room_id)').eq('rounds.room_id', roomId)
       : sb.from('word_answers').select('username, word_id'),
@@ -2263,7 +2295,8 @@ async function computeQuietStatsByUser(scope, roomId) {
   if (pool) pool.forEach(ensure);
 
   (streakRows || []).forEach(r => { if (r.username && (!isRoom || byUser[r.username])) ensure(r.username).streak = r.current_streak || 0; });
-  (crownRows || []).forEach(r => { if (r.username) ensure(r.username).crowns++; });
+  // Dedupe first: a tied Match has two rank=1 rows, but only one crown.
+  Object.values(dedupeChampionsByRound(crownRows)).forEach(r => { if (r.username) ensure(r.username).crowns++; });
   (wordAnswerRows || []).forEach(r => { if (r.username) ensure(r.username).wordsPlayed.add(r.word_id); });
   (roundRows || []).forEach(r => {
     if (!r.creator_username) return;
@@ -2569,13 +2602,13 @@ async function computeSocialProofTicker(roomId) {
   const played = new Set((myScores || []).map(s => s.round_id));
   const candidates = rounds.filter(r => !played.has(r.id));
   if (candidates.length === 0) return null;
-  const { data: lbRows } = await sb.from('trial_leaderboard').select('round_id, username, score_points, rank').in('round_id', candidates.map(r => r.id));
+  const { data: lbRows } = await sb.from('trial_leaderboard').select('round_id, username, score_points, rank, played_at').in('round_id', candidates.map(r => r.id));
   const byRound = {};
   (lbRows || []).forEach(r => { (byRound[r.round_id] = byRound[r.round_id] || []).push(r); });
   for (const r of candidates) {
     const rows = byRound[r.id] || [];
     if (rows.length < 2) continue;
-    const champ = rows.find(x => x.rank === 1);
+    const champ = pickChampion(rows);
     if (!champ) continue;
     return `${rows.length} have failed to take ${displayName(champ.username)}'s crown on Match #${r.trial_number} (${champ.score_points} pts) — think you can?`;
   }
@@ -3137,8 +3170,8 @@ async function renderScorecard(correct, points, newBadges) {
   });
 
   const verdictEl = $('score-verdict');
-  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank').eq('round_id', currentRound.id).order('rank');
-  const champRow = (lbRows || []).find(r => r.rank === 1);
+  const { data: lbRows } = await sb.from('trial_leaderboard').select('username, score_points, rank, played_at').eq('round_id', currentRound.id).order('rank').order('played_at');
+  const champRow = pickChampion(lbRows);
   const myRow = (lbRows || []).find(r => r.username === me);
   let iWon = null;
   // Duel-relative wording: compares RANK, not raw score — rank already
@@ -3201,7 +3234,13 @@ async function renderScorecard(correct, points, newBadges) {
   const duelHolder = $('score-duel-holder');
   duelHolder.innerHTML = '';
   duelHolder.classList.add('hidden');
-  const rivalRow = (myRow && myRow.rank === 1) ? (lbRows || []).find(r => r.rank === 2) : champRow;
+  // Keyed on actually BEING the champion, not on rank===1 — with a tie both
+  // players have rank 1, so the old check sent the non-crowned one looking
+  // for rank 2 and skipped right past the person who took their crown.
+  const iAmChamp = !!(champRow && champRow.username === me);
+  const rivalRow = iAmChamp
+    ? (lbRows || []).filter(r => r.username !== me).sort(championSort)[0] || null
+    : champRow;
   if (rivalRow && rivalRow.username !== me) {
     const record = await computeDuelRecordLifetime(me, rivalRow.username);
     duelHolder.innerHTML = duelRecordCard(rivalRow.username, record, true);
@@ -3351,10 +3390,9 @@ async function renderOtherDares(iWon) {
   title.textContent = `${open.length} more open Match${open.length > 1 ? 'es' : ''} in this Game Room:`;
   holder.appendChild(title);
   const shown = open.slice(0, 3);
-  const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', shown.map(r => r.id)).eq('rank', 1);
+  const { data: allLb } = await sb.from('trial_leaderboard').select('*').in('round_id', shown.map(r => r.id)).eq('rank', 1).order('played_at');
   if (myToken !== otherDaresLoadToken) return;
-  const champByRound = {};
-  (allLb || []).forEach(row => { champByRound[row.round_id] = row; });
+  const champByRound = dedupeChampionsByRound(allLb);
   for (const r of shown) {
     const champ = champByRound[r.id] || null;
     const state = computeMatchState(r, null);

@@ -766,7 +766,7 @@ async function openPlayerProfile(username) {
   moreHolder.innerHTML = played ? `
     <div class="room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${avgScorePart}
-      ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
+      ${statRow('📯', quietStats.challengesSent.value, `Duels Started${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
       ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
       ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
@@ -1328,7 +1328,9 @@ async function checkCrownsTaken() {
   } else {
     const first = events[0];
     const restCount = events.length - 1;
-    text = `You took ${displayName(first.dethroned_username)}'s crown on Match #${first.rounds.trial_number}${restCount ? ` — plus ${restCount} more` : ''} — nice!`;
+    const myCrowns = await getCrownsHeldInRoom(me, first.rounds.room_id);
+    const crownLine = `You now have ${myCrowns} crown${myCrowns === 1 ? '' : 's'}.`;
+    text = `You took ${displayName(first.dethroned_username)}'s crown on Match #${first.rounds.trial_number}${restCount ? ` — plus ${restCount} more` : ''} — nice!\n${crownLine}`;
     ctBtn.textContent = 'Start New Duel';
     ctBtn.onclick = () => goToPicker(first.rounds.room_id);
   }
@@ -1634,7 +1636,7 @@ async function renderStatusRow() {
   moreHolder.innerHTML = `
     <div id="home-stats-more" class="hidden room-stat-grid" style="border-top:1px solid var(--line); padding-top:6px;">
       ${streakPart}${avgScorePart}
-      ${statRow('📯', quietStats.challengesSent.value, `Challenges Sent${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
+      ${statRow('📯', quietStats.challengesSent.value, `Duels Started${rankSuffix(quietStats.challengesSent.rank)}`, 'Matches you started aimed directly at one person — this is what starts a Duel.', 'challengesSent')}
       ${statRow('🎯', quietStats.counter.value, `Counter${rankSuffix(quietStats.counter.rank)}`, 'Times you fired back after being challenged.', 'counter')}
       ${statRow('✍️', quietStats.wordsPlayed.value, `Words Played${rankSuffix(quietStats.wordsPlayed.rank)}`, 'Total words answered across every match, right or wrong.', 'wordsPlayed')}
       ${statRow('📅', globalStats.myActiveDays, `Active Days${rankSuffix(globalStats.activeDaysRank)}`, 'Number of different days you\'ve played a match.', 'activeDays')}
@@ -2398,7 +2400,7 @@ const STAT_META = {
   avgScore: { icon: '⚖️', label: 'Avg Score' },
   streak: { icon: '🔥', label: 'Day Streak' }, crowns: { icon: '👑', label: 'Crowns Held' },
   wordsPlayed: { icon: '✍️', label: 'Words Played' },
-  challengesSent: { icon: '📯', label: 'Challenges Sent' },
+  challengesSent: { icon: '📯', label: 'Duels Started' },
   counter: { icon: '🎯', label: 'Counter' },
   joinMatch: { icon: '⚔️', label: 'Join Match' },
 };
@@ -3392,7 +3394,7 @@ async function renderScorecard(correct, points, newBadges) {
     const card = document.createElement('div');
     card.className = 'forced-flow-card';
     if (iWon === false) {
-      card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Match, aimed straight at whoever's currently the Game Champion.</div>`;
+      card.innerHTML = `<div class="forced-flow-text">So close! The fastest way to level up is to challenge them right back — a brand-new Match, aimed straight at whoever's currently holding the crown.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
       btn.textContent = `Duel ${displayName(champRow.username)} Back`;

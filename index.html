@@ -258,7 +258,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .tabs-sub .tab { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; font-size: 12px; cursor: pointer; border: none; color: var(--cream-dim); opacity: 0.75; }
 .tabs-sub .tab.active { color: var(--teal); background: var(--ink-card); opacity: 1; }
 .global-rank-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); background: rgba(212,175,55,0.08); margin-bottom: 10px; }
-.badge-showcase { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .notif-banner { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-radius: 10px; margin-bottom: 12px; background: rgba(79,182,168,0.08); border: 1px solid var(--teal-dim); font-size: 13px; }
 .notif-banner button { width: auto; padding: 8px 14px; font-size: 13px; flex-shrink: 0; }
 </style>
@@ -436,7 +435,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="trial-leaderboard-list"></div>
     <div class="btn-row" style="margin-top:14px;">
       <button class="btn-primary" id="btn-trial-play">Play this Match</button>
-      <button class="share-icon-btn" id="btn-trial-send">🔗 Send</button>
+      <button class="share-icon-btn" id="btn-trial-send">📤 Share</button>
     </div>
   </section>
 
@@ -849,11 +848,6 @@ async function computeDuelRecordLifetime(userA, userB) {
   });
   return { wins, losses, ties, total: wins + losses + ties };
 }
-async function duelSuffix(opponent) {
-  const record = await computeDuelRecordLifetime(me, opponent);
-  if (record.total === 0) return '';
-  return ` — you're ${record.wins}-${record.losses}${record.ties ? ` (${record.ties} tie${record.ties > 1 ? 's' : ''})` : ''} against them`;
-}
 
 // Consecutive-win streak in the head-to-head between userA and userB, from
 // userA's point of view, most-recent duel first. A tie is skipped (neither
@@ -993,7 +987,6 @@ function displayName(u) {
   const name = (u || '').toUpperCase();
   return name.length > 12 ? name.slice(0, 11) + '…' : name;
 }
-function titleCaseName(u) { u = u || ''; return u.charAt(0).toUpperCase() + u.slice(1).toLowerCase(); }
 
 // Turns a list of usernames into natural, personal wording — "X and Y", "X,
 // Y, and Z" — deduping repeats (same person triggering multiple events).
@@ -1023,7 +1016,7 @@ async function shareRound(r) {
   const matchNum = r.trial_number;
   let body;
   if (champRow && champRow.username !== me) {
-    body = `${displayName(champRow.username)} is holding the crown at ${champRow.score_points} pts in Match #${matchNum}. Think you can take his crown?`;
+    body = `${displayName(champRow.username)} is holding the crown at ${champRow.score_points} pts in Match #${matchNum}. Think you can take the crown?`;
   } else if ((lbRows || []).length <= 1) {
     body = `I just issued a challenge. ${champRow ? champRow.score_points : ''} pts in Match #${matchNum}. Think you can beat the mighty ${displayName(me)}?`;
   } else {
@@ -1067,16 +1060,6 @@ async function pickRoundWords() {
   const remaining = pool.slice(0, needed);
   return shuffle([...reviewPicks, ...remaining]).map(w => w.id);
 }
-function fmtDate(d) { return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
-function timeLeft(expiresAt) {
-  const ms = new Date(expiresAt) - new Date();
-  if (ms <= 0) return 'expired';
-  const h = Math.floor(ms / 3600000);
-  if (h < 1) return `${Math.floor(ms / 60000)}m left`;
-  if (h < 24) return `${h}h left`;
-  return `${Math.floor(h / 24)}d left`;
-}
-
 // ---------------------------------------------------------------
 // STATE
 // ---------------------------------------------------------------
@@ -1266,6 +1249,7 @@ async function checkDethronements() {
   await sb.from('dethronement_events').update({ notified: true }).in('id', ids);
   let text;
   const btn = $('btn-dethroned-ok');
+  btn.disabled = false;
   if (events.length === 1) {
     const e = events[0];
     const target = e.dethroned_by_username;
@@ -1280,14 +1264,14 @@ async function checkDethronements() {
     // it's one-shot). Tapping the button now immediately starts the fresh
     // revenge duel instead, same as every other "duel them back" in the app.
     btn.textContent = `Duel ${displayName(target)} Back`;
-    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); startNewRound(target, true, e.rounds.room_id); };
+    btn.onclick = () => { btn.disabled = true; $('dethroned-modal').classList.add('hidden'); startNewRound(target, true, e.rounds.room_id); };
   } else {
     const first = events[0];
     const firstTarget = first.dethroned_by_username;
     const restCount = events.length - 1;
     text = `${displayName(firstTarget)} took your crown on Match #${first.rounds.trial_number}${restCount ? ` — plus ${restCount} more crown${restCount > 1 ? 's' : ''} taken` : ''}.`;
     btn.textContent = `Duel ${displayName(firstTarget)} Back`;
-    btn.onclick = () => { $('dethroned-modal').classList.add('hidden'); startNewRound(firstTarget, true, first.rounds.room_id); };
+    btn.onclick = () => { btn.disabled = true; $('dethroned-modal').classList.add('hidden'); startNewRound(firstTarget, true, first.rounds.room_id); };
   }
   const { data: seenBefore } = await sb.from('reminders_shown').select('*').eq('username', me).eq('reminder_key', 'first_dethroned').maybeSingle();
   if (!seenBefore) {
@@ -1357,6 +1341,7 @@ async function checkRepelled() {
   await sb.from('dethronement_events').update({ notified: true }).in('id', ids);
   let text;
   const rpBtn = $('btn-repelled-ok');
+  rpBtn.disabled = false;
   if (events.length === 1) {
     const e = events[0];
     const target = e.dethroned_by_username;
@@ -1376,7 +1361,7 @@ async function checkRepelled() {
       : `${displayName(target)} came for your crown on Match #${e.rounds.trial_number} and lost — but it's since moved on to ${displayName(lb[0].username)} anyway.`;
     text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     rpBtn.textContent = `Duel ${displayName(target)} Again`;
-    rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(target, true, e.rounds.room_id); };
+    rpBtn.onclick = () => { rpBtn.disabled = true; $('repelled-modal').classList.add('hidden'); startNewRound(target, true, e.rounds.room_id); };
   } else {
     const first = events[0];
     const firstTarget = first.dethroned_by_username;
@@ -1395,7 +1380,7 @@ async function checkRepelled() {
       : `${displayName(firstTarget)} came for your crown on Match #${first.rounds.trial_number} and lost${restCount ? ` — plus ${restCount} more attempt${restCount > 1 ? 's' : ''} failed` : ''} — but it's since moved on to ${displayName(lb[0].username)} anyway.`;
     text = `${eventLine}\n${crownLine}`;
     rpBtn.textContent = `Duel ${displayName(firstTarget)} Again`;
-    rpBtn.onclick = () => { $('repelled-modal').classList.add('hidden'); startNewRound(firstTarget, true, first.rounds.room_id); };
+    rpBtn.onclick = () => { rpBtn.disabled = true; $('repelled-modal').classList.add('hidden'); startNewRound(firstTarget, true, first.rounds.room_id); };
   }
   $('repelled-modal-text').textContent = text;
   $('repelled-modal').classList.remove('hidden');
@@ -1420,6 +1405,7 @@ async function checkTiedEvents() {
   let text;
   tiedFocusRound = events.length === 1 ? events[0].rounds : null;
   const tdBtn = $('btn-tied-ok');
+  tdBtn.disabled = false;
   if (events.length === 1) {
     const e = events[0];
     const other = e.dethroned_username === me ? e.dethroned_by_username : e.dethroned_username;
@@ -1443,7 +1429,7 @@ async function checkTiedEvents() {
   $('tied-modal-text').textContent = text;
   $('tied-modal').classList.remove('hidden');
 }
-$('btn-tied-ok').onclick = () => { $('tied-modal').classList.add('hidden'); focusMatchCard(tiedFocusRound); };
+$('btn-tied-ok').onclick = () => { $('btn-tied-ok').disabled = true; $('tied-modal').classList.add('hidden'); focusMatchCard(tiedFocusRound); };
 
 async function checkNewChallenges() {
   if (anyDuelPopupOpen()) return;
@@ -1458,6 +1444,7 @@ async function checkNewChallenges() {
   if (fresh.length === 0) return;
   let text;
   const chBtn = $('btn-challenged-ok');
+  chBtn.disabled = false;
   if (fresh.length === 1) {
     const { data: lb } = await sb.from('trial_leaderboard').select('username, score_points, played_at').eq('round_id', fresh[0].id).order('rank').order('played_at').limit(1);
     const champ = (lb && lb[0]) || null;
@@ -1472,13 +1459,13 @@ async function checkNewChallenges() {
       : `${displayName(fresh[0].creator_username)} challenged you to Match #${fresh[0].trial_number}.`;
     text = `${eventLine}\n${crownLine}${recordLine ? '\n' + recordLine : ''}`;
     chBtn.textContent = 'Accept the Duel';
-    chBtn.onclick = () => { $('challenged-modal').classList.add('hidden'); startRound(fresh[0]); };
+    chBtn.onclick = () => { chBtn.disabled = true; $('challenged-modal').classList.add('hidden'); startRound(fresh[0]); };
   } else {
     const first = fresh[0];
     const restCount = fresh.length - 1;
     text = `${displayName(first.creator_username)} challenged you to Match #${first.trial_number}${restCount ? ` — plus ${restCount} more duel${restCount > 1 ? 's' : ''} waiting` : ''}.`;
     chBtn.textContent = 'Accept the Duel';
-    chBtn.onclick = () => { $('challenged-modal').classList.add('hidden'); startRound(first); };
+    chBtn.onclick = () => { chBtn.disabled = true; $('challenged-modal').classList.add('hidden'); startRound(first); };
   }
   $('challenged-modal-text').textContent = text;
   $('challenged-modal').classList.remove('hidden');
@@ -1506,14 +1493,6 @@ const BADGE_META = {
 };
 
 const MIN_GAMES_TO_RANK = 2;
-const TIER_BANDS = [
-  { min: 900, name: 'Grandmaster' },
-  { min: 700, name: 'Sage' },
-  { min: 500, name: 'Scholar' },
-  { min: 300, name: 'Wordsmith' },
-  { min: 0, name: 'Novice' },
-];
-function tierForScore(avgScore) { return TIER_BANDS.find(t => avgScore >= t.min).name; }
 
 const SCORE_COMMENTS = [
   { min: 900, lines: ['Flawless run — Grandmaster form!', 'Certified word wizard.', 'The GP examiners are shaking.'] },
@@ -1655,33 +1634,6 @@ async function renderStatusRow() {
     const collapsed = more.classList.toggle('hidden');
     $('home-stats-toggle').textContent = collapsed ? `▸ ${moreCount} more stats` : '▾ Show less';
   };
-}
-
-const HOME_BADGE_CAP = 4;
-async function renderBadgeShowcase() {
-  const holder = $('badge-showcase-holder');
-  holder.innerHTML = '';
-  const { data: rows } = await sb.from('badges').select('badge_key').eq('username', me);
-  const uniqueKeys = [...new Set((rows || []).map(r => r.badge_key))];
-  if (uniqueKeys.length === 0) return;
-  uniqueKeys.sort((a, b) => (BADGE_META[b]?.rarity || 0) - (BADGE_META[a]?.rarity || 0));
-  const row = document.createElement('div');
-  row.className = 'badge-showcase';
-  uniqueKeys.slice(0, HOME_BADGE_CAP).forEach(key => {
-    const meta = BADGE_META[key] || { emoji: '🏅', label: key };
-    const chip = document.createElement('span');
-    chip.className = 'badge-chip';
-    chip.textContent = `${meta.emoji} ${meta.label}`;
-    row.appendChild(chip);
-  });
-  if (uniqueKeys.length > HOME_BADGE_CAP) {
-    const more = document.createElement('span');
-    more.className = 'badge-chip badge-chip-more';
-    more.textContent = `+${uniqueKeys.length - HOME_BADGE_CAP} more`;
-    more.onclick = () => openPlayerProfile(me);
-    row.appendChild(more);
-  }
-  holder.appendChild(row);
 }
 
 async function computeGlobalStatRankings(username) {
@@ -2046,6 +1998,20 @@ function matchStatusBadge(state) {
   // slightly less specific in that one rare case.
   return { badge: '⚔️ take the crown', badgeClass: 'open-invite' };
 }
+// Shared with matchStatusBadge's reasoning above: this text is more
+// specific than the badge (mentions "you'd be first"), so unlike the badge
+// it's worth keeping the champ-check rather than collapsing it — but it
+// was being hand-typed identically in two separate render functions
+// (Room's Match list, and the "N more open Matches" forced-flow card),
+// which is exactly the kind of duplication that let a stale gendered
+// pronoun survive in two copies of the share-message logic earlier. One
+// source of truth here instead.
+function matchBadgeInfo(state, champ) {
+  if (state === 'champion') return 'You\'re the current crown holder on this Match.';
+  if (state === 'losing') return 'Someone took the crown here — this Match is done, but you can duel them back with a fresh one.';
+  if (state === 'challenged_back' || state === 'targeted') return 'Someone is duelling you for the crown on this Match.';
+  return champ ? 'Open to anyone in the room — take the crown for yourself.' : 'Nobody\'s played this Match yet — you\'d be first.';
+}
 async function loadDares() {
   const myToken = ++daresLoadToken;
   const list = $('dares-list');
@@ -2089,20 +2055,16 @@ async function loadDares() {
 
     let statusLine, rankLine = '';
     const { badge, badgeClass } = matchStatusBadge(state);
-    let badgeInfo;
+    const badgeInfo = matchBadgeInfo(state, champ);
     if (state === 'champion') {
-      badgeInfo = 'You\'re the current crown holder on this Match.';
       statusLine = `${myRow.score_points} pts`;
       rankLine = `#1 of ${rows.length}`;
     } else if (state === 'losing') {
-      badgeInfo = 'Someone took the crown here — this Match is done, but you can duel them back with a fresh one.';
       statusLine = `👑 ${displayName(champ.username)} — ${champ.score_points} pts`;
       rankLine = `#${myRow.rank} of ${rows.length}`;
     } else if (state === 'challenged_back' || state === 'targeted') {
-      badgeInfo = 'Someone is duelling you for the crown on this Match.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     } else {
-      badgeInfo = champ ? 'Open to anyone in the room — take the crown for yourself.' : 'Nobody\'s played this Match yet — you\'d be first.';
       statusLine = champ ? `👑 ${displayName(champ.username)} — ${champ.score_points} pts` : 'nobody has played yet';
     }
 
@@ -2193,14 +2155,15 @@ async function openTrialScreen(round) {
   });
 
   const playBtn = $('btn-trial-play');
+  playBtn.disabled = false;
   if (!iPlayed) {
     playBtn.classList.remove('hidden');
     playBtn.textContent = champ ? `⚔️ Take the Crown` : '☝️ Start the Duel';
-    playBtn.onclick = () => startRound(round);
+    playBtn.onclick = () => { playBtn.disabled = true; startRound(round); };
   } else if (myRow.rank !== 1) {
     playBtn.classList.remove('hidden');
     playBtn.textContent = `Duel Back`;
-    playBtn.onclick = () => startNewRound(champ.username, true);
+    playBtn.onclick = () => { playBtn.disabled = true; startNewRound(champ.username, true); };
   } else {
     playBtn.classList.add('hidden');
   }
@@ -2262,11 +2225,6 @@ function pickStrongestDuel(candidates) {
     if (!best || net > best.net || (net === best.net && record.total > best.record.total)) best = { opponent, record, net };
   }
   return best;
-}
-
-function ordinal(n) {
-  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
 async function computeRoomStatRankings(roomId) {
@@ -3349,20 +3307,7 @@ async function renderScorecard(correct, points, newBadges) {
     scoreLbList.appendChild(div);
   });
 
-  $('btn-challenge-others').onclick = () => {
-    const url = `${location.origin}${location.pathname}?room=${currentRoom.code}&round=${currentRound.short_code}`;
-    const header = `🎯 MAXWORD — GP Vocabulary Showdown\n`;
-    const matchNum = currentRound.trial_number;
-    let body;
-    if (champRow && champRow.username !== me) {
-      body = `${displayName(champRow.username)} is holding the crown at ${champRow.score_points} pts in Match #${matchNum}. Think you can take his crown?`;
-    } else if ((lbRows || []).length === 1) {
-      body = `I just issued a challenge. ${points} pts in Match #${matchNum}. Think you can beat the mighty ${displayName(me)}?`;
-    } else {
-      body = `Yours truly, ${displayName(me)}, is undefeated with ${points} pts in Match #${matchNum}. Think you can defeat me?`;
-    }
-    shareText(`${header}${body}\n\n${url}`);
-  };
+  $('btn-challenge-others').onclick = () => shareRound(currentRound);
 
   // The follow-up action, honest about what actually happened (no dead ends,
   // no fake urgency on an outcome that doesn't warrant it):
@@ -3451,7 +3396,7 @@ async function renderScorecard(correct, points, newBadges) {
       laterBtn.onclick = () => openRoom(currentRoom);
       card.appendChild(laterBtn);
     } else {
-      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! Every Match you play feeds your overall average, and that average is what your Leaderboard position is based on.</div>`;
+      card.innerHTML = `<div class="forced-flow-text">Two down — you're now ranked! Every Match is a shot at the crown, and your Leaderboard position is built from how many you're currently holding — not your average score.</div>`;
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
       btn.textContent = 'See my Game Room';
@@ -3496,9 +3441,7 @@ async function renderOtherDares(iWon) {
     const champ = champByRound[r.id] || null;
     const state = computeMatchState(r, null);
     const { badge, badgeClass } = matchStatusBadge(state);
-    const badgeInfo = state === 'unplayed'
-      ? (champ ? 'Open to anyone in the room — take the crown for yourself.' : 'Nobody\'s played this Match yet — you\'d be first.')
-      : 'Someone is duelling you for the crown on this Match.';
+    const badgeInfo = matchBadgeInfo(state, champ);
     const div = document.createElement('div');
     div.className = 'trial-card state-targeted';
     div.dataset.roundId = r.id;

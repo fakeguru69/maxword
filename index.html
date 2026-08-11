@@ -43,7 +43,19 @@ h1, h2, h3, .display { font-family: 'Cinzel', serif; letter-spacing: 0.02em; mar
    button rows below) can end up placed below the actually-visible area
    whenever the address bar IS showing, as in the cutoff screenshot. dvh
    tracks the real, current visible height instead. */
-.app { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding: 14px 18px 40px; display: flex; flex-direction: column; gap: 12px; }
+.app { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding: 14px 0 40px; display: flex; flex-direction: column; gap: 8px; }
+/* Cards used to sit inset from the true screen edge by .app's own side
+   padding (18px), while the fixed button row (added earlier) has no side
+   padding of its own and sits flush to the real edge — that mismatch is
+   what created the visible gap between the card border and the buttons
+   below it. Moved the 18px inset out of .app and onto the two elements
+   that need it directly (.seal, .footnote) so every .card now stretches
+   flush to the same edge the button row already uses — matching widths,
+   no more gap. Each .card keeps its own 18px padding, so the text/content
+   inside doesn't move at all, only the border/background now reaches
+   further out. */
+.seal { padding: 0 18px; }
+.app > .footnote { padding: 0 18px; }
 .hidden { display: none !important; }
 .seal { display: flex; align-items: center; gap: 12px; }
 .seal-mark { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--gold); display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; color: var(--gold); font-weight: 700; background: radial-gradient(circle, rgba(212,175,55,0.15), transparent 70%); flex-shrink: 0; }
@@ -104,7 +116,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .option-btn.wrong { border-color: var(--danger); background: rgba(192,85,74,0.12); color: var(--danger); }
 .reveal-sentence { margin-top: 14px; font-size: 14px; color: var(--cream-dim); border-left: 2px solid var(--gold-soft); padding-left: 12px; }
 .scorecard { text-align: center; padding: 20px 16px; }
-.scorecard .cat-eyebrow { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); margin-bottom: 10px; }
+.scorecard .cat-eyebrow { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); margin-bottom: 8px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--teal); text-shadow: 0 0 24px rgba(79,182,168,0.35); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
 .scorecard .score-comment { font-size: 16px; font-weight: 600; font-style: italic; color: var(--cream-dim); margin-bottom: 10px; }
@@ -126,7 +138,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    standings list or "Back to room" button once they're no longer
    pushed down by an in-flow element. */
 #normal-scorecard-actions .btn-row {
-  position: fixed; left: 0; right: 0; bottom: 12px; z-index: 5;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
   max-width: 444px; margin: 0 auto;
   background: var(--ink-card); padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
@@ -136,7 +148,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    this screen has the identical risk (champion card + Duel Record +
    standings, all above the button). */
 #trial-actions-row {
-  position: fixed; left: 0; right: 0; bottom: 12px; z-index: 5;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
   max-width: 444px; margin: 0 auto;
   background: var(--ink-card); padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
@@ -161,7 +173,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .footnote { font-size: 11px; letter-spacing: -0.01em; color: var(--cream-dim); text-align: center; white-space: nowrap; }
 .error-text { color: var(--danger); font-size: 13px; margin-top: -8px; margin-bottom: 10px; }
 .empty-state { text-align: center; color: var(--cream-dim); font-size: 13px; padding: 20px 10px; }
-.breadcrumb { font-size: 12px; color: var(--cream-dim); padding: 0; margin-bottom: 6px; text-decoration: none; }
+.breadcrumb { font-size: 12px; color: var(--cream-dim); padding: 0; margin-bottom: 4px; text-decoration: none; }
 .breadcrumb:active { color: var(--teal); }
 .member-line { font-size: 12px; color: var(--cream-dim); margin-top: 2px; margin-bottom: 6px; }
 .member-line .manage-link { color: var(--teal); text-decoration: underline; cursor: pointer; }
@@ -213,17 +225,17 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-tag { font-size: 12px; color: var(--cream-dim); }
 .trial-tag.status { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
 .trial-tag.status.losing { border-color: var(--danger); color: #F0A898; }
-.trial-header { text-align: center; margin-bottom: 14px; }
+.trial-header { text-align: center; margin-bottom: 8px; }
 .trial-header .trial-number { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
 .champion-banner { text-align: center; }
 .champion-banner .crown { font-size: 30px; margin-bottom: 4px; }
 .champion-banner .champ-name { font-family: 'Cinzel', serif; font-weight: 700; color: var(--gold); font-size: 22px; margin-top: 6px; letter-spacing: 0.02em; }
 .champ-pts { color: var(--teal); font-size: 15px; font-weight: 700; margin-top: 4px; }
-.card-one { border: 1px solid var(--gold); background: var(--ink-card); border-radius: 14px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 0 24px rgba(212,175,55,0.06); }
-.zone-hero { text-align: center; padding: 22px 16px 18px; }
+.card-one { border: 1px solid var(--gold); background: var(--ink-card); border-radius: 14px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 0 24px rgba(212,175,55,0.06); }
+.zone-hero { text-align: center; padding: 16px 16px 14px; }
 .zone-duel { border-top: 1px solid rgba(212,175,55,0.4); background: rgba(212,175,55,0.05); padding: 16px; text-align: center; }
 .verdict-line { font-size: 15px; font-weight: 700; color: var(--gold); margin-top: 12px; line-height: 1.4; }
-.standings-label { font-size: 11px; color: var(--cream-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 4px 0 8px; text-align: center; }
+.standings-label { font-size: 11px; color: var(--cream-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 2px 0 4px; text-align: center; }
 .dethroned-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(192,85,74,0.15); border: 1px solid var(--danger); color: #F0A898; font-weight: 600; }
 .challenged-banner { text-align: center; padding: 14px; border-radius: 12px; margin-bottom: 14px; background: rgba(212,175,55,0.12); border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
 .urgency-banner { font-size: 12px; text-align: center; padding: 8px; border-radius: 8px; margin-bottom: 10px; background: rgba(192,85,74,0.1); color: #E08A6B; }
@@ -470,7 +482,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <section id="view-trial" class="card hidden">
     <button class="link-btn breadcrumb" id="btn-trial-back">&larr; Back to room</button>
     <div class="trial-header">
-      <div class="trial-number">📜 Match #<span id="trial-number-display"></span></div>
+      <div class="trial-number">Match #<span id="trial-number-display"></span></div>
       <div class="trial-tags" id="trial-tags"></div>
     </div>
     <div id="trial-urgency-holder"></div>
@@ -646,7 +658,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
   <!-- SCORECARD -->
   <section id="view-scorecard" class="card hidden">
     <div class="scorecard">
-      <div class="cat-eyebrow" id="score-eyebrow">📜 Match #</div>
+      <div class="cat-eyebrow" id="score-eyebrow">Match #</div>
       <div class="card-one">
         <div class="zone-hero">
           <div class="big-score" id="score-big"></div>
@@ -3235,7 +3247,7 @@ async function maybeAwardBadges(correct) {
 }
 
 async function renderScorecard(correct, points, newBadges) {
-  $('score-eyebrow').textContent = `📜 Match #${currentRound.trial_number}`;
+  $('score-eyebrow').textContent = `Match #${currentRound.trial_number}`;
   $('score-big').textContent = `${points} pts`;
   $('score-grid').innerHTML = roundAnswers.map(a => `<span>${a ? '🟩' : '⬛'}</span>`).join('');
   $('score-comment').textContent = commentForScore(points);

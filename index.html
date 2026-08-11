@@ -33,9 +33,17 @@ html, body {
   color: var(--cream);
   font-family: 'Space Grotesk', sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 h1, h2, h3, .display { font-family: 'Cinzel', serif; letter-spacing: 0.02em; margin: 0; }
-.app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 14px 18px 40px; display: flex; flex-direction: column; gap: 12px; }
+/* dvh (dynamic viewport height) second on purpose, as an override for
+   browsers that support it, with 100vh as the fallback for those that
+   don't — vh is calculated as if the browser's address bar were never
+   showing, so anything sized/positioned off of it (including our sticky
+   button rows below) can end up placed below the actually-visible area
+   whenever the address bar IS showing, as in the cutoff screenshot. dvh
+   tracks the real, current visible height instead. */
+.app { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding: 14px 18px 40px; display: flex; flex-direction: column; gap: 12px; }
 .hidden { display: none !important; }
 .seal { display: flex; align-items: center; gap: 12px; }
 .seal-mark { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--gold); display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; color: var(--gold); font-weight: 700; background: radial-gradient(circle, rgba(212,175,55,0.15), transparent 70%); flex-shrink: 0; }
@@ -111,7 +119,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    list scrolling underneath would show through it. */
 #normal-scorecard-actions .btn-row {
   position: sticky; bottom: 12px; z-index: 5;
-  background: var(--ink); padding: 4px 0;
+  background: var(--ink-card); padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 /* Same treatment, same reasoning, for Match Detail's play/share row —
@@ -119,7 +127,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    standings, all above the button). */
 #trial-actions-row {
   position: sticky; bottom: 12px; z-index: 5;
-  background: var(--ink); padding: 4px 0;
+  background: var(--ink-card); padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }

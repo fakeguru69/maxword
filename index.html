@@ -119,33 +119,35 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    viewport-unit quirks. Trade-off, and it's a good one: the row is now
    ALWAYS visible while on this screen, not just "catches" near the
    bottom like sticky did — strictly more reliable for "make sure this is
-   always reachable." Needs left/right:0 + max-width/margin to match
-   .app's centered column, since fixed no longer respects the parent's
-   layout the way sticky did. The container padding-bottom additions
-   below give the row's own height clearance so it doesn't cover the
-   standings list or "Back to room" button once they're no longer
-   pushed down by an in-flow element. */
+   always reachable." The container padding-bottom additions below give
+   the row's own height clearance so it doesn't cover the standings list
+   or "Back to room" button once they're no longer pushed down by an
+   in-flow element. */
 /* Bottom bar is intentionally NOT nested inside .card — position:fixed
-   would ignore the card's own padding either way, so instead this bar
-   mirrors .app's own box model exactly (same max-width, same 18px side
-   padding, same centering), which puts its buttons at exactly the same
-   horizontal position as the card's edge above it, on any screen width. */
-#normal-scorecard-actions .btn-row {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 5;
-  width: 100%; max-width: 480px; box-sizing: border-box;
-  background: var(--ink-card); padding: 4px 18px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-}
-#normal-scorecard-actions { padding-bottom: 110px; }
-/* Same treatment, same reasoning, for Match Detail's play/share row —
-   this screen has the identical risk (champion card + Duel Record +
-   standings, all above the button). */
+   would ignore the card's own padding either way, so instead this bar's
+   own box is sized/centered to match .card's actual on-screen width
+   directly (width: calc(100% - 36px); max-width: 444px — mirroring
+   .app's 480px max-width minus its 18px+18px side padding), rather than
+   being a full-viewport box with internal padding. That keeps both the
+   buttons AND the ink-card backdrop panel aligned with the card's edges
+   above it, on any screen width. */
+/* Aug 12 fix: bar's own box now matches .card's width (calc(100% - 36px),
+   max-width 444 = 480-36) instead of being a full-viewport-width box with
+   only internal padding. Previously the ink-card BACKGROUND covered the
+   full-width box (edge-to-edge, no inset) while the buttons inside it were
+   pushed in by padding — so the buttons lined up with the card above but
+   the grey-blue backdrop panel was visibly wider than the card. Shrinking
+   the box itself (not just its padding) makes the backdrop's width and
+   inset match the card's exactly. */
+#normal-scorecard-actions .btn-row,
 #trial-actions-row {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 5;
-  width: 100%; max-width: 480px; box-sizing: border-box;
-  background: var(--ink-card); padding: 4px 18px;
+  width: calc(100% - 36px); max-width: 444px; box-sizing: border-box;
+  background: var(--ink-card); padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  border-radius: var(--radius) var(--radius) 0 0;
 }
+#normal-scorecard-actions { padding-bottom: 110px; }
 #view-trial { padding-top: 10px; padding-bottom: 110px; }
 .badge-chip { display: inline-block; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(212,175,55,0.12); color: var(--gold); border: 1px solid var(--gold-soft); margin: 3px; }
 .badge-chip-more { cursor: pointer; background: transparent; border-style: dashed; color: var(--cream-dim); }

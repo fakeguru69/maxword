@@ -116,9 +116,16 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    requiring a scroll to reach "Duel X Back"/"Share" at all. Opaque
    background is needed because Share (.btn-secondary) is transparent by
    design — without a solid backdrop behind the whole row, the standings
-   list scrolling underneath would show through it. */
+   list scrolling underneath would show through it.
+   bottom offset raised 12px→28px (Aug 11): the 100dvh fix confirmed
+   working in Chrome but NOT in Brave — screenshots at the same minute
+   showed Chrome fully clear, Brave still cutting the row off. Root cause
+   in Brave specifically not confirmed (can't test Brave directly), so
+   this is a defensive buffer increase rather than a diagnosed fix — more
+   clearance costs nothing on a browser that was already working, but
+   gives real room back to one that wasn't. */
 #normal-scorecard-actions .btn-row {
-  position: sticky; bottom: 12px; z-index: 5;
+  position: sticky; bottom: 28px; z-index: 5;
   background: var(--ink-card); padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
@@ -126,7 +133,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    this screen has the identical risk (champion card + Duel Record +
    standings, all above the button). */
 #trial-actions-row {
-  position: sticky; bottom: 12px; z-index: 5;
+  position: sticky; bottom: 28px; z-index: 5;
   background: var(--ink-card); padding: 4px 0;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }

@@ -43,19 +43,7 @@ h1, h2, h3, .display { font-family: 'Cinzel', serif; letter-spacing: 0.02em; mar
    button rows below) can end up placed below the actually-visible area
    whenever the address bar IS showing, as in the cutoff screenshot. dvh
    tracks the real, current visible height instead. */
-.app { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding: 14px 0 40px; display: flex; flex-direction: column; gap: 8px; }
-/* Cards used to sit inset from the true screen edge by .app's own side
-   padding (18px), while the fixed button row (added earlier) has no side
-   padding of its own and sits flush to the real edge — that mismatch is
-   what created the visible gap between the card border and the buttons
-   below it. Moved the 18px inset out of .app and onto the two elements
-   that need it directly (.seal, .footnote) so every .card now stretches
-   flush to the same edge the button row already uses — matching widths,
-   no more gap. Each .card keeps its own 18px padding, so the text/content
-   inside doesn't move at all, only the border/background now reaches
-   further out. */
-.seal { padding: 0 18px; }
-.app > .footnote { padding: 0 18px; }
+.app { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding: 14px 18px 40px; display: flex; flex-direction: column; gap: 8px; }
 .hidden { display: none !important; }
 .seal { display: flex; align-items: center; gap: 12px; }
 .seal-mark { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--gold); display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; color: var(--gold); font-weight: 700; background: radial-gradient(circle, rgba(212,175,55,0.15), transparent 70%); flex-shrink: 0; }
@@ -115,7 +103,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .option-btn.correct { border-color: var(--teal); background: rgba(79,182,168,0.12); color: var(--teal); }
 .option-btn.wrong { border-color: var(--danger); background: rgba(192,85,74,0.12); color: var(--danger); }
 .reveal-sentence { margin-top: 14px; font-size: 14px; color: var(--cream-dim); border-left: 2px solid var(--gold-soft); padding-left: 12px; }
-.scorecard { text-align: center; padding: 20px 16px; }
+.scorecard { text-align: center; padding: 20px 0; }
 .scorecard .cat-eyebrow { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); margin-bottom: 8px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--teal); text-shadow: 0 0 24px rgba(79,182,168,0.35); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
@@ -137,10 +125,15 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    below give the row's own height clearance so it doesn't cover the
    standings list or "Back to room" button once they're no longer
    pushed down by an in-flow element. */
+/* Bottom bar is intentionally NOT nested inside .card — position:fixed
+   would ignore the card's own padding either way, so instead this bar
+   mirrors .app's own box model exactly (same max-width, same 18px side
+   padding, same centering), which puts its buttons at exactly the same
+   horizontal position as the card's edge above it, on any screen width. */
 #normal-scorecard-actions .btn-row {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
-  max-width: 444px; margin: 0 auto;
-  background: var(--ink-card); padding: 4px 0;
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 5;
+  width: 100%; max-width: 480px; box-sizing: border-box;
+  background: var(--ink-card); padding: 4px 18px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 #normal-scorecard-actions { padding-bottom: 110px; }
@@ -148,9 +141,9 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
    this screen has the identical risk (champion card + Duel Record +
    standings, all above the button). */
 #trial-actions-row {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
-  max-width: 444px; margin: 0 auto;
-  background: var(--ink-card); padding: 4px 0;
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 5;
+  width: 100%; max-width: 480px; box-sizing: border-box;
+  background: var(--ink-card); padding: 4px 18px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
 #view-trial { padding-bottom: 110px; }
@@ -189,8 +182,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .example-card .example-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
 .example-card .example-sentence { font-size: 16px; line-height: 1.5; color: var(--cream); }
 .custom-question-input.hidden { display: none; }
-.share-icon-btn { background: transparent; color: var(--cream-dim); border: 1px solid var(--line); font-size: 14px; }
-.my-open-row .share-icon-btn { width: auto; flex: 0 0 auto; padding: 8px 12px; }
 .my-open-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; margin-bottom: 10px; border: 1px dashed var(--gold-soft); border-radius: 10px; font-size: 13px; color: var(--gold); background: rgba(212,175,55,0.05); }
 .section-label.strong { font-size: 16px; letter-spacing: 0.02em; text-transform: none; color: var(--cream); font-family: 'Cinzel', serif; margin: 16px 0 6px; }
 .account-name-line { font-size: 22px; font-weight: 700; font-family: 'Cinzel', serif; color: var(--gold); }
@@ -494,7 +485,7 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
     <div id="trial-leaderboard-list"></div>
     <div id="trial-actions-row" class="btn-row" style="margin-top:14px;">
       <button class="btn-primary" id="btn-trial-play">Play this Match</button>
-      <button class="share-icon-btn" id="btn-trial-send"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px; margin-right:4px;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>Share</button>
+      <button class="btn-gold-outline" id="btn-trial-send"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px; margin-right:4px;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>Share</button>
     </div>
   </section>
 
@@ -3381,11 +3372,6 @@ async function renderScorecard(correct, points, newBadges) {
   //   rather than pointing at a specific runner-up — "ready for another,"
   //   not "go beat this one specific person who has nothing to do with it."
   const dareBackBtn = $('btn-dare-back');
-  // Share reverts to its own default .btn-secondary (transparent, teal
-  // outline) instead of being forced to gold .btn-primary — the 📤 emoji
-  // has poor contrast against gold, and gold also wrongly implied Share
-  // was as primary an action as the actual Duel/Start button next to it.
-  // Matches Match Detail's Share button, which never had this problem.
   dareBackBtn.className = 'btn-primary';
   // This button is a fixed, reused element — not recreated per render — so
   // a disabled=true set by a PAST visit here (see the iWon===false branch

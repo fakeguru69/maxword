@@ -2270,7 +2270,16 @@ async function openTrialScreen(round) {
   playBtn.disabled = false;
   if (!iPlayed) {
     playBtn.classList.remove('hidden');
-    playBtn.textContent = champ ? `⚔️ Take the Crown` : '☝️ Start the Duel';
+    // Was always "Take the Crown"/"Start the Duel" regardless of state —
+    // but the Challenged popup for this EXACT same situation (someone
+    // named you directly, targeted/challenged_back) calls the action
+    // "Accept the Duel", and the badge just above this button already
+    // says "🎯 duelling you"/"🎯 duelling you back". Landing on this
+    // screen by tapping that badge instead of the popup silently swapped
+    // the vocabulary for the identical action — matched here now.
+    playBtn.textContent = (state === 'targeted' || state === 'challenged_back')
+      ? '🎯 Accept the Duel'
+      : (champ ? `⚔️ Take the Crown` : '☝️ Start the Duel');
     playBtn.onclick = () => { playBtn.disabled = true; startRound(round); };
   } else if (myRow.rank !== 1) {
     playBtn.classList.remove('hidden');

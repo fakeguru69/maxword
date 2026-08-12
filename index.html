@@ -112,7 +112,18 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .option-btn.wrong { border-color: var(--danger); background: rgba(192,85,74,0.12); color: var(--danger); }
 .reveal-sentence { margin-top: 14px; font-size: 14px; color: var(--cream-dim); border-left: 2px solid var(--gold-soft); padding-left: 12px; }
 .scorecard { text-align: center; padding: 8px 0 20px; }
-.scorecard .cat-eyebrow { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); margin-bottom: 8px; }
+/* Merged with .trial-header .trial-number — Match Detail's "Match #X" and
+   Scorecard's "Match #X" were two separately-typed rules that happened to
+   carry identical typography (font, weight, 32px, gold, same glow). One
+   rule now for the shared part; can't silently drift. margin-bottom stays
+   split: Scorecard's title sits directly above .card-one with nothing
+   between them, so it needs its own 8px. Match Detail's title has a
+   sibling (.trial-tags) inside the same .trial-header block first, and
+   .trial-header itself already carries the 8px before .card-one — adding
+   margin-bottom to the title too would double up and shove the tags row
+   down that didn't need moving. Checked before merging, not assumed. */
+.scorecard .cat-eyebrow, .trial-header .trial-number { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
+.scorecard .cat-eyebrow { margin-bottom: 8px; }
 .scorecard .big-score { font-family: 'Cinzel', serif; font-size: 44px; color: var(--teal); text-shadow: 0 0 24px rgba(79,182,168,0.35); }
 .scorecard .grid-emoji { display: grid; grid-template-columns: repeat(5, auto); justify-content: center; gap: 8px; font-size: 20px; margin: 14px 0; }
 .scorecard .score-comment { font-size: 16px; font-weight: 600; font-style: italic; color: var(--cream-dim); margin-bottom: 10px; }
@@ -234,7 +245,6 @@ button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 
 .trial-tag.status { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-weight: 600; }
 .trial-tag.status.losing { border-color: var(--danger); color: #F0A898; }
 .trial-header { text-align: center; margin-bottom: 8px; }
-.trial-header .trial-number { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; color: var(--gold); text-shadow: 0 0 18px rgba(212,175,55,0.35); }
 .champion-banner { text-align: center; }
 .champion-banner .crown { font-size: 30px; margin-bottom: 4px; }
 .champion-banner .champ-name { font-family: 'Cinzel', serif; font-weight: 700; color: var(--gold); font-size: 22px; margin-top: 6px; letter-spacing: 0.02em; }
